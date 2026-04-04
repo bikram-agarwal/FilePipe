@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.ui.screens.history
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,16 +8,19 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.insertSeparators
 import androidx.paging.map
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.HistoryStatusFilter
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
+import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import dev.bikram.filepipe.domain.model.isNoChangesRun
 import dev.bikram.filepipe.domain.usecase.UndoRunUseCase
+import dev.bikram.filepipe.ui.feedback.toUserMessage
 import dev.bikram.filepipe.ui.navigation.Screen
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +43,8 @@ enum class HistoryStatusSection {
     PARTIAL,
     NO_CHANGES,
     IN_PROGRESS,
+    CANCELLED,
+    UNDONE,
 }
 
 sealed interface HistoryItem {
@@ -65,7 +71,8 @@ data class HistoryUiState(
 class HistoryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val runHistoryRepository: RunHistoryRepository,
-    private val undoRunUseCase: UndoRunUseCase
+    private val undoRunUseCase: UndoRunUseCase,
+    @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     val filterRuleId: Long? = savedStateHandle.get<Long>(Screen.HistoryForRule.ARG_RULE_ID)
@@ -157,11 +164,7 @@ class HistoryViewModel @Inject constructor(
 
     fun undoRun(historyId: Long) = viewModelScope.launch {
         val result = undoRunUseCase(historyId)
-        _userMessage.value = when {
-            result.totalFailed == 0 -> "Undone: ${result.totalReversed} file(s) restored"
-            result.totalReversed == 0 -> "Undo failed: ${result.errors.firstOrNull() ?: "unknown error"}"
-            else -> "Partial undo: ${result.totalReversed} restored, ${result.totalFailed} failed"
-        }
+        _userMessage.value = result.toUserMessage(appContext)
     }
 
     private fun sortHistories(
@@ -220,10 +223,14 @@ class HistoryViewModel @Inject constructor(
         val partial = mutableListOf<RunHistory>()
         val noChanges = mutableListOf<RunHistory>()
         val inProgress = mutableListOf<RunHistory>()
+        val cancelled = mutableListOf<RunHistory>()
+        val undone = mutableListOf<RunHistory>()
         for (history in list) {
             when {
+                history.isEffectivelyUndone() -> undone.add(history)
                 history.isNoChangesRun() -> noChanges.add(history)
                 history.status == RunStatus.IN_PROGRESS -> inProgress.add(history)
+                history.status == RunStatus.CANCELLED -> cancelled.add(history)
                 history.status == RunStatus.FAILED -> failed.add(history)
                 history.status == RunStatus.PARTIAL_FAILURE -> partial.add(history)
                 history.status == RunStatus.SUCCESS -> successWork.add(history)
@@ -240,6 +247,8 @@ class HistoryViewModel @Inject constructor(
         appendSection(HistoryStatusSection.PARTIAL, partial)
         appendSection(HistoryStatusSection.NO_CHANGES, noChanges)
         appendSection(HistoryStatusSection.IN_PROGRESS, inProgress)
+        appendSection(HistoryStatusSection.CANCELLED, cancelled)
+        appendSection(HistoryStatusSection.UNDONE, undone)
         return result
     }
 
@@ -264,9 +273,11 @@ private fun RunHistory.matchesHistoryStatusFilter(filter: HistoryStatusFilter): 
     return when (filter) {
         HistoryStatusFilter.ALL -> true
         HistoryStatusFilter.SUCCESS ->
-            status == RunStatus.SUCCESS && !isNoChangesRun()
+            status == RunStatus.SUCCESS && !isNoChangesRun() && !isEffectivelyUndone()
         HistoryStatusFilter.FAILED -> status == RunStatus.FAILED
         HistoryStatusFilter.PARTIAL -> status == RunStatus.PARTIAL_FAILURE
         HistoryStatusFilter.NO_CHANGES -> isNoChangesRun()
+        HistoryStatusFilter.CANCELLED -> status == RunStatus.CANCELLED
+        HistoryStatusFilter.UNDONE -> isEffectivelyUndone()
     }
 }

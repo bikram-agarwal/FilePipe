@@ -1,8 +1,10 @@
 package dev.bikram.filepipe.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.TriggerType
@@ -20,10 +22,14 @@ data class RunHistoryEntity(
     val completedAt: Long? = null,
     val status: RunStatus,
     val totalFilesFound: Int = 0,
+    @ColumnInfo(defaultValue = "0")
+    val cancelledUnprocessedCount: Int = 0,
     val totalFilesMoved: Int = 0,
     val totalFilesFailed: Int = 0,
     val errorMessage: String? = null,
-    val isReversed: Boolean = false
+    val isReversed: Boolean = false,
+    @ColumnInfo(defaultValue = "MOVE")
+    val operationMode: OperationMode = OperationMode.MOVE
 )
 
 fun RunHistoryEntity.toDomain(): RunHistory = RunHistory(
@@ -35,8 +41,10 @@ fun RunHistoryEntity.toDomain(): RunHistory = RunHistory(
     completedAt = completedAt,
     status = status,
     totalFilesFound = totalFilesFound,
+    cancelledUnprocessedCount = cancelledUnprocessedCount,
     totalFilesMoved = totalFilesMoved,
     totalFilesFailed = totalFilesFailed,
     errorMessage = errorMessage,
-    isReversed = isReversed
+    isReversed = isReversed,
+    operationMode = operationMode
 )

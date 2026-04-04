@@ -12,14 +12,19 @@ import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.TriggerType
-import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
 import dev.bikram.filepipe.domain.usecase.ExecuteRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
+import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
+import dev.bikram.filepipe.manualrun.ManualRunForegroundCoordinator
 import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -49,6 +54,13 @@ sealed interface RulesRunNavigation {
     data object HistoryList : RulesRunNavigation
 }
 
+/** Where the sole in-run Cancel control is shown for manual runs. */
+sealed interface ManualRunCancelAnchor {
+    data object None : ManualRunCancelAnchor
+    data class SingleRule(val ruleId: Long) : ManualRunCancelAnchor
+    data object RunSelectedBar : ManualRunCancelAnchor
+}
+
 data class RulesUiState(
     val rules: List<Rule> = emptyList(),
     val staleRuleIds: Set<Long> = emptySet(),
@@ -57,6 +69,7 @@ data class RulesUiState(
     val selectedRuleIds: Set<Long> = emptySet(),
     val progressMap: Map<Long, RunProgress> = emptyMap(),
     val isRunning: Boolean = false,
+    val manualRunCancelAnchor: ManualRunCancelAnchor = ManualRunCancelAnchor.None,
     val previewState: PreviewState? = null,
     val isCompactMode: Boolean = false,
     val cardModeOverrides: Set<Long> = emptySet(),
@@ -74,7 +87,8 @@ class RulesViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val appShortcutsManager: AppShortcutsManager,
     private val pendingShortcutRepository: PendingShortcutRepository,
-    private val fileOperationRepository: FileOperationRepository
+    private val fileOperationRepository: FileOperationRepository,
+    private val manualRunForegroundCoordinator: ManualRunForegroundCoordinator
 ) : ViewModel() {
 
     // Eagerly so Room query starts before the UI renders, preventing an empty-state flash on cold start.
@@ -89,6 +103,7 @@ class RulesViewModel @Inject constructor(
     private val _cardModeOverrides = MutableStateFlow<Set<Long>>(emptySet())
     private val _sortKey = MutableStateFlow(HistorySortKey.LAST_RAN)
     private val _sortDirection = MutableStateFlow(HistorySortDirection.DESCENDING)
+    private val _manualRunCancelAnchor = MutableStateFlow<ManualRunCancelAnchor>(ManualRunCancelAnchor.None)
 
     private val sortedRulesFlow = combine(_rules, _sortKey, _sortDirection) { rules, sortKey, sortDirection ->
         sortRulesList(rules, sortKey, sortDirection)
@@ -122,6 +137,7 @@ class RulesViewModel @Inject constructor(
         .combine(_previewState) { state, preview -> state.copy(previewState = preview) }
         .combine(_isCompactMode) { state, compact -> state.copy(isCompactMode = compact) }
         .combine(_cardModeOverrides) { state, overrides -> state.copy(cardModeOverrides = overrides) }
+        .combine(_manualRunCancelAnchor) { state, anchor -> state.copy(manualRunCancelAnchor = anchor) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RulesUiState())
 
     private val _navigateAfterRun = MutableSharedFlow<RulesRunNavigation>(extraBufferCapacity = 1)
@@ -133,7 +149,27 @@ class RulesViewModel @Inject constructor(
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 
+    private var manualRunJob: Job? = null
+    private val manualRunJobLock = Any()
+
     fun clearUserMessage() { _userMessage.value = null }
+
+    fun cancelManualRun() {
+        viewModelScope.launch {
+            val toCancel = synchronized(manualRunJobLock) {
+                val current = manualRunJob
+                manualRunJob = null
+                current
+            }
+            toCancel?.cancel(CancellationException("User cancelled"))
+            toCancel?.join()
+            _manualRunCancelAnchor.value = ManualRunCancelAnchor.None
+            manualRunForegroundCoordinator.setManualRunActive(false)
+            if (toCancel == null) {
+                clearRunProgressOnly()
+            }
+        }
+    }
 
     init {
         viewModelScope.launch {
@@ -205,8 +241,12 @@ class RulesViewModel @Inject constructor(
         if (toDelete.isNotEmpty()) _deleteUndoEvent.emit(DeleteUndoEvent(toDelete))
     }
 
-    fun clearProgress() {
+    fun clearRunProgressOnly() {
         _progressMap.value = emptyMap()
+    }
+
+    fun clearProgress() {
+        clearRunProgressOnly()
         _selectedRuleIds.value = emptySet()
     }
 
@@ -238,61 +278,70 @@ class RulesViewModel @Inject constructor(
         rulesAutoExportTrigger.maybeExportAfterRuleChange()
     }
 
-    fun runSelected() = viewModelScope.launch {
+    fun runSelected() {
         val selected = _rules.value.filter { it.id in _selectedRuleIds.value && it.isEnabled }
-        if (selected.isEmpty()) return@launch
-
-        _progressMap.update {
-            selected.associate { rule ->
-                rule.id to RunProgress(
-                    ruleId = rule.id,
-                    ruleName = rule.name,
-                    progress = 0f
-                )
-            }
-        }
-
-        val results = executeRulesUseCase(
-            rules = selected,
-            triggerType = TriggerType.MANUAL,
-            onProgress = { progress ->
-                _progressMap.update { current -> current + (progress.ruleId to progress) }
-            }
-        )
-
-        when {
-            results.size == 1 -> _navigateAfterRun.emit(
-                RulesRunNavigation.HistoryDetail(results.first().historyId)
-            )
-            results.isNotEmpty() -> _navigateAfterRun.emit(RulesRunNavigation.HistoryList)
-        }
-        clearProgress()
+        enqueueManualRun(selected, ManualRunCancelAnchor.RunSelectedBar)
     }
 
-    fun runRule(rule: Rule) = viewModelScope.launch {
-        if (!rule.isEnabled) return@launch
+    fun runRule(rule: Rule) {
+        if (!rule.isEnabled) return
+        enqueueManualRun(listOf(rule), ManualRunCancelAnchor.SingleRule(rule.id))
+    }
 
-        _progressMap.value = mapOf(
-            rule.id to RunProgress(
-                ruleId = rule.id,
-                ruleName = rule.name,
-                progress = 0f
-            )
-        )
-
-        val results = executeRulesUseCase(
-            rules = listOf(rule),
-            triggerType = TriggerType.MANUAL,
-            onProgress = { progress ->
-                _progressMap.update { current -> current + (progress.ruleId to progress) }
+    /**
+     * Runs [rules] in-process for immediate start. [ManualRunForegroundService] is started from
+     * [MainActivity] when the app goes to background while a manual run is active.
+     *
+     * Uses a [CoroutineStart.LAZY] job so the slot can be updated before the previous runner is
+     * cancelled and joined, avoiding overlapping executions and stale [manualRunJob] identity.
+     */
+    private fun enqueueManualRun(rules: List<Rule>, anchor: ManualRunCancelAnchor) {
+        if (rules.isEmpty()) return
+        viewModelScope.launch {
+            val newJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
+                val selfJob = coroutineContext[Job]!!
+                manualRunForegroundCoordinator.setManualRunActive(true)
+                _manualRunCancelAnchor.value = anchor
+                _progressMap.value = rules.associate { rule ->
+                    rule.id to RunProgress(
+                        ruleId = rule.id,
+                        ruleName = rule.name,
+                        progress = 0f
+                    )
+                }
+                try {
+                    val results = executeRulesUseCase(rules, TriggerType.MANUAL) { progress ->
+                        _progressMap.update { current -> current + (progress.ruleId to progress) }
+                    }
+                    when {
+                        results.size == 1 ->
+                            _navigateAfterRun.emit(
+                                RulesRunNavigation.HistoryDetail(results.first().historyId)
+                            )
+                        results.isNotEmpty() ->
+                            _navigateAfterRun.emit(RulesRunNavigation.HistoryList)
+                    }
+                } catch (_: CancellationException) {
+                    // History finalized inside ExecuteRulesUseCase
+                } finally {
+                    manualRunForegroundCoordinator.setManualRunActive(false)
+                    synchronized(manualRunJobLock) {
+                        if (manualRunJob === selfJob) {
+                            manualRunJob = null
+                        }
+                    }
+                    _manualRunCancelAnchor.value = ManualRunCancelAnchor.None
+                    clearProgress()
+                }
             }
-        )
-
-        clearProgress()
-
-        val result = results.firstOrNull()
-        if (result != null) {
-            _navigateAfterRun.emit(RulesRunNavigation.HistoryDetail(result.historyId))
+            val previousJob = synchronized(manualRunJobLock) {
+                val old = manualRunJob
+                manualRunJob = newJob
+                old
+            }
+            previousJob?.cancel()
+            previousJob?.cancelAndJoin()
+            newJob.start()
         }
     }
 

@@ -35,6 +35,12 @@
             </intent-filter>
         </activity>
 
+        <!-- In-app manual run: promoted when app goes to background -->
+        <service
+            android:name=".manualrun.ManualRunForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <!-- WorkManager foreground service -->
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"

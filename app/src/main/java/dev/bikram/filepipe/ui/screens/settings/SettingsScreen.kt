@@ -687,7 +687,7 @@ fun SettingsScreen(
 
             // ── About ─────────────────────────────────────────────────────────
             item {
-                val context = LocalContext.current
+                val aboutContext = LocalContext.current
                 val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
                     .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
                 Column(modifier = Modifier.padding(top = 24.dp)) {
@@ -742,9 +742,9 @@ fun SettingsScreen(
                                             .clickable {
                                                 playTap()
                                                 val profileUrl =
-                                                    context.getString(R.string.about_author_github_profile_url)
+                                                    aboutContext.getString(R.string.about_author_github_profile_url)
                                                 runCatching {
-                                                    context.startActivity(
+                                                    aboutContext.startActivity(
                                                         Intent(Intent.ACTION_VIEW, Uri.parse(profileUrl))
                                                     )
                                                 }
@@ -765,7 +765,7 @@ fun SettingsScreen(
                                             playTap()
                                             val url = "https://github.com/$githubRepoForSourceLink"
                                             runCatching {
-                                                context.startActivity(
+                                                aboutContext.startActivity(
                                                     Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                                 )
                                             }

@@ -14,6 +14,7 @@ import dev.bikram.filepipe.domain.export.FileMovedBackupDto
 import dev.bikram.filepipe.domain.export.RunHistoryBackupDto
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunResult
 import dev.bikram.filepipe.domain.model.RunStatus
@@ -81,14 +82,20 @@ class RunHistoryRepository @Inject constructor(
     suspend fun getFilesForRunOnce(runHistoryId: Long): List<FileMoved> =
         fileMovedDao.getFilesForRunOnce(runHistoryId).map { it.toDomain() }
 
-    suspend fun startRun(ruleId: Long?, ruleName: String, triggerType: TriggerType): Long =
+    suspend fun startRun(
+        ruleId: Long?,
+        ruleName: String,
+        triggerType: TriggerType,
+        operationMode: OperationMode
+    ): Long =
         runHistoryDao.insertHistory(
             RunHistoryEntity(
                 ruleId = ruleId,
                 ruleName = ruleName,
                 triggeredBy = triggerType,
                 startedAt = System.currentTimeMillis(),
-                status = RunStatus.IN_PROGRESS
+                status = RunStatus.IN_PROGRESS,
+                operationMode = operationMode
             )
         )
 
@@ -99,6 +106,7 @@ class RunHistoryRepository @Inject constructor(
                 completedAt = result.completedAt,
                 status = result.status,
                 totalFilesFound = result.filesMoved.size,
+                cancelledUnprocessedCount = 0,
                 totalFilesMoved = result.totalMoved,
                 totalFilesFailed = result.totalFailed
             )
@@ -131,9 +139,57 @@ class RunHistoryRepository @Inject constructor(
         )
     }
 
+    suspend fun finishRunUserCancelled(historyId: Long, totalPlanned: Int) {
+        val history = runHistoryDao.getHistoryById(historyId) ?: return
+        runHistoryDao.updateHistory(
+            history.copy(
+                completedAt = System.currentTimeMillis(),
+                status = RunStatus.CANCELLED,
+                totalFilesFound = totalPlanned,
+                cancelledUnprocessedCount = totalPlanned,
+                totalFilesMoved = 0,
+                totalFilesFailed = 0,
+                errorMessage = null
+            )
+        )
+    }
+
+    suspend fun completeRunUserCancelledPartial(result: RunResult, totalPlanned: Int) {
+        val history = runHistoryDao.getHistoryById(result.historyId) ?: return
+        val unprocessed = (totalPlanned - result.filesMoved.size).coerceAtLeast(0)
+        runHistoryDao.updateHistory(
+            history.copy(
+                completedAt = result.completedAt,
+                status = RunStatus.CANCELLED,
+                totalFilesFound = totalPlanned,
+                cancelledUnprocessedCount = unprocessed,
+                totalFilesMoved = result.totalMoved,
+                totalFilesFailed = result.totalFailed,
+                errorMessage = null
+            )
+        )
+        fileMovedDao.insertFilesMoved(
+            result.filesMoved.map { fileMoved ->
+                FileMovedEntity(
+                    runHistoryId = result.historyId,
+                    fileName = fileMoved.fileName,
+                    sourceUri = fileMoved.sourceUri,
+                    destinationUri = fileMoved.destinationUri,
+                    fileSizeBytes = fileMoved.fileSizeBytes,
+                    movedAt = fileMoved.movedAt,
+                    success = fileMoved.success,
+                    skipped = fileMoved.skipped,
+                    errorMessage = fileMoved.errorMessage
+                )
+            }
+        )
+    }
+
     suspend fun markRunReversed(historyId: Long) {
         val history = runHistoryDao.getHistoryById(historyId) ?: return
-        runHistoryDao.updateHistory(history.copy(isReversed = true))
+        runHistoryDao.updateHistory(
+            history.copy(isReversed = true, status = RunStatus.UNDONE)
+        )
     }
 
     suspend fun deleteHistoryById(historyId: Long) {
@@ -162,6 +218,8 @@ class RunHistoryRepository @Inject constructor(
         for (dto in backupRuns) {
             val triggeredBy = runCatching { TriggerType.valueOf(dto.triggeredBy) }.getOrDefault(TriggerType.MANUAL)
             val status = runCatching { RunStatus.valueOf(dto.status) }.getOrDefault(RunStatus.SUCCESS)
+            val operationMode =
+                runCatching { OperationMode.valueOf(dto.operationMode) }.getOrDefault(OperationMode.MOVE)
             val filesFound = dto.files.size.coerceAtLeast(dto.totalFilesMoved + dto.totalFilesFailed)
             val entity = RunHistoryEntity(
                 id = 0L,
@@ -172,10 +230,12 @@ class RunHistoryRepository @Inject constructor(
                 completedAt = dto.completedAt,
                 status = status,
                 totalFilesFound = filesFound,
+                cancelledUnprocessedCount = dto.cancelledUnprocessedCount,
                 totalFilesMoved = dto.totalFilesMoved,
                 totalFilesFailed = dto.totalFilesFailed,
                 errorMessage = dto.errorMessage,
-                isReversed = dto.isReversed
+                isReversed = dto.isReversed,
+                operationMode = operationMode
             )
             val newHistoryId = runHistoryDao.insertHistory(entity)
             if (dto.files.isNotEmpty()) {

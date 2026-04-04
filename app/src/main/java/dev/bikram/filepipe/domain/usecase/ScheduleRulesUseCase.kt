@@ -108,12 +108,12 @@ class ScheduleRulesUseCase @Inject constructor(
                 val request = when (schedule.type) {
                     ScheduleType.EVERY_N_HOURS -> {
                         val hours = schedule.intervalHours?.toLong()?.coerceIn(1L, 24L) ?: 1L
-                        PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(hours, java.util.concurrent.TimeUnit.HOURS)
+                        PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(hours, TimeUnit.HOURS)
                     }
-                    ScheduleType.DAILY -> PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(1L, java.util.concurrent.TimeUnit.DAYS)
-                    ScheduleType.WEEKLY -> PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(7L, java.util.concurrent.TimeUnit.DAYS)
+                    ScheduleType.DAILY -> PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(1L, TimeUnit.DAYS)
+                    ScheduleType.WEEKLY -> PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(7L, TimeUnit.DAYS)
                 }
-                    .setInitialDelay(delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
                     .setInputData(inputData)
                     .addTag(batchTag)
                     .setConstraints(constraints)

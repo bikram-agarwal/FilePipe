@@ -105,7 +105,7 @@ class RuleDetailViewModel @Inject constructor(
     private val validateRuleUseCase: ValidateRuleUseCase,
     private val previewRuleUseCase: PreviewRuleUseCase,
     private val rulesAutoExportTrigger: RulesAutoExportTrigger,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val ruleId: Long = savedStateHandle[Screen.RuleDetail.ARG_RULE_ID] ?: Screen.RuleDetail.NEW_RULE_ID

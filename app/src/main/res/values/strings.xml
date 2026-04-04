@@ -17,6 +17,10 @@
     <string name="rule_card_destination_not_set">Not set</string>
     <string name="rule_card_to">To</string>
     <string name="rule_card_stale_folder_warning">One or more folders need re-selection — tap Edit</string>
+    <string name="rule_card_progress_moving_file">Moving %1$s (%2$d / %3$d)</string>
+    <string name="rule_card_progress_copying_file">Copying %1$s (%2$d / %3$d)</string>
+    <string name="rule_card_progress_files_moved_summary">%1$d / %2$d files moved</string>
+    <string name="rule_card_progress_files_copied_summary">%1$d / %2$d files copied</string>
     <string name="rule_delete_confirm">Delete rule?</string>
     <string name="rule_delete_message">This will also remove any scheduled runs for this rule.</string>
 
@@ -94,12 +98,21 @@
     <!-- History screen -->
     <string name="history_title">History</string>
     <string name="history_detail_title">Run details</string>
+    <string name="history_detail_files_moved_label">Files moved</string>
+    <string name="history_detail_files_copied_label">Files copied</string>
+    <string name="history_detail_undo_files">Undo (%d file(s))</string>
+    <string name="history_detail_not_processed_cancelled_label">Not processed (cancelled)</string>
     <string name="history_empty_title">No history yet</string>
     <string name="history_empty_subtitle">Run some rules to see your file move history here</string>
     <string name="history_triggered_manual">Manual</string>
     <string name="history_triggered_scheduled">Scheduled</string>
     <string name="history_files_moved">%d files moved</string>
+    <string name="history_files_copied">%d files copied</string>
     <string name="history_files_failed">%d failed</string>
+    <string name="history_files_cancelled_remaining">%d not processed (cancelled)</string>
+    <string name="history_file_summary_cancelled">Cancelled</string>
+    <string name="history_filter_cancelled">Cancelled</string>
+    <string name="history_status_header_cancelled">Cancelled</string>
     <string name="history_clear">Clear history</string>
     <string name="history_clear_content_description">Clear all history</string>
     <string name="history_clear_confirm_title">Clear all history?</string>
@@ -110,6 +123,16 @@
     <string name="status_partial">Partial</string>
     <string name="status_failed">Failed</string>
     <string name="status_in_progress">Running</string>
+    <string name="status_cancelled">Cancelled</string>
+    <string name="status_undone">Undone</string>
+
+    <string name="undo_success_restored">%d file(s) restored to the original folder</string>
+    <string name="undo_success_deleted_destination">%d file(s) deleted at destination</string>
+    <string name="undo_partial_restored">Partial undo: %1$d restored, %2$d failed</string>
+    <string name="undo_partial_deleted_destination">Partial undo: %1$d deleted at destination, %2$d failed</string>
+    <string name="undo_failed_prefix">Undo failed: %s</string>
+    <string name="undo_unknown_error">Unknown error</string>
+    <string name="history_detail_run_undone">This run has been undone.</string>
 
     <!-- Permission screen -->
     <string name="permission_title">Storage Access Required</string>
@@ -121,6 +144,14 @@
     <string name="notification_channel_desc">Shows progress when organizing files</string>
     <string name="notification_running">Running: %s</string>
     <string name="notification_running_batch">Running %d rules…</string>
+    <string name="notification_preparing">Preparing…</string>
+    <string name="notification_working">Working…</string>
+    <string name="notification_finishing">Finishing…</string>
+    <string name="notification_run_stopped_early">Stopped - not all files were processed</string>
+    <string name="notification_run_failed_abbr">Stopped: %1$s</string>
+    <string name="notification_moving_n_of_m">Moving %1$d of %2$d</string>
+    <string name="notification_copying_n_of_m">Copying %1$d of %2$d</string>
+    <string name="notification_batch_rule_file">%1$s · %2$s</string>
 
     <!-- Rule search -->
     <!-- History search / filter -->
@@ -134,6 +165,7 @@
     <string name="history_filter_failed">Failed</string>
     <string name="history_filter_partial">Partial</string>
     <string name="history_filter_no_changes">No changes</string>
+    <string name="history_filter_undone">Undone</string>
     <string name="history_view_by_date">By date</string>
     <string name="history_view_by_rule">By rule</string>
     <string name="history_group_menu">Group runs</string>
@@ -145,6 +177,7 @@
     <string name="history_status_header_partial">Partial</string>
     <string name="history_status_header_no_changes">No changes</string>
     <string name="history_status_header_in_progress">In progress</string>
+    <string name="history_status_header_undone">Undone</string>
 
     <!-- Onboarding wizard -->
     <string name="onboarding_wizard_title">Create your first rule</string>
@@ -263,6 +296,7 @@
     <string name="notification_summary_body_moved">%d files moved</string>
     <string name="notification_summary_body_copied">%d files copied</string>
     <string name="notification_summary_body_partial">%1$d moved, %2$d failed</string>
+    <string name="notification_summary_body_partial_copied">%1$d copied, %2$d failed</string>
 
     <!-- Advanced filters section -->
     <string name="advanced_section_title">Advanced filters</string>

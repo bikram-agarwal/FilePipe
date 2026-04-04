@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.data.local.database
 
 import androidx.room.TypeConverter
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.domain.model.TriggerType
@@ -33,4 +34,10 @@ class Converters {
 
     @TypeConverter
     fun toRunStatus(value: String): RunStatus = RunStatus.valueOf(value)
+
+    @TypeConverter
+    fun fromOperationMode(value: OperationMode): String = value.name
+
+    @TypeConverter
+    fun toOperationMode(value: String): OperationMode = OperationMode.valueOf(value)
 }

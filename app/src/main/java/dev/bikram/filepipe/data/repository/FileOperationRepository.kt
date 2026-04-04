@@ -10,6 +10,7 @@ import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -101,7 +102,7 @@ class FileOperationRepository @Inject constructor(
         destFolderUriString: String,
         conflictPolicy: ConflictPolicy,
         operationMode: OperationMode
-    ): FileMoved = withContext(Dispatchers.IO) {
+    ): FileMoved = withContext(Dispatchers.IO + NonCancellable) {
         val destTree = DocumentFile.fromTreeUri(context, Uri.parse(destFolderUriString))
         if (destTree == null || !destTree.exists() || !destTree.canWrite()) {
             return@withContext FileMoved(

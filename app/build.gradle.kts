@@ -43,8 +43,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "dev.bikram.filepipe"
         minSdk = 30
         targetSdk = 36
-        versionCode = 201
-        versionName = "2.0.1"
+        versionCode = 210
+        versionName = "2.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -143,6 +143,7 @@ dependencies {
     // Lifecycle / ViewModel
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.lifecycle.process)
 
     // Hilt
     implementation(libs.hilt.android)

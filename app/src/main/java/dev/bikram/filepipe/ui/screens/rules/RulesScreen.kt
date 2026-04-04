@@ -55,7 +55,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -122,6 +121,7 @@ fun RulesScreen(
     val selectedRuleIds = uiState.selectedRuleIds
     val progressMap = uiState.progressMap
     val isRunning = uiState.isRunning
+    val manualRunCancelAnchor = uiState.manualRunCancelAnchor
     val isCompactMode = uiState.isCompactMode
     val cardModeOverrides = uiState.cardModeOverrides
     val swipeStartToEnd = uiState.swipeStartToEnd
@@ -273,36 +273,17 @@ fun RulesScreen(
             )
         },
         bottomBar = {
-            if (isRunning) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 8.dp,
-                            bottom = contentPadding.calculateBottomPadding() + 4.dp
-                        )
-                ) {
-                    Text(
-                        text = stringResource(R.string.run_in_progress),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                }
-            } else {
-                AnimatedVisibility(
-                    visible = hasSelection,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
+            when {
+                isRunning && manualRunCancelAnchor == ManualRunCancelAnchor.RunSelectedBar -> {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = contentPadding.calculateBottomPadding() + 8.dp),
+                            .padding(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 8.dp,
+                                bottom = contentPadding.calculateBottomPadding() + 8.dp
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Surface(
@@ -311,32 +292,64 @@ fun RulesScreen(
                             tonalElevation = 3.dp,
                             shadowElevation = 3.dp
                         ) {
-                            Row(
+                            OutlinedButton(
+                                onClick = { playTap(); viewModel.cancelManualRun() },
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                shape = RoundedCornerShape(50),
+                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
                             ) {
-                                FilledTonalIconButton(onClick = { playTap(); viewModel.clearSelection() }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Cancel selection")
-                                }
-                                FilledTonalIconButton(
-                                    onClick = { playTap(); pendingDeleteSelected = true },
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                    )
+                                Text(stringResource(R.string.cancel))
+                            }
+                        }
+                    }
+                }
+                isRunning -> { }
+                else -> {
+                    AnimatedVisibility(
+                        visible = hasSelection,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = contentPadding.calculateBottomPadding() + 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                tonalElevation = 3.dp,
+                                shadowElevation = 3.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
-                                }
-                                FilledTonalButton(
-                                    onClick = { playTap(); viewModel.runSelected() },
-                                    enabled = enabledSelectedCount > 0,
-                                    shape = RoundedCornerShape(50),
-                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                                ) {
-                                    Text("Run Selected (${selectedRuleIds.size})")
-                                    Spacer(Modifier.width(6.dp))
-                                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    FilledTonalIconButton(onClick = { playTap(); viewModel.clearSelection() }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Cancel selection")
+                                    }
+                                    FilledTonalIconButton(
+                                        onClick = { playTap(); pendingDeleteSelected = true },
+                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
+                                    }
+                                    FilledTonalButton(
+                                        onClick = { playTap(); viewModel.runSelected() },
+                                        enabled = enabledSelectedCount > 0,
+                                        shape = RoundedCornerShape(50),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Text("Run Selected (${selectedRuleIds.size})")
+                                        Spacer(Modifier.width(6.dp))
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    }
                                 }
                             }
                         }
@@ -372,6 +385,9 @@ fun RulesScreen(
             ) {
                 items(rules, key = { it.id }) { rule ->
                     val isExpanded = viewModel.isCardExpanded(rule.id, isCompactMode, cardModeOverrides)
+                    val showInlineProgressCancel =
+                        manualRunCancelAnchor is ManualRunCancelAnchor.SingleRule &&
+                            manualRunCancelAnchor.ruleId == rule.id
                     SwipeToDismissRuleCard(
                         rule = rule,
                         isSelected = rule.id in selectedRuleIds,
@@ -394,6 +410,8 @@ fun RulesScreen(
                         onDelete = { pendingDeleteRule = rule },
                         onDuplicate = { viewModel.duplicateRule(rule) },
                         onRunRule = { viewModel.runRule(rule) },
+                        onCancelManualRun = { viewModel.cancelManualRun() },
+                        showInlineProgressCancel = showInlineProgressCancel,
                         onPreviewRule = { viewModel.startPreview(rule) },
                         onViewHistory = { onNavigateToRuleHistory(rule.id) },
                         modifier = Modifier.animateItem()
@@ -541,6 +559,8 @@ private fun SwipeToDismissRuleCard(
     onDelete: () -> Unit,
     onDuplicate: () -> Unit,
     onRunRule: () -> Unit,
+    onCancelManualRun: () -> Unit,
+    showInlineProgressCancel: Boolean,
     onPreviewRule: () -> Unit,
     onViewHistory: () -> Unit,
     modifier: Modifier = Modifier
@@ -600,6 +620,8 @@ private fun SwipeToDismissRuleCard(
             cardActions = cardIconPairs,
             onToggleEnabled = onToggleEnabled,
             onRunClick = onRunRule,
+            onCancelRunClick = onCancelManualRun,
+            showInlineProgressCancel = showInlineProgressCancel,
             isAnyRuleRunning = isAnyRuleRunning,
             onPreviewRule = onPreviewRule,
             onViewHistory = onViewHistory,

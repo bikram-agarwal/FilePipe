@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.ui.screens.historydetail
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,8 +8,10 @@ import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.usecase.UndoRunUseCase
+import dev.bikram.filepipe.ui.feedback.toUserMessage
 import dev.bikram.filepipe.ui.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +24,8 @@ import javax.inject.Inject
 class HistoryDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val runHistoryRepository: RunHistoryRepository,
-    private val undoRunUseCase: UndoRunUseCase
+    private val undoRunUseCase: UndoRunUseCase,
+    @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val historyId: Long = savedStateHandle[Screen.HistoryDetail.ARG_HISTORY_ID] ?: 0L
@@ -45,12 +49,7 @@ class HistoryDetailViewModel @Inject constructor(
 
     fun undoRun() = viewModelScope.launch {
         val result = undoRunUseCase(historyId)
-        _userMessage.value = when {
-            result.totalFailed == 0 -> "Undone: ${result.totalReversed} file(s) restored"
-            result.totalReversed == 0 -> "Undo failed: ${result.errors.firstOrNull() ?: "unknown error"}"
-            else -> "Partial undo: ${result.totalReversed} restored, ${result.totalFailed} failed"
-        }
-        // Reload history to reflect isReversed = true
+        _userMessage.value = result.toUserMessage(appContext)
         _history.value = runHistoryRepository.getHistoryById(historyId)
     }
 }

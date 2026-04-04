@@ -68,6 +68,8 @@ data class RunHistoryBackupDto(
     val totalFilesFailed: Int,
     val errorMessage: String? = null,
     val isReversed: Boolean = false,
+    val operationMode: String = "MOVE",
+    val cancelledUnprocessedCount: Int = 0,
     val files: List<FileMovedBackupDto> = emptyList()
 )
 
@@ -148,6 +150,8 @@ fun RunHistory.toBackupDto(files: List<FileMoved> = emptyList()): RunHistoryBack
     totalFilesFailed = totalFilesFailed,
     errorMessage = errorMessage,
     isReversed = isReversed,
+    operationMode = operationMode.name,
+    cancelledUnprocessedCount = cancelledUnprocessedCount,
     files = files.map { it.toBackupDto() }
 )
 

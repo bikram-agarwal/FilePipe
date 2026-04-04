@@ -120,7 +120,9 @@ fun HistoryScreen(
         HistoryStatusFilter.SUCCESS to stringResource(R.string.history_filter_success),
         HistoryStatusFilter.FAILED to stringResource(R.string.history_filter_failed),
         HistoryStatusFilter.PARTIAL to stringResource(R.string.history_filter_partial),
-        HistoryStatusFilter.NO_CHANGES to stringResource(R.string.history_filter_no_changes)
+        HistoryStatusFilter.NO_CHANGES to stringResource(R.string.history_filter_no_changes),
+        HistoryStatusFilter.CANCELLED to stringResource(R.string.history_filter_cancelled),
+        HistoryStatusFilter.UNDONE to stringResource(R.string.history_filter_undone)
     )
 
     if (showClearConfirm) {
@@ -487,6 +489,8 @@ private fun historyStatusSectionTitle(section: HistoryStatusSection): String = w
     HistoryStatusSection.PARTIAL -> stringResource(R.string.history_status_header_partial)
     HistoryStatusSection.NO_CHANGES -> stringResource(R.string.history_status_header_no_changes)
     HistoryStatusSection.IN_PROGRESS -> stringResource(R.string.history_status_header_in_progress)
+    HistoryStatusSection.CANCELLED -> stringResource(R.string.history_status_header_cancelled)
+    HistoryStatusSection.UNDONE -> stringResource(R.string.history_status_header_undone)
 }
 
 @Composable

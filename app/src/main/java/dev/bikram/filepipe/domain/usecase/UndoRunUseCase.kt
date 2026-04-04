@@ -10,6 +10,7 @@ import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
+import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -17,7 +18,8 @@ import javax.inject.Inject
 data class UndoResult(
     val totalReversed: Int,
     val totalFailed: Int,
-    val errors: List<String>
+    val errors: List<String>,
+    val operationMode: OperationMode = OperationMode.MOVE
 )
 
 class UndoRunUseCase @Inject constructor(
@@ -31,10 +33,16 @@ class UndoRunUseCase @Inject constructor(
         val history = runHistoryRepository.getHistoryById(historyId)
             ?: return@withContext UndoResult(0, 0, listOf("Run not found"))
 
-        if (history.isReversed) {
-            return@withContext UndoResult(0, 0, listOf("This run has already been undone"))
+        if (history.isEffectivelyUndone()) {
+            return@withContext UndoResult(
+                0,
+                0,
+                listOf("This run has already been undone"),
+                operationMode = history.operationMode
+            )
         }
 
+        val operationMode = history.operationMode
         val movedFiles = runHistoryRepository.getFilesForRunOnce(historyId)
             .filter { it.success && !it.skipped && it.destinationUri.isNotBlank() }
 
@@ -44,14 +52,6 @@ class UndoRunUseCase @Inject constructor(
 
         movedFiles.forEach { fileMoved ->
             val destUri = Uri.parse(fileMoved.destinationUri)
-            val sourceFolderUriString = parentTreeUriString(fileMoved.sourceUri)
-
-            if (sourceFolderUriString == null) {
-                errors.add("${fileMoved.fileName}: cannot determine original source folder")
-                failed++
-                return@forEach
-            }
-
             val destDoc = DocumentFile.fromSingleUri(context, destUri)
             if (destDoc == null || !destDoc.exists()) {
                 errors.add("${fileMoved.fileName}: file no longer exists at destination")
@@ -59,24 +59,48 @@ class UndoRunUseCase @Inject constructor(
                 return@forEach
             }
 
-            val sourceEntry = FileEntry(
-                uri = destUri,
-                name = fileMoved.fileName,
-                size = destDoc.length()
-            )
+            when (operationMode) {
+                OperationMode.COPY -> {
+                    val deleted = try {
+                        destDoc.delete()
+                    } catch (_: SecurityException) {
+                        false
+                    }
+                    if (deleted) {
+                        reversed++
+                    } else {
+                        failed++
+                        errors.add("${fileMoved.fileName}: could not delete at destination")
+                    }
+                }
+                OperationMode.MOVE -> {
+                    val sourceFolderUriString = parentTreeUriString(fileMoved.sourceUri)
+                    if (sourceFolderUriString == null) {
+                        errors.add("${fileMoved.fileName}: cannot determine original source folder")
+                        failed++
+                        return@forEach
+                    }
 
-            val reverseResult = fileOperationRepository.moveFile(
-                sourceEntry = sourceEntry,
-                destFolderUriString = sourceFolderUriString,
-                conflictPolicy = ConflictPolicy.RENAME_SUFFIX,
-                operationMode = OperationMode.MOVE
-            )
+                    val sourceEntry = FileEntry(
+                        uri = destUri,
+                        name = fileMoved.fileName,
+                        size = destDoc.length()
+                    )
 
-            if (reverseResult.success) {
-                reversed++
-            } else {
-                failed++
-                reverseResult.errorMessage?.let { errors.add("${fileMoved.fileName}: $it") }
+                    val reverseResult = fileOperationRepository.moveFile(
+                        sourceEntry = sourceEntry,
+                        destFolderUriString = sourceFolderUriString,
+                        conflictPolicy = ConflictPolicy.RENAME_SUFFIX,
+                        operationMode = OperationMode.MOVE
+                    )
+
+                    if (reverseResult.success) {
+                        reversed++
+                    } else {
+                        failed++
+                        reverseResult.errorMessage?.let { errors.add("${fileMoved.fileName}: $it") }
+                    }
+                }
             }
         }
 
@@ -84,7 +108,7 @@ class UndoRunUseCase @Inject constructor(
             runHistoryRepository.markRunReversed(historyId)
         }
 
-        UndoResult(reversed, failed, errors)
+        UndoResult(reversed, failed, errors, operationMode = operationMode)
     }
 
     /**

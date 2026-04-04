@@ -40,6 +40,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -69,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.ScheduleType
@@ -95,6 +97,8 @@ fun RuleCard(
     cardActions: List<RuleCardAction>, // non-swipe action icons shown in card
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
+    onCancelRunClick: () -> Unit,
+    showInlineProgressCancel: Boolean = false,
     isAnyRuleRunning: Boolean,
     onPreviewRule: () -> Unit = {},
     onViewHistory: () -> Unit = {},
@@ -136,6 +140,8 @@ fun RuleCard(
                     cardActions = cardActions,
                     onToggleEnabled = onToggleEnabled,
                     onRunClick = onRunClick,
+                    onCancelRunClick = onCancelRunClick,
+                    showInlineProgressCancel = showInlineProgressCancel,
                     isAnyRuleRunning = isAnyRuleRunning,
                     hasStaleFolder = hasStaleFolder,
                     onStaleWarningClick = onStaleWarningClick
@@ -148,6 +154,8 @@ fun RuleCard(
                     onLongClick = onLongClick,
                     onToggleEnabled = onToggleEnabled,
                     onRunClick = onRunClick,
+                    onCancelRunClick = onCancelRunClick,
+                    showInlineProgressCancel = showInlineProgressCancel,
                     isAnyRuleRunning = isAnyRuleRunning
                 )
             }
@@ -164,6 +172,8 @@ private fun CompactContent(
     onLongClick: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
+    onCancelRunClick: () -> Unit,
+    showInlineProgressCancel: Boolean,
     isAnyRuleRunning: Boolean
 ) {
     val playTap = rememberPlayTapSound()
@@ -233,11 +243,30 @@ private fun CompactContent(
                         }
                     )
                     if (runInProgress) {
-                        Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                            CircularWavyProgressIndicator(
-                                progress = { if (progress!!.totalFiles > 0) progress.progress else 0f },
-                                modifier = Modifier.size(26.dp)
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                                CircularWavyProgressIndicator(
+                                    progress = { if (progress!!.totalFiles > 0) progress.progress else 0f },
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                            if (showInlineProgressCancel) {
+                                OutlinedButton(
+                                    onClick = { playTap(); onCancelRunClick() },
+                                    shape = RoundedCornerShape(50),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                        horizontal = 10.dp, vertical = 6.dp
+                                    )
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.cancel),
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                            }
                         }
                     } else {
                         FilledTonalButton(
@@ -272,6 +301,8 @@ private fun ExpandedContent(
     cardActions: List<RuleCardAction>,
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
+    onCancelRunClick: () -> Unit,
+    showInlineProgressCancel: Boolean,
     isAnyRuleRunning: Boolean,
     hasStaleFolder: Boolean = false,
     onStaleWarningClick: () -> Unit = {}
@@ -434,7 +465,18 @@ private fun ExpandedContent(
                             val summary = when {
                                 runProgress.error != null -> "Error: ${runProgress.error}"
                                 runProgress.totalFiles == 0 -> "No matching files found"
-                                else -> "${runProgress.filesMoved} / ${runProgress.totalFiles} files moved"
+                                else -> when (rule.operationMode) {
+                                    OperationMode.COPY -> stringResource(
+                                        R.string.rule_card_progress_files_copied_summary,
+                                        runProgress.filesMoved,
+                                        runProgress.totalFiles
+                                    )
+                                    OperationMode.MOVE -> stringResource(
+                                        R.string.rule_card_progress_files_moved_summary,
+                                        runProgress.filesMoved,
+                                        runProgress.totalFiles
+                                    )
+                                }
                             }
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -470,7 +512,20 @@ private fun ExpandedContent(
                                     modifier = Modifier.size(28.dp)
                                 )
                                 Text(
-                                    text = "Moving ${runProgress.currentFileName.ifBlank { "…" }} (${runProgress.filesMoved + 1} / ${runProgress.totalFiles})",
+                                    text = when (rule.operationMode) {
+                                        OperationMode.COPY -> stringResource(
+                                            R.string.rule_card_progress_copying_file,
+                                            runProgress.currentFileName.ifBlank { "…" },
+                                            runProgress.filesMoved + 1,
+                                            runProgress.totalFiles
+                                        )
+                                        OperationMode.MOVE -> stringResource(
+                                            R.string.rule_card_progress_moving_file,
+                                            runProgress.currentFileName.ifBlank { "…" },
+                                            runProgress.filesMoved + 1,
+                                            runProgress.totalFiles
+                                        )
+                                    },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -523,22 +578,37 @@ private fun ExpandedContent(
             val runInProgress = progress != null && !progress.isComplete
             val runBlocked = isAnyRuleRunning && progress == null
             @OptIn(ExperimentalMaterial3Api::class)
-            TooltipBox(
-                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                tooltip = { PlainTooltip { Text(stringResource(R.string.run_now)) } },
-                state = rememberTooltipState()
-            ) {
-                FilledTonalButton(
-                    onClick = {
-                        playTap()
-                        onRunClick()
-                    },
-                    enabled = rule.isEnabled && !runInProgress && !runBlocked,
-                    shape = RoundedCornerShape(50)
+            if (runInProgress && showInlineProgressCancel) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                    tooltip = { PlainTooltip { Text(stringResource(R.string.cancel)) } },
+                    state = rememberTooltipState()
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(text = stringResource(R.string.run_now))
+                    OutlinedButton(
+                        onClick = { playTap(); onCancelRunClick() },
+                        shape = RoundedCornerShape(50)
+                    ) {
+                        Text(text = stringResource(R.string.cancel))
+                    }
+                }
+            } else if (!runInProgress) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                    tooltip = { PlainTooltip { Text(stringResource(R.string.run_now)) } },
+                    state = rememberTooltipState()
+                ) {
+                    FilledTonalButton(
+                        onClick = {
+                            playTap()
+                            onRunClick()
+                        },
+                        enabled = rule.isEnabled && !runBlocked,
+                        shape = RoundedCornerShape(50)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(text = stringResource(R.string.run_now))
+                    }
                 }
             }
         }
