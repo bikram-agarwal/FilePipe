@@ -123,7 +123,7 @@ class UndoRunUseCase @Inject constructor(
             }
         }
 
-        UndoResult(reversed, failed, errors, operationMode = operationMode)
+        return@withContext UndoResult(reversed, failed, errors, operationMode = operationMode)
     }
 
     /**

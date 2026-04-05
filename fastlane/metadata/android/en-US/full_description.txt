@@ -1,4 +1,6 @@
-<b>Pipe your scattered files into order.</b> File Pipe lets you define rules that automatically move or copy files from one folder to another — no manual sorting needed. Set it up once and let it run on a schedule, or trigger rules whenever you need them.
+Ever wanted all your videos in one folder, regardless of which app downloaded them? Or wished your Downloads folder would just sort itself into Documents, Images, and everything else?
+
+That's exactly what <b>File Pipe</b> does. Write a rule, set a schedule, done. Define rules to split mixed folders by type, or pull scattered media files into one place.
 
 <b>━━ RULES ━━</b>
 Use templates to start fast, or build your own. Create a rule by choosing source folders, file extensions, and a destination. Each rule can move or copy files, and you control what happens when a filename collision occurs — skip, overwrite, or rename automatically. Rules can scan subfolders recursively and each one gets its own schedule.

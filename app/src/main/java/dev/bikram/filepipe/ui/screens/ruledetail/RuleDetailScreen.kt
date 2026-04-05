@@ -342,7 +342,7 @@ fun RuleDetailScreen(
     LaunchedEffect(state.removedRedundantFolders) {
         if (state.removedRedundantFolders.isNotEmpty()) {
             val names = state.removedRedundantFolders.joinToString(", ") { it.substringAfterLast('/') }
-            snackbarHostState.showSnackbar("Removed redundant subfolder(s): $names")
+            snackbarHostState.showSnackbar(context.getString(R.string.rule_detail_redundant_subfolder_removed, names))
             viewModel.dismissRedundantFolderNotice()
         }
     }
@@ -541,7 +541,7 @@ fun RuleDetailScreen(
                             )
                         }
                         IconButton(onClick = { withTapSound { viewModel.removeSourceFolder(path) } }) {
-                            Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.schedule_remove_short), modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -977,7 +977,7 @@ fun RuleDetailScreen(
             title = { Text(if (viewModel.isNewRule) stringResource(R.string.new_rule) else stringResource(R.string.edit_rule)) },
             navigationIcon = {
                 IconButton(onClick = { withTapSound(::tryNavigateBack) }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
                 }
             },
             actions = {
@@ -1269,7 +1269,7 @@ fun RuleDetailScreen(
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
                 Text(
-                    text = "Pick a starting point - you can customize everything after.",
+                    text = stringResource(R.string.template_picker_subtitle),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 12.dp)

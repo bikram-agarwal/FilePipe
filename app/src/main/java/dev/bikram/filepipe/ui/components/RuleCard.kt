@@ -40,6 +40,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -301,12 +302,9 @@ private fun CompactContent(
                             }
                         }
                     } else {
-                        FilledTonalButton(
+                        FilledTonalIconButton(
                             onClick = { playTap(); onRunClick() },
                             enabled = rule.isEnabled && !runBlocked,
-                            shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.filledTonalButtonColors(),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Icon(
                                 Icons.Default.PlayArrow,

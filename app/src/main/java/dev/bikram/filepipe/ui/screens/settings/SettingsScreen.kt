@@ -1160,11 +1160,11 @@ private val LOG_RETENTION_OPTIONS = listOf(7, 14, 30, 90, -1)
 
 @Composable
 private fun logRetentionLabel(days: Int): String = when (days) {
-    7 -> "7 days"
-    14 -> "14 days"
-    30 -> "30 days"
-    90 -> "90 days"
-    else -> "Never"
+    7 -> stringResource(R.string.log_retention_7_days)
+    14 -> stringResource(R.string.log_retention_14_days)
+    30 -> stringResource(R.string.log_retention_30_days)
+    90 -> stringResource(R.string.log_retention_90_days)
+    else -> stringResource(R.string.log_retention_never)
 }
 
 @Composable
@@ -1186,11 +1186,11 @@ private fun LogRetentionDropdown(currentDays: Int, onSelect: (Int) -> Unit) {
 
 @Composable
 private fun swipeActionLabel(action: SwipeAction): String = when (action) {
-    SwipeAction.EDIT -> "Edit"
-    SwipeAction.DELETE -> "Delete"
-    SwipeAction.DUPLICATE -> "Duplicate"
-    SwipeAction.PREVIEW -> "Preview"
-    SwipeAction.VIEW_HISTORY -> "View history"
+    SwipeAction.EDIT -> stringResource(R.string.action_edit)
+    SwipeAction.DELETE -> stringResource(R.string.delete)
+    SwipeAction.DUPLICATE -> stringResource(R.string.action_duplicate)
+    SwipeAction.PREVIEW -> stringResource(R.string.preview_title)
+    SwipeAction.VIEW_HISTORY -> stringResource(R.string.view_history)
 }
 
 @Composable

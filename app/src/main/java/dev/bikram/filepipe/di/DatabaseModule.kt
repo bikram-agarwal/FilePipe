@@ -19,8 +19,17 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
-    private val migration4To5 = object : Migration(4, 5) {
+    private val migration2To3 = object : Migration(2, 3) {
         override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE run_history ADD COLUMN cancelledUnprocessedCount INTEGER NOT NULL DEFAULT 0"
+            )
+            db.execSQL(
+                "ALTER TABLE run_history ADD COLUMN operationMode TEXT NOT NULL DEFAULT 'MOVE'"
+            )
+            db.execSQL(
+                "ALTER TABLE run_history ADD COLUMN copyCreatedDestFolderUris TEXT NOT NULL DEFAULT '[]'"
+            )
             db.execSQL("ALTER TABLE rules ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0")
             db.execSQL("UPDATE rules SET sortOrder = id")
         }
@@ -30,7 +39,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "media_organizer.db")
-            .addMigrations(migration4To5)
+            .addMigrations(migration2To3)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 

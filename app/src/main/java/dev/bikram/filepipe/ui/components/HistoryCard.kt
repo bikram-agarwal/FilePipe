@@ -76,8 +76,8 @@ fun HistoryCard(
             Spacer(Modifier.height(6.dp))
 
             val triggerLabel = when (history.triggeredBy) {
-                TriggerType.MANUAL -> "Manual"
-                TriggerType.SCHEDULED -> "Scheduled"
+                TriggerType.MANUAL -> stringResource(R.string.history_triggered_manual)
+                TriggerType.SCHEDULED -> stringResource(R.string.history_triggered_scheduled)
             }
             val timeLabel = formatTime(history.startedAt)
             val successPart = if (history.totalFilesMoved > 0) {
@@ -107,7 +107,7 @@ fun HistoryCard(
                     history.cancelledUnprocessedCount == 0 ->
                     stringResource(R.string.status_cancelled)
                 history.totalFilesMoved == 0 && history.totalFilesFailed == 0 && cancelledPart.isEmpty() ->
-                    "No files affected"
+                    stringResource(R.string.history_no_files_affected)
                 else -> buildString {
                     if (successPart.isNotEmpty()) append(successPart)
                     if (failedPart.isNotEmpty()) {
@@ -133,16 +133,14 @@ fun HistoryCard(
 @Composable
 fun StatusChip(status: RunStatus, noChanges: Boolean = false, modifier: Modifier = Modifier) {
     val (label, targetColor) = when {
-        noChanges -> "No changes" to MaterialTheme.colorScheme.surfaceVariant
+        noChanges -> stringResource(R.string.status_no_changes) to MaterialTheme.colorScheme.surfaceVariant
         else -> when (status) {
-            RunStatus.SUCCESS -> "Success" to MaterialTheme.colorScheme.primaryContainer
-            RunStatus.PARTIAL_FAILURE -> "Partial" to MaterialTheme.colorScheme.tertiaryContainer
-            RunStatus.FAILED -> "Failed" to MaterialTheme.colorScheme.errorContainer
-            RunStatus.IN_PROGRESS -> "Running" to MaterialTheme.colorScheme.secondaryContainer
-            RunStatus.CANCELLED ->
-                stringResource(R.string.status_cancelled) to MaterialTheme.colorScheme.surfaceVariant
-            RunStatus.UNDONE ->
-                stringResource(R.string.status_undone) to MaterialTheme.colorScheme.surfaceVariant
+            RunStatus.SUCCESS -> stringResource(R.string.status_success) to MaterialTheme.colorScheme.primaryContainer
+            RunStatus.PARTIAL_FAILURE -> stringResource(R.string.status_partial) to MaterialTheme.colorScheme.tertiaryContainer
+            RunStatus.FAILED -> stringResource(R.string.status_failed) to MaterialTheme.colorScheme.errorContainer
+            RunStatus.IN_PROGRESS -> stringResource(R.string.status_in_progress) to MaterialTheme.colorScheme.secondaryContainer
+            RunStatus.CANCELLED -> stringResource(R.string.status_cancelled) to MaterialTheme.colorScheme.surfaceVariant
+            RunStatus.UNDONE -> stringResource(R.string.status_undone) to MaterialTheme.colorScheme.surfaceVariant
         }
     }
     val containerColor by animateColorAsState(

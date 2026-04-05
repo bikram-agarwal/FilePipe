@@ -25,6 +25,7 @@
     <string name="rule_delete_message">This will also remove any scheduled runs for this rule.</string>
 
     <!-- Rule detail screen -->
+    <string name="rule_detail_redundant_subfolder_removed">Removed redundant subfolder(s): %1$s</string>
     <string name="new_rule">New Rule</string>
     <string name="edit_rule">Edit Rule</string>
     <string name="rule_name_label">Rule name</string>
@@ -86,6 +87,9 @@
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
     <string name="delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_duplicate">Duplicate</string>
+    <string name="nav_back">Back</string>
     <string name="delete_rule">Delete rule</string>
     <string name="duplicate_rule">Duplicate rule</string>
     <string name="view_history">View history</string>
@@ -101,6 +105,7 @@
     <string name="run_now">Run now</string>
 
     <!-- History screen -->
+    <string name="history_no_files_affected">No files affected</string>
     <string name="history_title">History</string>
     <string name="history_detail_title">Run details</string>
     <string name="history_detail_files_moved_label">Files moved</string>
@@ -284,11 +289,17 @@
 
     <!-- Template picker -->
     <string name="template_picker_title">Start from a template</string>
+    <string name="template_picker_subtitle">Pick a starting point — you can customize everything after.</string>
 
     <!-- Settings — history section -->
     <string name="settings_history_section">History</string>
     <string name="settings_log_retention">Log retention</string>
     <string name="settings_log_retention_hint">How long to keep run history records.</string>
+    <string name="log_retention_7_days">7 days</string>
+    <string name="log_retention_14_days">14 days</string>
+    <string name="log_retention_30_days">30 days</string>
+    <string name="log_retention_90_days">90 days</string>
+    <string name="log_retention_never">Never</string>
 
     <!-- Notification actions -->
     <string name="notification_action_undo">Undo</string>

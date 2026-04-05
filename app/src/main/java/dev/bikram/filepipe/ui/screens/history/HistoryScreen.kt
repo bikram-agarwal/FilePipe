@@ -37,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -198,6 +199,7 @@ fun HistoryScreen(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_date)) },
+                                    leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_DATE, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_DATE)
@@ -206,6 +208,7 @@ fun HistoryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_rule)) },
+                                    leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_RULE, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_RULE)
@@ -214,6 +217,7 @@ fun HistoryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_status)) },
+                                    leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_STATUS, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_STATUS)
@@ -238,6 +242,7 @@ fun HistoryScreen(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
+                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
@@ -246,6 +251,7 @@ fun HistoryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
+                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
@@ -254,6 +260,7 @@ fun HistoryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
+                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
@@ -262,6 +269,7 @@ fun HistoryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
+                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)

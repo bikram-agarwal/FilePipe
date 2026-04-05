@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "a3825445e5c785c2d9dde51da5d97db4",
+    "identityHash": "4ebd61717afe4eeb6cb170f4fe207e9e",
     "entities": [
       {
         "tableName": "rules",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `sourceFolderPaths` TEXT NOT NULL, `destinationFolderPath` TEXT NOT NULL, `fileExtensions` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `scheduleType` TEXT, `scheduleDayOfWeek` INTEGER, `scheduleHour` INTEGER, `scheduleMinute` INTEGER, `scheduleIntervalHours` INTEGER, `workManagerTag` TEXT, `conflictPolicy` TEXT NOT NULL, `operationMode` TEXT NOT NULL, `scanSubdirectories` INTEGER NOT NULL, `iconKey` TEXT NOT NULL, `iconEmoji` TEXT, `filenamePattern` TEXT, `minFileSizeBytes` INTEGER, `maxFileSizeBytes` INTEGER, `minAgeDays` INTEGER, `maxAgeDays` INTEGER, `excludePatterns` TEXT NOT NULL DEFAULT '[]')",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `sourceFolderPaths` TEXT NOT NULL, `destinationFolderPath` TEXT NOT NULL, `fileExtensions` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL DEFAULT 0, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `scheduleType` TEXT, `scheduleDayOfWeek` INTEGER, `scheduleHour` INTEGER, `scheduleMinute` INTEGER, `scheduleIntervalHours` INTEGER, `workManagerTag` TEXT, `conflictPolicy` TEXT NOT NULL, `operationMode` TEXT NOT NULL, `scanSubdirectories` INTEGER NOT NULL, `iconKey` TEXT NOT NULL, `iconEmoji` TEXT, `filenamePattern` TEXT, `minFileSizeBytes` INTEGER, `maxFileSizeBytes` INTEGER, `minAgeDays` INTEGER, `maxAgeDays` INTEGER, `excludePatterns` TEXT NOT NULL DEFAULT '[]')",
         "fields": [
           {
             "fieldPath": "id",
@@ -43,6 +43,13 @@
             "columnName": "isEnabled",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "createdAt",
@@ -157,7 +164,7 @@
       },
       {
         "tableName": "run_history",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ruleId` INTEGER, `ruleName` TEXT NOT NULL, `triggeredBy` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `completedAt` INTEGER, `status` TEXT NOT NULL, `totalFilesFound` INTEGER NOT NULL, `cancelledUnprocessedCount` INTEGER NOT NULL DEFAULT 0, `totalFilesMoved` INTEGER NOT NULL, `totalFilesFailed` INTEGER NOT NULL, `errorMessage` TEXT, `isReversed` INTEGER NOT NULL, `operationMode` TEXT NOT NULL DEFAULT 'MOVE')",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ruleId` INTEGER, `ruleName` TEXT NOT NULL, `triggeredBy` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `completedAt` INTEGER, `status` TEXT NOT NULL, `totalFilesFound` INTEGER NOT NULL, `cancelledUnprocessedCount` INTEGER NOT NULL DEFAULT 0, `totalFilesMoved` INTEGER NOT NULL, `totalFilesFailed` INTEGER NOT NULL, `errorMessage` TEXT, `isReversed` INTEGER NOT NULL, `operationMode` TEXT NOT NULL DEFAULT 'MOVE', `copyCreatedDestFolderUris` TEXT NOT NULL DEFAULT '[]')",
         "fields": [
           {
             "fieldPath": "id",
@@ -241,6 +248,13 @@
             "affinity": "TEXT",
             "notNull": true,
             "defaultValue": "'MOVE'"
+          },
+          {
+            "fieldPath": "copyCreatedDestFolderUris",
+            "columnName": "copyCreatedDestFolderUris",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'[]'"
           }
         ],
         "primaryKey": {
@@ -359,7 +373,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a3825445e5c785c2d9dde51da5d97db4')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4ebd61717afe4eeb6cb170f4fe207e9e')"
     ]
   }
 }
