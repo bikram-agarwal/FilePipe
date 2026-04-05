@@ -54,33 +54,36 @@ class FileOperationRepository @Inject constructor(
         val minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
         val maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
 
-        val sequence = if (scanSubdirectories) {
-            walkDocFiles(folder, maxDepth)
+        val sequence: Sequence<Pair<DocumentFile, List<String>>> = if (scanSubdirectories) {
+            walkDocFilesWithRelativeParents(folder, maxDepth, emptyList())
         } else {
-            (folder.listFiles()?.asSequence() ?: emptySequence()).filter { it.isFile }
+            (folder.listFiles()?.asSequence() ?: emptySequence())
+                .filter { it.isFile }
+                .map { it to emptyList() }
         }
 
         try {
             sequence
-                .filter { doc ->
+                .filter { (doc, _) ->
                     val ext = ".${doc.name.orEmpty().substringAfterLast('.').lowercase()}"
                     ext in lowerExtensions
                 }
-                .filter { doc -> filenameRegex == null || filenameRegex.matches(doc.name.orEmpty()) }
-                .filter { doc -> excludeRegexes.none { it.matches(doc.name.orEmpty()) } }
-                .filter { doc -> minFileSizeBytes == null || doc.length() >= minFileSizeBytes }
-                .filter { doc -> maxFileSizeBytes == null || doc.length() <= maxFileSizeBytes }
-                .filter { doc ->
+                .filter { (doc, _) -> filenameRegex == null || filenameRegex.matches(doc.name.orEmpty()) }
+                .filter { (doc, _) -> excludeRegexes.none { it.matches(doc.name.orEmpty()) } }
+                .filter { (doc, _) -> minFileSizeBytes == null || doc.length() >= minFileSizeBytes }
+                .filter { (doc, _) -> maxFileSizeBytes == null || doc.length() <= maxFileSizeBytes }
+                .filter { (doc, _) ->
                     if (minAgeMs == null && maxAgeMs == null) return@filter true
                     val ageMs = now - doc.lastModified()
                     (minAgeMs == null || ageMs >= minAgeMs) && (maxAgeMs == null || ageMs <= maxAgeMs)
                 }
-                .map { doc ->
+                .map { (doc, relativeParentSegments) ->
                     FileEntry(
                         uri = doc.uri,
                         name = doc.name.orEmpty(),
                         size = doc.length(),
-                        lastModifiedMs = doc.lastModified()
+                        lastModifiedMs = doc.lastModified(),
+                        relativeParentSegments = relativeParentSegments
                     )
                 }
                 .toList()
@@ -89,11 +92,29 @@ class FileOperationRepository @Inject constructor(
         }
     }
 
-    private fun walkDocFiles(dir: DocumentFile, maxDepth: Int): Sequence<DocumentFile> = sequence {
+    /**
+     * Yields each file with path segments from the scanned tree root to the file's parent
+     * (e.g. `Photos/vacation/img.jpg` → `["Photos","vacation"]`).
+     */
+    private fun walkDocFilesWithRelativeParents(
+        dir: DocumentFile,
+        maxDepth: Int,
+        relativeParentSegments: List<String>
+    ): Sequence<Pair<DocumentFile, List<String>>> = sequence {
         if (maxDepth <= 0) return@sequence
         dir.listFiles()?.forEach { child ->
-            if (child.isFile) yield(child)
-            else if (child.isDirectory) yieldAll(walkDocFiles(child, maxDepth - 1))
+            val segment = child.name?.trim().orEmpty()
+            if (child.isFile) {
+                yield(child to relativeParentSegments)
+            } else if (child.isDirectory && segment.isNotEmpty() && segment != "." && segment != "..") {
+                yieldAll(
+                    walkDocFilesWithRelativeParents(
+                        child,
+                        maxDepth - 1,
+                        relativeParentSegments + segment
+                    )
+                )
+            }
         }
     }
 
@@ -101,7 +122,8 @@ class FileOperationRepository @Inject constructor(
         sourceEntry: FileEntry,
         destFolderUriString: String,
         conflictPolicy: ConflictPolicy,
-        operationMode: OperationMode
+        operationMode: OperationMode,
+        destFoldersCreatedCollector: MutableCollection<String>? = null
     ): FileMoved = withContext(Dispatchers.IO + NonCancellable) {
         val destTree = DocumentFile.fromTreeUri(context, Uri.parse(destFolderUriString))
         if (destTree == null || !destTree.exists() || !destTree.canWrite()) {
@@ -115,7 +137,21 @@ class FileOperationRepository @Inject constructor(
             )
         }
 
-        val existing = destTree.findFile(sourceEntry.name)
+        val destParent = ensureDestParentFolder(
+            destTree,
+            sourceEntry.relativeParentSegments,
+            destFoldersCreatedCollector
+        )
+            ?: return@withContext FileMoved(
+                fileName = sourceEntry.name,
+                sourceUri = sourceEntry.uri.toString(),
+                destinationUri = "",
+                fileSizeBytes = sourceEntry.size,
+                success = false,
+                errorMessage = "Could not create destination folder structure"
+            )
+
+        val existing = destParent.findFile(sourceEntry.name)
         if (existing != null) {
             when (conflictPolicy) {
                 ConflictPolicy.SKIP -> return@withContext FileMoved(
@@ -132,7 +168,7 @@ class FileOperationRepository @Inject constructor(
         }
 
         val destName = if (conflictPolicy == ConflictPolicy.RENAME_SUFFIX) {
-            resolveDestName(sourceEntry.name, destTree)
+            resolveDestName(sourceEntry.name, destParent)
         } else {
             sourceEntry.name
         }
@@ -141,7 +177,7 @@ class FileOperationRepository @Inject constructor(
             ?: mimeTypeFromName(sourceEntry.name)
 
         return@withContext try {
-            val destFile = destTree.createFile(mimeType, destName)
+            val destFile = destParent.createFile(mimeType, destName)
                 ?: return@withContext FileMoved(
                     fileName = sourceEntry.name,
                     sourceUri = sourceEntry.uri.toString(),
@@ -237,13 +273,11 @@ class FileOperationRepository @Inject constructor(
         conflictPolicy: ConflictPolicy
     ): PreviewFileResult = withContext(Dispatchers.IO) {
         val destTree = DocumentFile.fromTreeUri(context, Uri.parse(destFolderUriString))
-        val existing = destTree?.findFile(sourceEntry.name)
-
-        if (existing == null) {
+        if (destTree == null || !destTree.exists()) {
             return@withContext PreviewFileResult(
                 fileName = sourceEntry.name,
                 sourcePath = sourceEntry.uri.toString(),
-                simulatedDestPath = "$destFolderUriString/${sourceEntry.name}",
+                simulatedDestPath = destFolderUriString,
                 wouldSkip = false,
                 wouldOverwrite = false,
                 renamedTo = null,
@@ -251,36 +285,71 @@ class FileOperationRepository @Inject constructor(
             )
         }
 
-        when (conflictPolicy) {
-            ConflictPolicy.SKIP -> PreviewFileResult(
-                fileName = sourceEntry.name,
-                sourcePath = sourceEntry.uri.toString(),
-                simulatedDestPath = existing.uri.toString(),
-                wouldSkip = true,
-                wouldOverwrite = false,
-                renamedTo = null,
-                sizeBytes = sourceEntry.size
-            )
-            ConflictPolicy.OVERWRITE -> PreviewFileResult(
-                fileName = sourceEntry.name,
-                sourcePath = sourceEntry.uri.toString(),
-                simulatedDestPath = existing.uri.toString(),
-                wouldSkip = false,
-                wouldOverwrite = true,
-                renamedTo = null,
-                sizeBytes = sourceEntry.size
-            )
-            ConflictPolicy.RENAME_SUFFIX -> {
-                val resolvedName = resolveDestName(sourceEntry.name, destTree)
+        val pathSuffix = relativePathSuffixForDisplay(sourceEntry.relativeParentSegments, sourceEntry.name)
+        val simulatedRootPath = "$destFolderUriString/$pathSuffix"
+
+        val resolution = peekDestParentForPreview(destTree, sourceEntry.relativeParentSegments)
+        when (resolution) {
+            is DestParentPreview.Partial, is DestParentPreview.BlockedByFile -> {
                 PreviewFileResult(
                     fileName = sourceEntry.name,
                     sourcePath = sourceEntry.uri.toString(),
-                    simulatedDestPath = "$destFolderUriString/$resolvedName",
+                    simulatedDestPath = simulatedRootPath,
                     wouldSkip = false,
                     wouldOverwrite = false,
-                    renamedTo = if (resolvedName != sourceEntry.name) resolvedName else null,
+                    renamedTo = null,
                     sizeBytes = sourceEntry.size
                 )
+            }
+            is DestParentPreview.Resolved -> {
+                val existing = resolution.parent.findFile(sourceEntry.name)
+                if (existing == null) {
+                    return@withContext PreviewFileResult(
+                        fileName = sourceEntry.name,
+                        sourcePath = sourceEntry.uri.toString(),
+                        simulatedDestPath = simulatedRootPath,
+                        wouldSkip = false,
+                        wouldOverwrite = false,
+                        renamedTo = null,
+                        sizeBytes = sourceEntry.size
+                    )
+                }
+                when (conflictPolicy) {
+                    ConflictPolicy.SKIP -> PreviewFileResult(
+                        fileName = sourceEntry.name,
+                        sourcePath = sourceEntry.uri.toString(),
+                        simulatedDestPath = existing.uri.toString(),
+                        wouldSkip = true,
+                        wouldOverwrite = false,
+                        renamedTo = null,
+                        sizeBytes = sourceEntry.size
+                    )
+                    ConflictPolicy.OVERWRITE -> PreviewFileResult(
+                        fileName = sourceEntry.name,
+                        sourcePath = sourceEntry.uri.toString(),
+                        simulatedDestPath = existing.uri.toString(),
+                        wouldSkip = false,
+                        wouldOverwrite = true,
+                        renamedTo = null,
+                        sizeBytes = sourceEntry.size
+                    )
+                    ConflictPolicy.RENAME_SUFFIX -> {
+                        val resolvedName = resolveDestName(sourceEntry.name, resolution.parent)
+                        PreviewFileResult(
+                            fileName = sourceEntry.name,
+                            sourcePath = sourceEntry.uri.toString(),
+                            simulatedDestPath = buildSimulatedDestUriString(
+                                destFolderUriString,
+                                sourceEntry.relativeParentSegments,
+                                resolvedName
+                            ),
+                            wouldSkip = false,
+                            wouldOverwrite = false,
+                            renamedTo = if (resolvedName != sourceEntry.name) resolvedName else null,
+                            sizeBytes = sourceEntry.size
+                        )
+                    }
+                }
             }
         }
     }
@@ -305,6 +374,73 @@ class FileOperationRepository @Inject constructor(
 
     fun invalidateAccessCache() {
         accessCache.clear()
+    }
+
+    private fun ensureDestParentFolder(
+        destTree: DocumentFile,
+        relativeParentSegments: List<String>,
+        destFoldersCreatedCollector: MutableCollection<String>? = null
+    ): DocumentFile? {
+        var current = destTree
+        for (rawSegment in relativeParentSegments) {
+            val segment = rawSegment.trim()
+            if (segment.isEmpty() || segment == "." || segment == "..") continue
+            val next = current.findFile(segment)
+            current = when {
+                next != null && next.isDirectory -> next
+                next != null -> return null
+                else -> {
+                    val created = current.createDirectory(segment) ?: return null
+                    destFoldersCreatedCollector?.add(created.uri.toString())
+                    created
+                }
+            }
+        }
+        return current
+    }
+
+    private fun peekDestParentForPreview(
+        destTree: DocumentFile,
+        relativeParentSegments: List<String>
+    ): DestParentPreview {
+        var current = destTree
+        for (rawSegment in relativeParentSegments) {
+            val segment = rawSegment.trim()
+            if (segment.isEmpty() || segment == "." || segment == "..") continue
+            val next = current.findFile(segment)
+            when {
+                next == null -> return DestParentPreview.Partial
+                !next.isDirectory -> return DestParentPreview.BlockedByFile
+                else -> current = next
+            }
+        }
+        return DestParentPreview.Resolved(current)
+    }
+
+    private fun relativePathSuffixForDisplay(relativeParentSegments: List<String>, fileName: String): String {
+        val clean = relativeParentSegments.map { it.trim() }
+            .filter { it.isNotEmpty() && it != "." && it != ".." }
+        return if (clean.isEmpty()) fileName else clean.joinToString("/", postfix = "/") + fileName
+    }
+
+    private fun buildSimulatedDestUriString(
+        destFolderUriString: String,
+        relativeParentSegments: List<String>,
+        fileName: String
+    ): String {
+        val clean = relativeParentSegments.map { it.trim() }
+            .filter { it.isNotEmpty() && it != "." && it != ".." }
+        return if (clean.isEmpty()) {
+            "$destFolderUriString/$fileName"
+        } else {
+            "$destFolderUriString/${clean.joinToString("/")}/$fileName"
+        }
+    }
+
+    private sealed class DestParentPreview {
+        data class Resolved(val parent: DocumentFile) : DestParentPreview()
+        data object Partial : DestParentPreview()
+        data object BlockedByFile : DestParentPreview()
     }
 
     private fun resolveDestName(name: String, destTree: DocumentFile): String {
@@ -346,5 +482,10 @@ data class FileEntry(
     val uri: Uri,
     val name: String,
     val size: Long,
-    val lastModifiedMs: Long = 0L
+    val lastModifiedMs: Long = 0L,
+    /**
+     * Directory names from the scanned source tree root down to this file's parent
+     * (not including the file name). Empty when the file sits directly under the source root.
+     */
+    val relativeParentSegments: List<String> = emptyList()
 )

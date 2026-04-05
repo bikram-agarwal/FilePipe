@@ -154,6 +154,18 @@ class RulesViewModel @Inject constructor(
 
     fun clearUserMessage() { _userMessage.value = null }
 
+    /**
+     * Clears the folder readability cache and recomputes which rules lack access.
+     * Call when returning to the rules list (e.g. after re-granting SAF permission) because
+     * [folderPathsSignature] does not change when only permissions change.
+     */
+    fun refreshStaleFolderAccess() {
+        viewModelScope.launch(Dispatchers.IO) {
+            fileOperationRepository.invalidateAccessCache()
+            _staleRuleIds.value = computeStaleRuleIds(_rules.value)
+        }
+    }
+
     fun cancelManualRun() {
         viewModelScope.launch {
             val toCancel = synchronized(manualRunJobLock) {

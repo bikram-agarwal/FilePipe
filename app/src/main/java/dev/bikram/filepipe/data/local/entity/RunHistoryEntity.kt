@@ -29,7 +29,9 @@ data class RunHistoryEntity(
     val errorMessage: String? = null,
     val isReversed: Boolean = false,
     @ColumnInfo(defaultValue = "MOVE")
-    val operationMode: OperationMode = OperationMode.MOVE
+    val operationMode: OperationMode = OperationMode.MOVE,
+    @ColumnInfo(defaultValue = "[]")
+    val copyCreatedDestFolderUris: List<String> = emptyList()
 )
 
 fun RunHistoryEntity.toDomain(): RunHistory = RunHistory(
@@ -46,5 +48,6 @@ fun RunHistoryEntity.toDomain(): RunHistory = RunHistory(
     totalFilesFailed = totalFilesFailed,
     errorMessage = errorMessage,
     isReversed = isReversed,
-    operationMode = operationMode
+    operationMode = operationMode,
+    copyCreatedDestFolderUris = copyCreatedDestFolderUris
 )

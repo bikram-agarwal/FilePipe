@@ -88,6 +88,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -98,6 +99,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.core.app.NotificationManagerCompat
@@ -179,7 +181,9 @@ fun SettingsScreen(
     val updateSheetChangelog by viewModel.updateSheetChangelog.collectAsStateWithLifecycle()
     val manualUpdateNoResult by viewModel.manualUpdateNoResult.collectAsStateWithLifecycle()
     var showUpdateSheet by remember { mutableStateOf(false) }
-    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val configuration = LocalConfiguration.current
+    val maxUpdateSheetHeight = (configuration.screenHeightDp * 0.85f).dp
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     val snackbarHostState = remember { SnackbarHostState() }
@@ -226,6 +230,12 @@ fun SettingsScreen(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { }
 
+    LaunchedEffect(showUpdateSheet) {
+        if (showUpdateSheet) {
+            updateSheetState.expand()
+        }
+    }
+
     if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
         ModalBottomSheet(
             onDismissRequest = {
@@ -235,6 +245,7 @@ fun SettingsScreen(
             sheetState = updateSheetState
         ) {
             UpdateCheckBottomSheetContent(
+                maxSheetHeight = maxUpdateSheetHeight,
                 isCheckingUpdate = isCheckingUpdate,
                 updateInfo = updateInfo,
                 manualUpdateNoResult = manualUpdateNoResult,
@@ -794,6 +805,7 @@ fun SettingsScreen(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun UpdateCheckBottomSheetContent(
+    maxSheetHeight: Dp,
     isCheckingUpdate: Boolean,
     updateInfo: UpdateInfo?,
     manualUpdateNoResult: Boolean,
@@ -801,13 +813,14 @@ private fun UpdateCheckBottomSheetContent(
     changelogState: ChangelogUiState,
     onDownloadClick: (UpdateInfo) -> Unit
 ) {
-    val changelogScroll = rememberScrollState()
+    val sheetScroll = rememberScrollState()
     Column(
         Modifier
             .fillMaxWidth()
+            .heightIn(max = maxSheetHeight)
             .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 8.dp)
-            .verticalScroll(changelogScroll)
+            .verticalScroll(sheetScroll)
     ) {
         if (isCheckingUpdate) {
             Box(

@@ -29,6 +29,11 @@
     <string name="edit_rule">Edit Rule</string>
     <string name="rule_name_label">Rule name</string>
     <string name="rule_name_placeholder">e.g. Photos Backup</string>
+    <string name="rule_detail_folder_access_title">Folder access needed</string>
+    <string name="rule_detail_folder_access_source_line">Source: %1$s</string>
+    <string name="rule_detail_folder_access_destination_line">Destination: %1$s</string>
+    <string name="rule_detail_folder_access_hint">Tap a highlighted folder below to re-grant access in the system picker.</string>
+    <string name="rule_detail_validation_errors_title">Can\'t save this rule</string>
     <string name="source_folders_label">Source folders</string>
     <string name="add_source_folder">Pick folders</string>
     <string name="file_types_label">File Types</string>
@@ -263,6 +268,7 @@
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>
     <string name="rule_scan_subdirs_label">Scan subdirectories</string>
+    <string name="rule_scan_subdirs_support">Folder structure under each source is recreated under the destination.</string>
     <string name="rule_section_operation_title">Operation</string>
     <string name="rule_operation_mode_label">Mode</string>
     <string name="operation_move">Move</string>

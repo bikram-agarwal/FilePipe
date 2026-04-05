@@ -3,6 +3,7 @@ package dev.bikram.filepipe.domain.usecase
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.RunResult
@@ -14,6 +15,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
+import java.util.Collections
 import javax.inject.Inject
 
 class ExecuteRulesUseCase @Inject constructor(
@@ -43,6 +45,8 @@ class ExecuteRulesUseCase @Inject constructor(
         val allFiles = mutableListOf<FileMoved>()
         var totalPlanned = 0
         var completedSuccessfulMoves = 0
+        val copyCreatedDestFolders: MutableSet<String> =
+            Collections.synchronizedSet(linkedSetOf())
 
         try {
             // Collect all matching files across all source folders
@@ -79,7 +83,12 @@ class ExecuteRulesUseCase @Inject constructor(
                     sourceEntry = entry,
                     destFolderUriString = rule.destinationFolderPath,
                     conflictPolicy = rule.conflictPolicy,
-                    operationMode = rule.operationMode
+                    operationMode = rule.operationMode,
+                    destFoldersCreatedCollector = if (rule.operationMode == OperationMode.COPY) {
+                        copyCreatedDestFolders
+                    } else {
+                        null
+                    }
                 )
                 // Job may be cancelled as soon as moveFile returns; record the outcome so undo/history match disk.
                 withContext(NonCancellable) {
@@ -102,7 +111,8 @@ class ExecuteRulesUseCase @Inject constructor(
                             historyId = historyId,
                             filesMoved = allFiles,
                             startedAt = startedAt,
-                            completedAt = completedAt
+                            completedAt = completedAt,
+                            copyCreatedDestFolderUris = copyCreatedDestFolders.toList()
                         ),
                         totalPlanned = totalPlanned
                     )
@@ -125,7 +135,8 @@ class ExecuteRulesUseCase @Inject constructor(
                 historyId = historyId,
                 filesMoved = allFiles,
                 startedAt = startedAt,
-                completedAt = System.currentTimeMillis()
+                completedAt = System.currentTimeMillis(),
+                copyCreatedDestFolderUris = copyCreatedDestFolders.toList()
             )
             runHistoryRepository.completeRun(result)
             onProgress(
@@ -141,7 +152,8 @@ class ExecuteRulesUseCase @Inject constructor(
             historyId = historyId,
             filesMoved = allFiles,
             startedAt = startedAt,
-            completedAt = completedAt
+            completedAt = completedAt,
+            copyCreatedDestFolderUris = copyCreatedDestFolders.toList()
         )
         runHistoryRepository.completeRun(result)
 

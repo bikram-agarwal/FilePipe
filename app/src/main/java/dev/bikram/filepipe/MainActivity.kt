@@ -17,10 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
@@ -30,8 +26,6 @@ import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
-import dev.bikram.filepipe.manualrun.ManualRunForegroundCoordinator
-import dev.bikram.filepipe.manualrun.ManualRunForegroundService
 import dev.bikram.filepipe.ui.navigation.AppNavigation
 import dev.bikram.filepipe.ui.theme.FilePipeTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -49,30 +43,11 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var rulesAutoExportTrigger: RulesAutoExportTrigger
 
-    @Inject
-    lateinit var manualRunForegroundCoordinator: ManualRunForegroundCoordinator
-
-    private val processManualRunObserver = object : DefaultLifecycleObserver {
-        override fun onStart(owner: LifecycleOwner) {
-            stopService(Intent(this@MainActivity, ManualRunForegroundService::class.java))
-        }
-
-        override fun onStop(owner: LifecycleOwner) {
-            if (manualRunForegroundCoordinator.isManualRunActive()) {
-                ContextCompat.startForegroundService(
-                    this@MainActivity,
-                    Intent(this@MainActivity, ManualRunForegroundService::class.java)
-                )
-            }
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleShortcutIntent(intent)
         handleOpenHistoryDetailIntent(intent)
-        ProcessLifecycleOwner.get().lifecycle.addObserver(processManualRunObserver)
 
         setContent {
             val preferences by userPreferencesRepository.preferencesFlow
@@ -115,11 +90,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    override fun onDestroy() {
-        ProcessLifecycleOwner.get().lifecycle.removeObserver(processManualRunObserver)
-        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {

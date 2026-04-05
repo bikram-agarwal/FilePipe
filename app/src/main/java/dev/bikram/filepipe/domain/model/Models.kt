@@ -57,7 +57,9 @@ data class RunHistory(
     val totalFilesFailed: Int = 0,
     val errorMessage: String? = null,
     val isReversed: Boolean = false,
-    val operationMode: OperationMode = OperationMode.MOVE
+    val operationMode: OperationMode = OperationMode.MOVE,
+    /** Destination folder document URIs created during a copy run (for undo to remove empty dirs). */
+    val copyCreatedDestFolderUris: List<String> = emptyList()
 )
 
 enum class TriggerType { MANUAL, SCHEDULED }
@@ -105,7 +107,8 @@ data class RunResult(
     val historyId: Long,
     val filesMoved: List<FileMoved>,
     val startedAt: Long,
-    val completedAt: Long
+    val completedAt: Long,
+    val copyCreatedDestFolderUris: List<String> = emptyList()
 ) {
     val totalMoved: Int get() = filesMoved.count { it.success && !it.skipped }
     val totalSkipped: Int get() = filesMoved.count { it.skipped }

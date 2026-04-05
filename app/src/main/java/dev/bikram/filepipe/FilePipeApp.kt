@@ -7,6 +7,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
+import dev.bikram.filepipe.manualrun.ManualRunProcessLifecycleBinder
 import dev.bikram.filepipe.worker.LogPruneWorker
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -17,6 +18,9 @@ class FilePipeApp : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var manualRunProcessLifecycleBinder: ManualRunProcessLifecycleBinder
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -24,6 +28,7 @@ class FilePipeApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        manualRunProcessLifecycleBinder.ensureRegistered()
         scheduleLogPruneWorker()
     }
 

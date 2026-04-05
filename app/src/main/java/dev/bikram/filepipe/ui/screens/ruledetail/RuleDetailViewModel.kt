@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileEntry
+import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -56,7 +58,10 @@ data class RuleDetailUiState(
     val errors: List<String> = emptyList(),
     val previewFiles: List<FileEntry>? = null,
     val isPreviewLoading: Boolean = false,
-    val removedRedundantFolders: List<String> = emptyList()
+    val removedRedundantFolders: List<String> = emptyList(),
+    /** Source URIs that are not usable (missing grant or not a storage folder link). */
+    val inaccessibleSourcePaths: List<String> = emptyList(),
+    val destinationFolderInaccessible: Boolean = false
 )
 
 private data class RuleSnapshot(
@@ -106,6 +111,7 @@ class RuleDetailViewModel @Inject constructor(
     private val previewRuleUseCase: PreviewRuleUseCase,
     private val rulesAutoExportTrigger: RulesAutoExportTrigger,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val fileOperationRepository: FileOperationRepository,
 ) : ViewModel() {
 
     private val ruleId: Long = savedStateHandle[Screen.RuleDetail.ARG_RULE_ID] ?: Screen.RuleDetail.NEW_RULE_ID
@@ -136,6 +142,7 @@ class RuleDetailViewModel @Inject constructor(
             if (template != null) applyTemplate(template)
             _uiState.update { it.copy(isLoading = false) }
             _baseline.value = _uiState.value.toSnapshot()
+            if (template == null) scheduleFolderAccessRecompute()
         }
     }
 
@@ -170,6 +177,33 @@ class RuleDetailViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = false) }
             _baseline.value = _uiState.value.toSnapshot()
         }
+        scheduleFolderAccessRecompute()
+    }
+
+    private fun pathLacksFolderAccess(path: String): Boolean {
+        if (path.isBlank()) return false
+        return !path.startsWith("content://") || !fileOperationRepository.isAccessible(path)
+    }
+
+    private fun scheduleFolderAccessRecompute() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val snapshot = _uiState.value
+            val inaccessibleSources = snapshot.sourceFolderPaths.filter { path -> pathLacksFolderAccess(path) }
+            val destinationInaccessible =
+                snapshot.destinationFolderPath.isNotBlank() &&
+                    pathLacksFolderAccess(snapshot.destinationFolderPath)
+            _uiState.update {
+                it.copy(
+                    inaccessibleSourcePaths = inaccessibleSources,
+                    destinationFolderInaccessible = destinationInaccessible
+                )
+            }
+        }
+    }
+
+    fun refreshFolderAccessAfterPermissionChange() {
+        fileOperationRepository.invalidateAccessCache()
+        scheduleFolderAccessRecompute()
     }
 
     fun setName(name: String) = _uiState.update { it.copy(name = name, errors = emptyList()) }
@@ -197,33 +231,45 @@ class RuleDetailViewModel @Inject constructor(
         return child.startsWith("$parent/")
     }
 
-    fun addSourceFolder(path: String) = _uiState.update { state ->
-        val newPaths = if (path in state.sourceFolderPaths) state.sourceFolderPaths
-                       else state.sourceFolderPaths + path
-        if (state.scanSubdirectories) {
-            val (kept, removed) = removeRedundantPaths(newPaths)
-            state.copy(sourceFolderPaths = kept, removedRedundantFolders = removed)
-        } else {
-            state.copy(sourceFolderPaths = newPaths, removedRedundantFolders = emptyList())
+    fun addSourceFolder(path: String) {
+        _uiState.update { state ->
+            val newPaths = if (path in state.sourceFolderPaths) state.sourceFolderPaths
+            else state.sourceFolderPaths + path
+            if (state.scanSubdirectories) {
+                val (kept, removed) = removeRedundantPaths(newPaths)
+                state.copy(sourceFolderPaths = kept, removedRedundantFolders = removed)
+            } else {
+                state.copy(sourceFolderPaths = newPaths, removedRedundantFolders = emptyList())
+            }
         }
+        scheduleFolderAccessRecompute()
     }
 
-    fun removeSourceFolder(path: String) = _uiState.update {
-        it.copy(sourceFolderPaths = it.sourceFolderPaths - path)
-    }
-
-    fun replaceSourceFolder(previousPath: String, newPath: String) = _uiState.update { state ->
-        if (previousPath !in state.sourceFolderPaths) state
-        else {
-            val withoutPrevious = state.sourceFolderPaths - previousPath
-            val nextPaths =
-                if (newPath in withoutPrevious) withoutPrevious
-                else withoutPrevious + newPath
-            state.copy(sourceFolderPaths = nextPaths)
+    fun removeSourceFolder(path: String) {
+        _uiState.update {
+            it.copy(sourceFolderPaths = it.sourceFolderPaths - path)
         }
+        scheduleFolderAccessRecompute()
     }
 
-    fun setDestination(path: String) = _uiState.update { it.copy(destinationFolderPath = path) }
+    fun replaceSourceFolder(previousPath: String, newPath: String) {
+        _uiState.update { state ->
+            if (previousPath !in state.sourceFolderPaths) state
+            else {
+                val withoutPrevious = state.sourceFolderPaths - previousPath
+                val nextPaths =
+                    if (newPath in withoutPrevious) withoutPrevious
+                    else withoutPrevious + newPath
+                state.copy(sourceFolderPaths = nextPaths)
+            }
+        }
+        scheduleFolderAccessRecompute()
+    }
+
+    fun setDestination(path: String) {
+        _uiState.update { it.copy(destinationFolderPath = path) }
+        scheduleFolderAccessRecompute()
+    }
 
     fun addExtension(ext: String) = _uiState.update {
         val normalized = ext.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
@@ -245,13 +291,16 @@ class RuleDetailViewModel @Inject constructor(
 
     fun setOperationMode(mode: OperationMode) = _uiState.update { it.copy(operationMode = mode) }
 
-    fun setScanSubdirectories(enabled: Boolean) = _uiState.update { state ->
-        if (enabled) {
-            val (kept, removed) = removeRedundantPaths(state.sourceFolderPaths)
-            state.copy(scanSubdirectories = true, sourceFolderPaths = kept, removedRedundantFolders = removed)
-        } else {
-            state.copy(scanSubdirectories = false, removedRedundantFolders = emptyList())
+    fun setScanSubdirectories(enabled: Boolean) {
+        _uiState.update { state ->
+            if (enabled) {
+                val (kept, removed) = removeRedundantPaths(state.sourceFolderPaths)
+                state.copy(scanSubdirectories = true, sourceFolderPaths = kept, removedRedundantFolders = removed)
+            } else {
+                state.copy(scanSubdirectories = false, removedRedundantFolders = emptyList())
+            }
         }
+        scheduleFolderAccessRecompute()
     }
 
     fun dismissRedundantFolderNotice() = _uiState.update { it.copy(removedRedundantFolders = emptyList()) }
@@ -308,6 +357,7 @@ class RuleDetailViewModel @Inject constructor(
                 nextState
             }
         }
+        scheduleFolderAccessRecompute()
     }
 
     fun dismissPreview() = _uiState.update { it.copy(previewFiles = null) }

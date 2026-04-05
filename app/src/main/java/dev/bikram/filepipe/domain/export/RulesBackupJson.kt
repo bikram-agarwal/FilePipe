@@ -70,7 +70,8 @@ data class RunHistoryBackupDto(
     val isReversed: Boolean = false,
     val operationMode: String = "MOVE",
     val cancelledUnprocessedCount: Int = 0,
-    val files: List<FileMovedBackupDto> = emptyList()
+    val files: List<FileMovedBackupDto> = emptyList(),
+    val copyCreatedDestFolderUris: List<String> = emptyList()
 )
 
 @Serializable
@@ -152,7 +153,8 @@ fun RunHistory.toBackupDto(files: List<FileMoved> = emptyList()): RunHistoryBack
     isReversed = isReversed,
     operationMode = operationMode.name,
     cancelledUnprocessedCount = cancelledUnprocessedCount,
-    files = files.map { it.toBackupDto() }
+    files = files.map { it.toBackupDto() },
+    copyCreatedDestFolderUris = copyCreatedDestFolderUris
 )
 
 fun FileMoved.toBackupDto(): FileMovedBackupDto = FileMovedBackupDto(

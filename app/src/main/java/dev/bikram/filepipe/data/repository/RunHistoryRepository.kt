@@ -108,7 +108,8 @@ class RunHistoryRepository @Inject constructor(
                 totalFilesFound = result.filesMoved.size,
                 cancelledUnprocessedCount = 0,
                 totalFilesMoved = result.totalMoved,
-                totalFilesFailed = result.totalFailed
+                totalFilesFailed = result.totalFailed,
+                copyCreatedDestFolderUris = result.copyCreatedDestFolderUris
             )
         )
         fileMovedDao.insertFilesMoved(
@@ -165,7 +166,8 @@ class RunHistoryRepository @Inject constructor(
                 cancelledUnprocessedCount = unprocessed,
                 totalFilesMoved = result.totalMoved,
                 totalFilesFailed = result.totalFailed,
-                errorMessage = null
+                errorMessage = null,
+                copyCreatedDestFolderUris = result.copyCreatedDestFolderUris
             )
         )
         fileMovedDao.insertFilesMoved(
@@ -235,7 +237,8 @@ class RunHistoryRepository @Inject constructor(
                 totalFilesFailed = dto.totalFilesFailed,
                 errorMessage = dto.errorMessage,
                 isReversed = dto.isReversed,
-                operationMode = operationMode
+                operationMode = operationMode,
+                copyCreatedDestFolderUris = dto.copyCreatedDestFolderUris
             )
             val newHistoryId = runHistoryDao.insertHistory(entity)
             if (dto.files.isNotEmpty()) {
