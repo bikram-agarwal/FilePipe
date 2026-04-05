@@ -3,6 +3,7 @@ package dev.bikram.filepipe.ui.screens.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,14 +20,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,9 +47,12 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
+import dev.bikram.filepipe.ui.components.CustomSeedHexDialog
 import dev.bikram.filepipe.ui.theme.Blue40
 import dev.bikram.filepipe.ui.theme.BlueGrey40
 import dev.bikram.filepipe.ui.theme.Teal40
+import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
+import dev.bikram.filepipe.ui.theme.parseSeedColorHexToColorOrNull
 
 @Composable
 fun themePaletteStyleLabel(style: ThemePaletteStyle): String = stringResource(
@@ -59,10 +69,29 @@ fun themePaletteStyleLabel(style: ThemePaletteStyle): String = stringResource(
     }
 )
 
+private fun customHexSwatchSelected(
+    colorSource: AppColorSource,
+    activeCustomSeedHex: String,
+    storedHex: String
+): Boolean {
+    if (colorSource != AppColorSource.CUSTOM) return false
+    val activeNorm = normalizeCustomSeedHexOrNull(activeCustomSeedHex)
+    val storedNorm = normalizeCustomSeedHexOrNull(storedHex)
+    return when {
+        activeNorm != null && storedNorm != null -> activeNorm == storedNorm
+        else -> activeCustomSeedHex.trim() == storedHex.trim()
+    }
+}
+
 @Composable
 fun ThemeAccentRow(
-    selected: AppColorSource,
-    onSelect: (AppColorSource) -> Unit,
+    colorSource: AppColorSource,
+    activeCustomSeedHex: String,
+    savedCustomSeedHexes: List<String>,
+    onSelectPreset: (AppColorSource) -> Unit,
+    onSelectCustomHex: (String) -> Unit,
+    onCustomHexLongPress: (String) -> Unit,
+    onAddCustomHexClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyRow(
@@ -70,8 +99,8 @@ fun ThemeAccentRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        items(AppColorSource.accentOptions, key = { it.name }) { source ->
-            val isSelected = selected == source
+        items(AppColorSource.accentOptions, key = { "preset_${it.name}" }) { source ->
+            val isSelected = colorSource == source
             val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
             Box(
@@ -84,7 +113,7 @@ fun ThemeAccentRow(
                         shape = CircleShape
                     )
                     .clickable(
-                        onClick = { onSelect(source) },
+                        onClick = { onSelectPreset(source) },
                         indication = ripple(bounded = true),
                         interactionSource = remember { MutableInteractionSource() }
                     )
@@ -92,6 +121,62 @@ fun ThemeAccentRow(
                 contentAlignment = Alignment.Center
             ) {
                 ThemeAccentCircleContent(source = source)
+            }
+        }
+        items(savedCustomSeedHexes, key = { "hex_$it" }) { storedHex ->
+            val isSelected = customHexSwatchSelected(colorSource, activeCustomSeedHex, storedHex)
+            val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+            val fillColor = parseSeedColorHexToColorOrNull(storedHex)
+                ?: MaterialTheme.colorScheme.surfaceVariant
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .border(
+                        width = if (isSelected) 3.dp else 1.dp,
+                        color = borderColor,
+                        shape = CircleShape
+                    )
+                    .combinedClickable(
+                        onClick = { onSelectCustomHex(storedHex) },
+                        onLongClick = { onCustomHexLongPress(storedHex) },
+                        indication = ripple(bounded = true),
+                        interactionSource = remember { MutableInteractionSource() }
+                    )
+                    .semantics { role = Role.RadioButton },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(fillColor)
+                )
+            }
+        }
+        item(key = "add_custom_seed") {
+            val addBorder = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .border(width = 1.dp, color = addBorder, shape = CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+                    .clickable(
+                        onClick = onAddCustomHexClick,
+                        indication = ripple(bounded = true),
+                        interactionSource = remember { MutableInteractionSource() }
+                    )
+                    .semantics { role = Role.Button },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = stringResource(R.string.settings_custom_seed_dialog_title),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(26.dp)
+                )
             }
         }
     }
@@ -193,10 +278,51 @@ fun ThemePaletteStyleRow(
 @Composable
 fun ThemeColorSection(
     colorSource: AppColorSource,
+    savedCustomSeedHexes: List<String>,
+    activeCustomSeedHex: String,
     themePaletteStyle: ThemePaletteStyle,
     onColorSource: (AppColorSource) -> Unit,
-    onPaletteStyle: (ThemePaletteStyle) -> Unit
+    onPaletteStyle: (ThemePaletteStyle) -> Unit,
+    onAddCustomSeedHex: (String) -> Unit,
+    onSelectCustomSeedHex: (String) -> Unit,
+    onRemoveCustomSeedHex: (String) -> Unit
 ) {
+    var showCustomHexDialog by remember { mutableStateOf(false) }
+    var hexPendingRemove by remember { mutableStateOf<String?>(null) }
+
+    if (showCustomHexDialog) {
+        CustomSeedHexDialog(
+            initialDraft = "",
+            onDismiss = { showCustomHexDialog = false },
+            onConfirm = { raw ->
+                onAddCustomSeedHex(raw)
+                showCustomHexDialog = false
+            }
+        )
+    }
+
+    val hexToConfirmRemove = hexPendingRemove
+    if (hexToConfirmRemove != null) {
+        AlertDialog(
+            onDismissRequest = { hexPendingRemove = null },
+            title = { Text(stringResource(R.string.settings_custom_seed_remove_title)) },
+            text = { Text(stringResource(R.string.settings_custom_seed_remove_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onRemoveCustomSeedHex(hexToConfirmRemove)
+                    hexPendingRemove = null
+                }) {
+                    Text(stringResource(R.string.schedule_remove_short))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { hexPendingRemove = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.settings_theme_colors_hint),
@@ -204,22 +330,24 @@ fun ThemeColorSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp)
         )
-        ThemeAccentRow(selected = colorSource, onSelect = onColorSource)
+        ThemeAccentRow(
+            colorSource = colorSource,
+            activeCustomSeedHex = activeCustomSeedHex,
+            savedCustomSeedHexes = savedCustomSeedHexes,
+            onSelectPreset = onColorSource,
+            onSelectCustomHex = onSelectCustomSeedHex,
+            onCustomHexLongPress = { hexPendingRemove = it },
+            onAddCustomHexClick = { showCustomHexDialog = true }
+        )
         Spacer(Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.settings_palette_style),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Text(
-            text = stringResource(R.string.settings_palette_style_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
-        )
         ThemePaletteStyleRow(
             selected = themePaletteStyle,
-            enabled = colorSource.isSeedBased,
+            enabled = colorSource == AppColorSource.DEFAULT || colorSource.isSeedBased,
             onSelect = onPaletteStyle
         )
     }

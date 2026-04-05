@@ -7,6 +7,10 @@ enum class SwipeAction {
 data class AppPreferences(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val colorSource: AppColorSource = AppColorSource.MATERIAL_YOU,
+    /** Saved custom accent seeds (canonical `#RRGGBB`); order is display order. */
+    val savedCustomSeedHexes: List<String> = emptyList(),
+    /** Active seed when [colorSource] is [AppColorSource.CUSTOM]. */
+    val activeCustomSeedHex: String = "",
     val themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     val exportFolderUri: String = "",
     val autoExportOnRuleChange: Boolean = false,
@@ -19,7 +23,9 @@ data class AppPreferences(
     val hapticFeedbackEnabled: Boolean = true,
     val progressiveBlurEnabled: Boolean = true,
     val autoCheckForUpdates: Boolean = true,
-    val useGradientBackground: Boolean = true
+    val useGradientBackground: Boolean = true,
+    /** Neutral light/dark greys for list cards instead of accent-tinted elevated surfaces. */
+    val useFixedCardColors: Boolean = false
 ) {
     companion object {
         val DEFAULT = AppPreferences()

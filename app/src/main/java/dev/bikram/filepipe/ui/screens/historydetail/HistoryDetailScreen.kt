@@ -82,6 +82,7 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.elevatedCardColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -213,7 +214,10 @@ fun HistoryDetailScreen(
 
 @Composable
 private fun RunSummaryCard(history: RunHistory, onUndo: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = elevatedCardColors()
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -316,10 +320,16 @@ private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
         file.success -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.error
     }
+    val listCardSurface = elevatedCardColors()
     val containerColor = when {
-        file.skipped -> MaterialTheme.colorScheme.surfaceContainerLow
+        file.skipped -> listCardSurface.containerColor
         !file.success -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-        else -> MaterialTheme.colorScheme.surfaceContainerLow
+        else -> listCardSurface.containerColor
+    }
+    val rowContentColor = if (file.success || file.skipped) {
+        listCardSurface.contentColor
+    } else {
+        MaterialTheme.colorScheme.onSurface
     }
 
     Surface(
@@ -332,6 +342,7 @@ private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
             ),
         shape = RoundedCornerShape(12.dp),
         color = containerColor,
+        contentColor = rowContentColor,
         tonalElevation = 1.dp
     ) {
         Row(

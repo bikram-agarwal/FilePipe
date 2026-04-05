@@ -6,6 +6,7 @@ import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.PreviewFileResult
@@ -39,6 +40,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 data class DeleteUndoEvent(val rules: List<Rule>)
@@ -80,6 +82,7 @@ data class RulesUiState(
 @HiltViewModel
 class RulesViewModel @Inject constructor(
     private val ruleRepository: RuleRepository,
+    private val runHistoryRepository: RunHistoryRepository,
     private val scheduleRulesUseCase: ScheduleRulesUseCase,
     private val executeRulesUseCase: ExecuteRulesUseCase,
     private val simulateRuleUseCase: SimulateRuleUseCase,
@@ -105,8 +108,17 @@ class RulesViewModel @Inject constructor(
     private val _sortDirection = MutableStateFlow(HistorySortDirection.DESCENDING)
     private val _manualRunCancelAnchor = MutableStateFlow<ManualRunCancelAnchor>(ManualRunCancelAnchor.None)
 
-    private val sortedRulesFlow = combine(_rules, _sortKey, _sortDirection) { rules, sortKey, sortDirection ->
-        sortRulesList(rules, sortKey, sortDirection)
+    private val lastRunStartedAtByRuleId: StateFlow<Map<Long, Long>> = runHistoryRepository
+        .observeLastRunStartedAtByRuleId()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    private val sortedRulesFlow = combine(
+        _rules,
+        _sortKey,
+        _sortDirection,
+        lastRunStartedAtByRuleId
+    ) { rules, sortKey, sortDirection, lastRunMap ->
+        sortRulesList(rules, sortKey, sortDirection, lastRunMap)
     }
 
     private val sortParamsFlow = combine(_sortKey, _sortDirection) { sortKey, sortDirection ->
@@ -394,13 +406,58 @@ class RulesViewModel @Inject constructor(
     private fun sortRulesList(
         rules: List<Rule>,
         sortKey: HistorySortKey,
-        sortDirection: HistorySortDirection
+        sortDirection: HistorySortDirection,
+        lastRunStartedAtByRuleId: Map<Long, Long>
     ): List<Rule> {
-        val comparator = when (sortKey) {
-            HistorySortKey.LAST_RAN -> compareBy<Rule> { it.updatedAt }
-            HistorySortKey.RULE_NAME -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+        when (sortKey) {
+            HistorySortKey.MY_ORDER ->
+                return rules.sortedWith(compareBy({ it.sortOrder }, { it.id }))
+            HistorySortKey.LAST_RAN -> {
+                val locale = Locale.getDefault()
+                return when (sortDirection) {
+                    HistorySortDirection.DESCENDING -> rules.sortedWith(
+                        compareByDescending<Rule> { lastRunStartedAtByRuleId[it.id] ?: Long.MIN_VALUE }
+                            .thenBy { it.name.lowercase(locale) }
+                            .thenBy { it.id }
+                    )
+                    HistorySortDirection.ASCENDING -> rules.sortedWith(
+                        compareBy<Rule> { lastRunStartedAtByRuleId[it.id] ?: Long.MAX_VALUE }
+                            .thenBy { it.name.lowercase(locale) }
+                            .thenBy { it.id }
+                    )
+                }
+            }
+            HistorySortKey.RULE_NAME -> {
+                val sorted = rules.sortedWith(
+                    compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+                )
+                return if (sortDirection == HistorySortDirection.DESCENDING) sorted.reversed() else sorted
+            }
         }
-        val sorted = rules.sortedWith(comparator)
-        return if (sortDirection == HistorySortDirection.DESCENDING) sorted.reversed() else sorted
+    }
+
+    fun persistMyOrder(ordered: List<Rule>) = viewModelScope.launch(Dispatchers.IO) {
+        persistSortOrderIndices(ordered)
+        rulesAutoExportTrigger.maybeExportAfterRuleChange()
+    }
+
+    /**
+     * Persists [ordered] as [Rule.sortOrder] indices. Optionally switches the rules list sort to
+     * [HistorySortKey.MY_ORDER] after IO so Room emits updated rows before the UI treats order as canonical.
+     */
+    fun applyDraggedOrder(ordered: List<Rule>, alsoSwitchSortToMyOrder: Boolean) =
+        viewModelScope.launch(Dispatchers.IO) {
+            persistSortOrderIndices(ordered)
+            rulesAutoExportTrigger.maybeExportAfterRuleChange()
+            if (alsoSwitchSortToMyOrder) {
+                withContext(Dispatchers.Main.immediate) {
+                    _sortKey.value = HistorySortKey.MY_ORDER
+                    _sortDirection.value = HistorySortDirection.ASCENDING
+                }
+            }
+        }
+
+    private suspend fun persistSortOrderIndices(ordered: List<Rule>) {
+        ruleRepository.persistOrderedSortIndices(ordered)
     }
 }

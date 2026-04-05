@@ -13,14 +13,29 @@ import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import dev.bikram.filepipe.domain.export.SettingsBackupDto
+import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private val Context.userPreferencesDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "user_settings"
 )
+
+private val customSeedHexListJson = Json {
+    ignoreUnknownKeys = true
+}
+
+private fun decodeCustomSeedHexList(json: String?): List<String> {
+    if (json.isNullOrBlank()) return emptyList()
+    return runCatching {
+        customSeedHexListJson.decodeFromString<List<String>>(json)
+    }.getOrElse { emptyList() }
+}
 
 private object PrefKeys {
     val THEME_MODE = stringPreferencesKey("theme_mode")
@@ -39,6 +54,11 @@ private object PrefKeys {
     val PROGRESSIVE_BLUR = booleanPreferencesKey("progressive_blur_enabled")
     val AUTO_CHECK_UPDATES = booleanPreferencesKey("auto_check_for_updates")
     val USE_GRADIENT_BACKGROUND = booleanPreferencesKey("use_gradient_background")
+    val FIXED_CARD_COLORS = booleanPreferencesKey("fixed_card_colors")
+    /** Legacy; migrated into [CUSTOM_SEED_HEX_LIST] + [ACTIVE_CUSTOM_SEED_HEX]. */
+    val CUSTOM_SEED_HEX = stringPreferencesKey("custom_seed_hex")
+    val CUSTOM_SEED_HEX_LIST = stringPreferencesKey("custom_seed_hex_list")
+    val ACTIVE_CUSTOM_SEED_HEX = stringPreferencesKey("active_custom_seed_hex")
 }
 
 @Singleton
@@ -69,9 +89,24 @@ class UserPreferencesRepository @Inject constructor(
         val themePaletteStyle = prefs[PrefKeys.THEME_PALETTE_STYLE]?.let { raw ->
             runCatching { ThemePaletteStyle.valueOf(raw) }.getOrNull()
         } ?: ThemePaletteStyle.TONAL_SPOT
+        val listFromStore = prefs[PrefKeys.CUSTOM_SEED_HEX_LIST]?.let { decodeCustomSeedHexList(it) }
+        val legacyHex = prefs[PrefKeys.CUSTOM_SEED_HEX].orEmpty().trim()
+        val savedCustomSeedHexes = when {
+            listFromStore != null -> listFromStore
+            legacyHex.isNotBlank() -> listOf(legacyHex)
+            else -> emptyList()
+        }
+        val activeFromKey = prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX].orEmpty().trim()
+        val activeCustomSeedHex = when {
+            activeFromKey.isNotBlank() -> activeFromKey
+            savedCustomSeedHexes.isNotEmpty() -> savedCustomSeedHexes.first()
+            else -> ""
+        }
         AppPreferences(
             themeMode = themeMode,
             colorSource = colorSource,
+            savedCustomSeedHexes = savedCustomSeedHexes,
+            activeCustomSeedHex = activeCustomSeedHex,
             themePaletteStyle = themePaletteStyle,
             exportFolderUri = prefs[PrefKeys.EXPORT_FOLDER_URI].orEmpty(),
             autoExportOnRuleChange = prefs[PrefKeys.AUTO_EXPORT_ON_CHANGE] ?: false,
@@ -91,7 +126,8 @@ class UserPreferencesRepository @Inject constructor(
             hapticFeedbackEnabled = prefs[PrefKeys.HAPTIC_FEEDBACK] ?: true,
             progressiveBlurEnabled = prefs[PrefKeys.PROGRESSIVE_BLUR] ?: true,
             autoCheckForUpdates = prefs[PrefKeys.AUTO_CHECK_UPDATES] ?: true,
-            useGradientBackground = prefs[PrefKeys.USE_GRADIENT_BACKGROUND] ?: true
+            useGradientBackground = prefs[PrefKeys.USE_GRADIENT_BACKGROUND] ?: true,
+            useFixedCardColors = prefs[PrefKeys.FIXED_CARD_COLORS] ?: false
         )
     }
 
@@ -172,6 +208,89 @@ class UserPreferencesRepository @Inject constructor(
         dataStore.edit { it[PrefKeys.USE_GRADIENT_BACKGROUND] = enabled }
     }
 
+    suspend fun setUseFixedCardColors(enabled: Boolean) {
+        dataStore.edit { it[PrefKeys.FIXED_CARD_COLORS] = enabled }
+    }
+
+    /**
+     * One-time migration from single [PrefKeys.CUSTOM_SEED_HEX] to list + active keys.
+     * Safe to call repeatedly.
+     */
+    suspend fun migrateLegacyCustomSeedIfNeeded() {
+        dataStore.edit { prefs ->
+            if (prefs[PrefKeys.CUSTOM_SEED_HEX_LIST] != null) return@edit
+            val legacy = prefs[PrefKeys.CUSTOM_SEED_HEX]?.trim()?.takeIf { it.isNotBlank() }
+            if (legacy != null) {
+                prefs[PrefKeys.CUSTOM_SEED_HEX_LIST] =
+                    customSeedHexListJson.encodeToString(listOf(legacy))
+                prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] = legacy
+            } else {
+                prefs[PrefKeys.CUSTOM_SEED_HEX_LIST] =
+                    customSeedHexListJson.encodeToString(emptyList<String>())
+            }
+            prefs.remove(PrefKeys.CUSTOM_SEED_HEX)
+        }
+    }
+
+    suspend fun addCustomSeedHex(rawInput: String) {
+        migrateLegacyCustomSeedIfNeeded()
+        val normalized = normalizeCustomSeedHexOrNull(rawInput) ?: return
+        dataStore.edit { prefs ->
+            val current = decodeCustomSeedHexList(prefs[PrefKeys.CUSTOM_SEED_HEX_LIST]).toMutableList()
+            current.removeAll { existing ->
+                normalizeCustomSeedHexOrNull(existing) == normalized
+            }
+            current.add(normalized)
+            prefs[PrefKeys.CUSTOM_SEED_HEX_LIST] =
+                customSeedHexListJson.encodeToString(current)
+            prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] = normalized
+            prefs[PrefKeys.COLOR_SOURCE] = AppColorSource.CUSTOM.name
+            prefs.remove(PrefKeys.USE_MATERIAL_YOU)
+            prefs.remove(PrefKeys.CUSTOM_SEED_HEX)
+        }
+    }
+
+    suspend fun selectCustomSeedHex(hex: String) {
+        migrateLegacyCustomSeedIfNeeded()
+        val targetNorm = normalizeCustomSeedHexOrNull(hex) ?: return
+        dataStore.edit { prefs ->
+            val current = decodeCustomSeedHexList(prefs[PrefKeys.CUSTOM_SEED_HEX_LIST])
+            val matchedStored = current.firstOrNull { stored ->
+                normalizeCustomSeedHexOrNull(stored) == targetNorm
+            } ?: return@edit
+            prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] =
+                normalizeCustomSeedHexOrNull(matchedStored) ?: matchedStored
+            prefs[PrefKeys.COLOR_SOURCE] = AppColorSource.CUSTOM.name
+            prefs.remove(PrefKeys.USE_MATERIAL_YOU)
+        }
+    }
+
+    suspend fun removeCustomSeedHex(hex: String) {
+        migrateLegacyCustomSeedIfNeeded()
+        val targetNorm = normalizeCustomSeedHexOrNull(hex) ?: return
+        dataStore.edit { prefs ->
+            val current = decodeCustomSeedHexList(prefs[PrefKeys.CUSTOM_SEED_HEX_LIST])
+            val filtered = current.filterNot { stored ->
+                normalizeCustomSeedHexOrNull(stored) == targetNorm
+            }
+            prefs[PrefKeys.CUSTOM_SEED_HEX_LIST] =
+                customSeedHexListJson.encodeToString(filtered)
+            val activeRaw = prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX].orEmpty()
+            val activeNorm = normalizeCustomSeedHexOrNull(activeRaw)
+            val wasActive = activeNorm == targetNorm
+            if (wasActive) {
+                if (filtered.isEmpty()) {
+                    prefs.remove(PrefKeys.ACTIVE_CUSTOM_SEED_HEX)
+                    prefs[PrefKeys.COLOR_SOURCE] = AppColorSource.DEFAULT.name
+                } else {
+                    val next = normalizeCustomSeedHexOrNull(filtered.first()) ?: filtered.first()
+                    prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] = next
+                }
+            }
+            prefs.remove(PrefKeys.CUSTOM_SEED_HEX)
+        }
+    }
+
     suspend fun applySettingsFromBackup(dto: SettingsBackupDto) {
         val exportUriString = dto.exportFolderUri
         if (exportUriString.startsWith("content://")) {
@@ -230,6 +349,47 @@ class UserPreferencesRepository @Inject constructor(
             prefs[PrefKeys.PROGRESSIVE_BLUR] = dto.progressiveBlurEnabled
             prefs[PrefKeys.AUTO_CHECK_UPDATES] = dto.autoCheckForUpdates
             prefs[PrefKeys.USE_GRADIENT_BACKGROUND] = dto.useGradientBackground
+            prefs[PrefKeys.FIXED_CARD_COLORS] = dto.useFixedCardColors
+
+            val restoredList: List<String>? = when {
+                dto.customSeedHexes != null -> dto.customSeedHexes
+                !dto.activeCustomSeedHex.isNullOrBlank() ->
+                    listOf(dto.activeCustomSeedHex.trim())
+                !dto.customSeedHex.isNullOrBlank() ->
+                    listOf(dto.customSeedHex.trim())
+                else -> null
+            }
+            if (restoredList != null) {
+                val normalizedList = restoredList.mapNotNull { normalizeCustomSeedHexOrNull(it) }.distinct()
+                prefs[PrefKeys.CUSTOM_SEED_HEX_LIST] =
+                    customSeedHexListJson.encodeToString(normalizedList)
+                if (normalizedList.isEmpty()) {
+                    prefs.remove(PrefKeys.ACTIVE_CUSTOM_SEED_HEX)
+                    val sourceAfterColor = prefs[PrefKeys.COLOR_SOURCE]?.let { raw ->
+                        runCatching { AppColorSource.valueOf(raw) }.getOrNull()
+                    }
+                    if (sourceAfterColor == AppColorSource.CUSTOM) {
+                        prefs[PrefKeys.COLOR_SOURCE] = AppColorSource.DEFAULT.name
+                    }
+                } else {
+                    val activeCandidate = when {
+                        !dto.activeCustomSeedHex.isNullOrBlank() ->
+                            normalizeCustomSeedHexOrNull(dto.activeCustomSeedHex.trim())
+                        !dto.customSeedHex.isNullOrBlank() ->
+                            normalizeCustomSeedHexOrNull(dto.customSeedHex.trim())
+                        else -> normalizedList.firstOrNull()
+                    }
+                    val activeNorm = when {
+                        activeCandidate != null &&
+                            normalizedList.any { normalizeCustomSeedHexOrNull(it) == activeCandidate } ->
+                            activeCandidate
+                        else ->
+                            normalizeCustomSeedHexOrNull(normalizedList.first()) ?: normalizedList.first()
+                    }
+                    prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] = activeNorm
+                }
+                prefs.remove(PrefKeys.CUSTOM_SEED_HEX)
+            }
         }
     }
 }

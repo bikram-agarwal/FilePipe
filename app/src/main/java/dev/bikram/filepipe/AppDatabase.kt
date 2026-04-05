@@ -14,7 +14,7 @@ import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
 
 @Database(
     entities = [RuleEntity::class, RunHistoryEntity::class, FileMovedEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),

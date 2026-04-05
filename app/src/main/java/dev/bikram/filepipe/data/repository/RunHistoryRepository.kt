@@ -32,6 +32,12 @@ class RunHistoryRepository @Inject constructor(
     fun getAllHistory(): Flow<List<RunHistory>> =
         runHistoryDao.getAllHistory().map { it.map { entity -> entity.toDomain() } }
 
+    /** For rules list "last run" sort: map rule id to most recent run [RunHistory.startedAt]. */
+    fun observeLastRunStartedAtByRuleId(): Flow<Map<Long, Long>> =
+        runHistoryDao.observeLastStartedAtByRuleId().map { rows ->
+            rows.associate { row -> row.ruleId to row.lastStartedAt }
+        }
+
     suspend fun getAllHistoryOnce(): List<RunHistory> =
         runHistoryDao.getAllHistoryOnce().map { it.toDomain() }
 
@@ -44,7 +50,7 @@ class RunHistoryRepository @Inject constructor(
     ): Flow<PagingData<RunHistory>> =
         Pager(PagingConfig(pageSize = 30, enablePlaceholders = false)) {
             when (sortKey) {
-                HistorySortKey.LAST_RAN -> when (sortDirection) {
+                HistorySortKey.LAST_RAN, HistorySortKey.MY_ORDER -> when (sortDirection) {
                     HistorySortDirection.DESCENDING -> runHistoryDao.getAllHistoryPagedLastRanDesc()
                     HistorySortDirection.ASCENDING -> runHistoryDao.getAllHistoryPagedLastRanAsc()
                 }
@@ -62,7 +68,7 @@ class RunHistoryRepository @Inject constructor(
     ): Flow<PagingData<RunHistory>> =
         Pager(PagingConfig(pageSize = 30, enablePlaceholders = false)) {
             when (sortKey) {
-                HistorySortKey.LAST_RAN -> when (sortDirection) {
+                HistorySortKey.LAST_RAN, HistorySortKey.MY_ORDER -> when (sortDirection) {
                     HistorySortDirection.DESCENDING -> runHistoryDao.getHistoryForRulePagedLastRanDesc(ruleId)
                     HistorySortDirection.ASCENDING -> runHistoryDao.getHistoryForRulePagedLastRanAsc(ruleId)
                 }

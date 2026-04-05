@@ -71,7 +71,9 @@ class MainActivity : ComponentActivity() {
                 themeMode = preferences.themeMode,
                 colorSource = preferences.colorSource,
                 themePaletteStyle = preferences.themePaletteStyle,
-                hapticFeedbackEnabled = preferences.hapticFeedbackEnabled
+                hapticFeedbackEnabled = preferences.hapticFeedbackEnabled,
+                useGradientBackground = preferences.useGradientBackground,
+                activeCustomSeedHex = preferences.activeCustomSeedHex
             ) {
                 if (introSeenAtLaunch == null) {
                     Surface(

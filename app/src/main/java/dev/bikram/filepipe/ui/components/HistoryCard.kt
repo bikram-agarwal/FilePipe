@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,13 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
@@ -22,7 +19,6 @@ import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,9 +31,12 @@ import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import dev.bikram.filepipe.domain.model.isNoChangesRun
 import dev.bikram.filepipe.domain.model.TriggerType
+import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private val HistoryCardShape = RoundedCornerShape(16.dp)
 
 @Composable
 fun HistoryCard(
@@ -45,17 +44,16 @@ fun HistoryCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val hoverInteraction = remember { MutableInteractionSource() }
-    val isHovered by hoverInteraction.collectIsHoveredAsState()
-    val elevation by animateDpAsState(
-        targetValue = if (isHovered) 8.dp else 2.dp,
-        label = "cardElevation"
-    )
-    ElevatedCard(
-        modifier = modifier.fillMaxWidth().hoverable(hoverInteraction),
-        onClick = onClick,
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = elevation),
-        colors = CardDefaults.elevatedCardColors()
+    val cardColors = elevatedCardColors()
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = HistoryCardShape,
+        color = cardColors.containerColor,
+        contentColor = cardColors.contentColor,
+        tonalElevation = 1.dp,
+        shadowElevation = 0.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -107,7 +105,7 @@ fun HistoryCard(
                     history.totalFilesMoved == 0 &&
                     history.totalFilesFailed == 0 &&
                     history.cancelledUnprocessedCount == 0 ->
-                    stringResource(R.string.history_file_summary_cancelled)
+                    stringResource(R.string.status_cancelled)
                 history.totalFilesMoved == 0 && history.totalFilesFailed == 0 && cancelledPart.isEmpty() ->
                     "No files affected"
                 else -> buildString {

@@ -11,6 +11,8 @@ data class Rule(
     val destinationFolderPath: String,
     val fileExtensions: List<String>,
     val isEnabled: Boolean = true,
+    /** Display order when sorting by [HistorySortKey.MY_ORDER]; lower first. */
+    val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val schedule: RuleSchedule? = null,

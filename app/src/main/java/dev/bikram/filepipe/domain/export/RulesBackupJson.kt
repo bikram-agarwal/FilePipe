@@ -34,6 +34,7 @@ data class RuleBackupDto(
     val destinationFolderPath: String,
     val fileExtensions: List<String>,
     val isEnabled: Boolean = true,
+    val sortOrder: Int = 0,
     val schedule: ScheduleBackupDto? = null,
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
@@ -103,7 +104,11 @@ data class SettingsBackupDto(
     val hapticFeedbackEnabled: Boolean = true,
     val progressiveBlurEnabled: Boolean = true,
     val autoCheckForUpdates: Boolean = true,
-    val useGradientBackground: Boolean = true
+    val useGradientBackground: Boolean = true,
+    val useFixedCardColors: Boolean = false,
+    val customSeedHex: String? = null,
+    val customSeedHexes: List<String>? = null,
+    val activeCustomSeedHex: String? = null
 )
 
 private val jsonFormatter = Json {
@@ -119,6 +124,7 @@ fun Rule.toBackupDto(): RuleBackupDto = RuleBackupDto(
     destinationFolderPath = destinationFolderPath,
     fileExtensions = fileExtensions,
     isEnabled = isEnabled,
+    sortOrder = sortOrder,
     schedule = schedule?.toBackupDto(),
     conflictPolicy = conflictPolicy.name,
     operationMode = operationMode.name,
@@ -184,7 +190,11 @@ fun AppPreferences.toBackupDto(): SettingsBackupDto = SettingsBackupDto(
     hapticFeedbackEnabled = hapticFeedbackEnabled,
     progressiveBlurEnabled = progressiveBlurEnabled,
     autoCheckForUpdates = autoCheckForUpdates,
-    useGradientBackground = useGradientBackground
+    useGradientBackground = useGradientBackground,
+    useFixedCardColors = useFixedCardColors,
+    customSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },
+    customSeedHexes = savedCustomSeedHexes.takeIf { it.isNotEmpty() },
+    activeCustomSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() }
 )
 
 fun RuleBackupDto.toDomain(): Rule = Rule(
@@ -194,6 +204,7 @@ fun RuleBackupDto.toDomain(): Rule = Rule(
     destinationFolderPath = destinationFolderPath,
     fileExtensions = fileExtensions,
     isEnabled = isEnabled,
+    sortOrder = sortOrder,
     schedule = schedule?.toDomain(),
     conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
     operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),

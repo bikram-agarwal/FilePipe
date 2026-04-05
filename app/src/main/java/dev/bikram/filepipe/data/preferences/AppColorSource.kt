@@ -5,6 +5,8 @@ import androidx.compose.ui.graphics.Color
 enum class AppColorSource {
     DEFAULT,
     MATERIAL_YOU,
+    /** Seed from [AppPreferences.activeCustomSeedHex] (Material Kolor, same as presets). */
+    CUSTOM,
     PRESET_SAPPHIRE,
     PRESET_EMERALD,
     PRESET_AMBER,
@@ -17,6 +19,7 @@ enum class AppColorSource {
 
     val isSeedBased: Boolean
         get() = when (this) {
+            CUSTOM,
             PRESET_SAPPHIRE, PRESET_EMERALD, PRESET_AMBER, PRESET_VIOLET, PRESET_CORAL,
             PRESET_TEAL, PRESET_LIME, PRESET_ROSE, PRESET_SLATE -> true
             else -> false

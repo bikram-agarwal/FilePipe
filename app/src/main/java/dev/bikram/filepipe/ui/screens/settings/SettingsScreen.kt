@@ -128,6 +128,7 @@ import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.ui.components.text.SimpleMarkdown
 
@@ -237,12 +238,15 @@ fun SettingsScreen(
     }
 
     if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
+        val updateSheetContainerColors = elevatedCardColors()
         ModalBottomSheet(
             onDismissRequest = {
                 showUpdateSheet = false
                 viewModel.dismissUpdateSheet()
             },
-            sheetState = updateSheetState
+            sheetState = updateSheetState,
+            containerColor = updateSheetContainerColors.containerColor,
+            contentColor = updateSheetContainerColors.contentColor
         ) {
             UpdateCheckBottomSheetContent(
                 maxSheetHeight = maxUpdateSheetHeight,
@@ -336,6 +340,8 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 ThemeColorSection(
                     colorSource = preferences.colorSource,
+                    savedCustomSeedHexes = preferences.savedCustomSeedHexes,
+                    activeCustomSeedHex = preferences.activeCustomSeedHex,
                     themePaletteStyle = preferences.themePaletteStyle,
                     onColorSource = { source ->
                         playTap()
@@ -344,6 +350,18 @@ fun SettingsScreen(
                     onPaletteStyle = { style ->
                         playTap()
                         viewModel.setThemePaletteStyle(style)
+                    },
+                    onAddCustomSeedHex = { hex ->
+                        playTap()
+                        viewModel.addCustomSeedHex(hex)
+                    },
+                    onSelectCustomSeedHex = { hex ->
+                        playTap()
+                        viewModel.selectCustomSeedHex(hex)
+                    },
+                    onRemoveCustomSeedHex = { hex ->
+                        playTap()
+                        viewModel.removeCustomSeedHex(hex)
                     }
                 )
                 if (preferences.colorSource == AppColorSource.MATERIAL_YOU && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
@@ -364,6 +382,17 @@ fun SettingsScreen(
                             onCheckedChange = { enabled ->
                                 playTap()
                                 viewModel.setUseGradientBackground(enabled)
+                            }
+                        )
+                    }
+                    GroupedListItem(position = GroupPosition.MIDDLE) {
+                        SettingsToggleItem(
+                            title = stringResource(R.string.settings_fixed_card_colors),
+                            subtitle = stringResource(R.string.settings_fixed_card_colors_desc),
+                            checked = preferences.useFixedCardColors,
+                            onCheckedChange = { enabled ->
+                                playTap()
+                                viewModel.setUseFixedCardColors(enabled)
                             }
                         )
                     }
@@ -725,7 +754,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(Modifier.height(10.dp))
                                 Text(
-                                    text = stringResource(R.string.settings_about_tagline),
+                                    text = stringResource(R.string.app_tagline),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center
@@ -814,6 +843,7 @@ private fun UpdateCheckBottomSheetContent(
     onDownloadClick: (UpdateInfo) -> Unit
 ) {
     val sheetScroll = rememberScrollState()
+    val changelogSurfaceColors = elevatedCardColors()
     Column(
         Modifier
             .fillMaxWidth()
@@ -885,7 +915,7 @@ private fun UpdateCheckBottomSheetContent(
                         UpToDatePhoneIcon()
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = stringResource(R.string.settings_update_sheet_up_to_date),
+                            text = stringResource(R.string.settings_up_to_date),
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
@@ -910,7 +940,10 @@ private fun UpdateCheckBottomSheetContent(
                         .fillMaxWidth()
                         .height(120.dp),
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer
+                    color = changelogSurfaceColors.containerColor,
+                    contentColor = changelogSurfaceColors.contentColor,
+                    tonalElevation = 1.dp,
+                    shadowElevation = 0.dp
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -924,7 +957,10 @@ private fun UpdateCheckBottomSheetContent(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer
+                    color = changelogSurfaceColors.containerColor,
+                    contentColor = changelogSurfaceColors.contentColor,
+                    tonalElevation = 1.dp,
+                    shadowElevation = 0.dp
                 ) {
                     SimpleMarkdown(
                         content = changelogState.text,
@@ -938,7 +974,10 @@ private fun UpdateCheckBottomSheetContent(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer
+                    color = changelogSurfaceColors.containerColor,
+                    contentColor = changelogSurfaceColors.contentColor,
+                    tonalElevation = 1.dp,
+                    shadowElevation = 0.dp
                 ) {
                     Text(
                         text = changelogState.message,

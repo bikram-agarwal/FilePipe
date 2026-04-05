@@ -115,9 +115,6 @@
     <string name="history_files_copied">%d files copied</string>
     <string name="history_files_failed">%d failed</string>
     <string name="history_files_cancelled_remaining">%d not processed (cancelled)</string>
-    <string name="history_file_summary_cancelled">Cancelled</string>
-    <string name="history_filter_cancelled">Cancelled</string>
-    <string name="history_status_header_cancelled">Cancelled</string>
     <string name="history_clear">Clear history</string>
     <string name="history_clear_content_description">Clear all history</string>
     <string name="history_clear_confirm_title">Clear all history?</string>
@@ -130,6 +127,7 @@
     <string name="status_in_progress">Running</string>
     <string name="status_cancelled">Cancelled</string>
     <string name="status_undone">Undone</string>
+    <string name="status_no_changes">No changes</string>
 
     <string name="undo_success_restored">%d file(s) restored to the original folder</string>
     <string name="undo_success_deleted_destination">%d file(s) deleted at destination</string>
@@ -165,24 +163,15 @@
     <string name="history_sort_last_ran_oldest">Last run (oldest first)</string>
     <string name="history_sort_rule_name_az">Rule name (A to Z)</string>
     <string name="history_sort_rule_name_za">Rule name (Z to A)</string>
+    <string name="rules_sort_my_order">My order</string>
     <string name="history_filter_all">All</string>
-    <string name="history_filter_success">Success</string>
-    <string name="history_filter_failed">Failed</string>
-    <string name="history_filter_partial">Partial</string>
-    <string name="history_filter_no_changes">No changes</string>
-    <string name="history_filter_undone">Undone</string>
     <string name="history_view_by_date">By date</string>
     <string name="history_view_by_rule">By rule</string>
     <string name="history_group_menu">Group runs</string>
     <string name="history_group_by_date">Group by date</string>
     <string name="history_group_by_rule">Group by rule</string>
     <string name="history_group_by_status">Group by status</string>
-    <string name="history_status_header_success">Success</string>
-    <string name="history_status_header_failed">Failed</string>
-    <string name="history_status_header_partial">Partial</string>
-    <string name="history_status_header_no_changes">No changes</string>
     <string name="history_status_header_in_progress">In progress</string>
-    <string name="history_status_header_undone">Undone</string>
 
     <!-- Onboarding wizard -->
     <string name="onboarding_wizard_title">Create your first rule</string>
@@ -197,6 +186,8 @@
     <string name="settings_appearance_section">Appearance</string>
     <string name="settings_gradient_background">Gradient background</string>
     <string name="settings_gradient_background_desc">Tinted background using your theme color</string>
+    <string name="settings_fixed_card_colors">Fixed card colors</string>
+    <string name="settings_fixed_card_colors_desc">Neutral grey cards instead of accent-tinted</string>
     <string name="settings_backup_section">Import/Export</string>
     <string name="settings_choose_export_folder">Choose export folder</string>
     <string name="settings_export_folder_hint">Folder for exporting backups (rules, history, settings).</string>
@@ -218,7 +209,17 @@
     <string name="theme_color_default">Default</string>
     <string name="settings_theme_colors_hint">Accent and dynamic color source</string>
     <string name="settings_palette_style">Palette style</string>
-    <string name="settings_palette_style_hint">How secondary and tertiary colors relate to the seed (preset accents only)</string>
+    <string name="settings_custom_seed_label">Custom accent (hex)</string>
+    <string name="settings_custom_seed_placeholder">#RRGGBB or RRGGBB</string>
+    <string name="settings_custom_seed_supporting">Invalid hex falls back to the default blue.</string>
+    <string name="settings_custom_seed_apply">Apply</string>
+    <string name="settings_custom_seed_dialog_title">Add custom accent color</string>
+    <string name="settings_custom_seed_dialog_add">Add</string>
+    <string name="settings_custom_seed_preview_label">Preview</string>
+    <string name="settings_custom_seed_preview_invalid">Enter a valid hex color</string>
+    <string name="settings_custom_seed_row_hint">Long-press a custom color swatch to delete it.</string>
+    <string name="settings_custom_seed_remove_title">Remove this color?</string>
+    <string name="settings_custom_seed_remove_message">It will be removed from your saved custom accents.</string>
     <string name="theme_palette_tonal_spot">Tonal spot</string>
     <string name="theme_palette_neutral">Neutral</string>
     <string name="theme_palette_vibrant">Vibrant</string>
@@ -230,12 +231,11 @@
     <string name="theme_palette_content">Content</string>
     <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
     <string name="settings_about_section">About</string>
-    <string name="settings_about_tagline">Organize your files automatically</string>
     <string name="settings_view_on_github">View on GitHub</string>
     <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_title_subtitle">Organize your files automatically</string>
+    <string name="app_tagline">Organize your files automatically</string>
     <string name="onboarding_lets_begin">Let\'s Begin</string>
     <string name="onboarding_byline">by Bikram Agarwal</string>
     <!-- Feedback / new settings -->
@@ -243,7 +243,7 @@
     <string name="settings_haptic_feedback">Haptic Feedback</string>
     <string name="settings_haptic_feedback_desc">Tap sounds and swipe vibrations</string>
     <string name="settings_progressive_blur">Progressive Blur</string>
-    <string name="settings_progressive_blur_desc">Frosted blur behind the tab bar on Android 12+</string>
+    <string name="settings_progressive_blur_desc">Frosted blur at top &amp; bottom of screen</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_desc">Run summaries and reminders</string>
     <string name="theme_black">Black (OLED)</string>
@@ -260,7 +260,6 @@
     <string name="settings_installing">Installing…</string>
     <string name="settings_update_available">Version %1$s available</string>
     <string name="settings_up_to_date">You\'re up to date</string>
-    <string name="settings_update_sheet_up_to_date">You are up to date</string>
     <string name="settings_changelog_title">What\'s New</string>
     <string name="settings_changelog_load_failed">Could not load changelog</string>
     <string name="settings_play_in_app_update_failed">Could not start the update. Try Check for updates again.</string>
@@ -285,7 +284,6 @@
 
     <!-- Template picker -->
     <string name="template_picker_title">Start from a template</string>
-    <string name="template_skip">Start blank</string>
 
     <!-- Settings — history section -->
     <string name="settings_history_section">History</string>
@@ -299,8 +297,6 @@
     <string name="notification_summary_channel_name">Run Summary</string>
     <string name="notification_summary_channel_desc">Shows a summary after each rule run completes</string>
     <string name="notification_summary_title">%s complete</string>
-    <string name="notification_summary_body_moved">%d files moved</string>
-    <string name="notification_summary_body_copied">%d files copied</string>
     <string name="notification_summary_body_partial">%1$d moved, %2$d failed</string>
     <string name="notification_summary_body_partial_copied">%1$d copied, %2$d failed</string>
 
@@ -321,7 +317,6 @@
 
     <!-- Folder bookmarks -->
     <string name="bookmark_toggle_cd">Toggle bookmark</string>
-    <string name="bookmarks_quick_pick">Bookmarks</string>
     <string name="bookmarks_choose">Bookmarks</string>
 
     <!-- Days of week -->

@@ -117,12 +117,12 @@ fun HistoryScreen(
 
     val filterChipsData = listOf(
         HistoryStatusFilter.ALL to stringResource(R.string.history_filter_all),
-        HistoryStatusFilter.SUCCESS to stringResource(R.string.history_filter_success),
-        HistoryStatusFilter.FAILED to stringResource(R.string.history_filter_failed),
-        HistoryStatusFilter.PARTIAL to stringResource(R.string.history_filter_partial),
-        HistoryStatusFilter.NO_CHANGES to stringResource(R.string.history_filter_no_changes),
-        HistoryStatusFilter.CANCELLED to stringResource(R.string.history_filter_cancelled),
-        HistoryStatusFilter.UNDONE to stringResource(R.string.history_filter_undone)
+        HistoryStatusFilter.SUCCESS to stringResource(R.string.status_success),
+        HistoryStatusFilter.FAILED to stringResource(R.string.status_failed),
+        HistoryStatusFilter.PARTIAL to stringResource(R.string.status_partial),
+        HistoryStatusFilter.NO_CHANGES to stringResource(R.string.status_no_changes),
+        HistoryStatusFilter.CANCELLED to stringResource(R.string.status_cancelled),
+        HistoryStatusFilter.UNDONE to stringResource(R.string.status_undone)
     )
 
     if (showClearConfirm) {
@@ -484,13 +484,13 @@ fun HistoryScreen(
 
 @Composable
 private fun historyStatusSectionTitle(section: HistoryStatusSection): String = when (section) {
-    HistoryStatusSection.SUCCESS -> stringResource(R.string.history_status_header_success)
-    HistoryStatusSection.FAILED -> stringResource(R.string.history_status_header_failed)
-    HistoryStatusSection.PARTIAL -> stringResource(R.string.history_status_header_partial)
-    HistoryStatusSection.NO_CHANGES -> stringResource(R.string.history_status_header_no_changes)
+    HistoryStatusSection.SUCCESS -> stringResource(R.string.status_success)
+    HistoryStatusSection.FAILED -> stringResource(R.string.status_failed)
+    HistoryStatusSection.PARTIAL -> stringResource(R.string.status_partial)
+    HistoryStatusSection.NO_CHANGES -> stringResource(R.string.status_no_changes)
     HistoryStatusSection.IN_PROGRESS -> stringResource(R.string.history_status_header_in_progress)
-    HistoryStatusSection.CANCELLED -> stringResource(R.string.history_status_header_cancelled)
-    HistoryStatusSection.UNDONE -> stringResource(R.string.history_status_header_undone)
+    HistoryStatusSection.CANCELLED -> stringResource(R.string.status_cancelled)
+    HistoryStatusSection.UNDONE -> stringResource(R.string.status_undone)
 }
 
 @Composable

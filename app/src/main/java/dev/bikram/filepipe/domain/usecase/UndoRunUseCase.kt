@@ -151,18 +151,27 @@ class UndoRunUseCase @Inject constructor(
             documentId.count { segment -> segment == '/' }
         }
         for (folderDocumentId in deepestFirst) {
-            val folderUri = DocumentsContract.buildDocumentUri(authority, folderDocumentId)
-            val folderDoc = DocumentFile.fromSingleUri(context, folderUri) ?: continue
-            if (!folderDoc.isDirectory) continue
-            val children = try {
-                folderDoc.listFiles()
-            } catch (_: SecurityException) {
-                null
-            }
-            if (children != null && children.isNotEmpty()) continue
             try {
-                folderDoc.delete()
-            } catch (_: SecurityException) {
+                val folderUri = DocumentsContract.buildDocumentUri(authority, folderDocumentId)
+                val folderDoc = try {
+                    DocumentFile.fromSingleUri(context, folderUri)
+                } catch (_: Exception) {
+                    null
+                } ?: continue
+                val isDirectory = try {
+                    folderDoc.isDirectory
+                } catch (_: Exception) {
+                    continue
+                }
+                if (!isDirectory) continue
+                val children = try {
+                    folderDoc.listFiles()
+                } catch (_: Exception) {
+                    null
+                }
+                if (children != null && children.isNotEmpty()) continue
+                deleteDocumentUriWithFallback(folderUri)
+            } catch (_: Exception) {
             }
         }
     }
@@ -201,29 +210,58 @@ class UndoRunUseCase @Inject constructor(
     }
 
     /**
-     * Derives the parent folder as a SAF tree URI string from a document URI.
-     * e.g. content://...document/primary%3ADCIM%2FCamera%2Fphoto.jpg
-     *   → content://...tree/primary%3ADCIM%2FCamera
-     */
-    /**
      * Removes destination folders that were created during the copy run, deepest first,
      * only when still empty (so pre-existing folders or folders with leftover content stay).
      */
     private fun deleteEmptyRecordedCopyFolders(folderUriStrings: List<String>) {
         val distinctSorted = folderUriStrings.distinct().sortedByDescending { documentPathDepth(it) }
         for (uriString in distinctSorted) {
-            val folderDoc = DocumentFile.fromSingleUri(context, Uri.parse(uriString)) ?: continue
-            if (!folderDoc.exists() || !folderDoc.isDirectory) continue
-            val children = try {
-                folderDoc.listFiles()
-            } catch (_: SecurityException) {
-                null
-            }
-            if (!children.isNullOrEmpty()) continue
             try {
-                folderDoc.delete()
-            } catch (_: SecurityException) {
+                val folderUri = Uri.parse(uriString)
+                val folderDoc = try {
+                    DocumentFile.fromSingleUri(context, folderUri)
+                } catch (_: Exception) {
+                    null
+                } ?: continue
+                val exists = try {
+                    folderDoc.exists()
+                } catch (_: Exception) {
+                    continue
+                }
+                if (!exists) continue
+                val isDirectory = try {
+                    folderDoc.isDirectory
+                } catch (_: Exception) {
+                    continue
+                }
+                if (!isDirectory) continue
+                val children = try {
+                    folderDoc.listFiles()
+                } catch (_: Exception) {
+                    null
+                }
+                if (!children.isNullOrEmpty()) continue
+                deleteDocumentUriWithFallback(folderUri)
+            } catch (_: Exception) {
             }
+        }
+    }
+
+    private fun deleteDocumentUriWithFallback(documentUri: Uri) {
+        try {
+            if (DocumentsContract.deleteDocument(context.contentResolver, documentUri)) {
+                return
+            }
+        } catch (_: Exception) {
+        }
+        val doc = try {
+            DocumentFile.fromSingleUri(context, documentUri)
+        } catch (_: Exception) {
+            null
+        }
+        try {
+            doc?.delete()
+        } catch (_: Exception) {
         }
     }
 
@@ -238,6 +276,11 @@ class UndoRunUseCase @Inject constructor(
         }
     }
 
+    /**
+     * Derives the parent folder as a SAF tree URI string from a document URI.
+     * e.g. content://...document/primary%3ADCIM%2FCamera%2Fphoto.jpg
+     *   → content://...tree/primary%3ADCIM%2FCamera
+     */
     private fun parentTreeUriString(documentUriString: String): String? {
         if (!documentUriString.startsWith("content://")) return null
         return try {

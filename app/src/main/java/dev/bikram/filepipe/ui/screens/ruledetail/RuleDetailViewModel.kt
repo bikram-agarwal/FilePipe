@@ -35,6 +35,7 @@ import javax.inject.Inject
 
 data class RuleDetailUiState(
     val id: Long = 0,
+    val sortOrder: Int = 0,
     val name: String = "",
     val sourceFolderPaths: List<String> = emptyList(),
     val destinationFolderPath: String = "",
@@ -152,6 +153,7 @@ class RuleDetailViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     id = rule.id,
+                    sortOrder = rule.sortOrder,
                     name = rule.name,
                     sourceFolderPaths = rule.sourceFolderPaths,
                     destinationFolderPath = rule.destinationFolderPath,
@@ -402,6 +404,7 @@ class RuleDetailViewModel @Inject constructor(
 
     private fun buildRuleFromState(state: RuleDetailUiState) = Rule(
         id = state.id,
+        sortOrder = state.sortOrder,
         name = state.name.trim(),
         sourceFolderPaths = state.sourceFolderPaths,
         destinationFolderPath = state.destinationFolderPath,

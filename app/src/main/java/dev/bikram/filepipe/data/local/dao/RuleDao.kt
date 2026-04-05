@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import dev.bikram.filepipe.data.local.entity.RuleEntity
 import kotlinx.coroutines.flow.Flow
@@ -27,6 +28,11 @@ interface RuleDao {
     @Update
     suspend fun updateRule(rule: RuleEntity)
 
+    @Transaction
+    suspend fun updateRulesSortOrders(rules: List<RuleEntity>) {
+        rules.forEach { updateRule(it) }
+    }
+
     @Delete
     suspend fun deleteRule(rule: RuleEntity)
 
@@ -35,6 +41,9 @@ interface RuleDao {
 
     @Query("SELECT id FROM rules")
     suspend fun getAllRuleIds(): List<Long>
+
+    @Query("SELECT IFNULL(MAX(sortOrder), -1) FROM rules")
+    suspend fun getMaxSortOrder(): Int
 
     @Query("DELETE FROM rules")
     suspend fun deleteAllRules()

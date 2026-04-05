@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -37,6 +36,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
@@ -71,19 +71,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -108,6 +116,10 @@ import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+
+private data class RulesListScrollAnchor(val ruleId: Long, val scrollOffset: Int)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,6 +134,8 @@ fun RulesScreen(
     val playTap = rememberPlayTapSound()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val rules = uiState.rules
+    val sortKey = uiState.sortKey
+    val sortDirection = uiState.sortDirection
     val selectedRuleIds = uiState.selectedRuleIds
     val progressMap = uiState.progressMap
     val isRunning = uiState.isRunning
@@ -142,6 +156,56 @@ fun RulesScreen(
     val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
 
     val hasSelection = selectedRuleIds.isNotEmpty()
+    val lazyListState = rememberLazyListState()
+    var reorderableRules by remember { mutableStateOf(rules) }
+    var previousSortKey by remember { mutableStateOf<HistorySortKey?>(null) }
+    var previousSortDirection by remember { mutableStateOf<HistorySortDirection?>(null) }
+    LaunchedEffect(sortKey, sortDirection, rules) {
+        val sortModeChanged =
+            previousSortKey != sortKey || previousSortDirection != sortDirection
+        previousSortKey = sortKey
+        previousSortDirection = sortDirection
+        if (rules.isEmpty()) {
+            reorderableRules = emptyList()
+            return@LaunchedEffect
+        }
+        if (sortModeChanged) {
+            reorderableRules = rules
+            return@LaunchedEffect
+        }
+        if (reorderableRules.isEmpty()) {
+            reorderableRules = rules
+            return@LaunchedEffect
+        }
+        val freshByRuleId = rules.associateBy { it.id }
+        reorderableRules = reorderableRules.mapNotNull { rule -> freshByRuleId[rule.id] }
+    }
+    val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        reorderableRules = reorderableRules.toMutableList().apply {
+            add(to.index, removeAt(from.index))
+        }
+    }
+    val sortKeyState = rememberUpdatedState(sortKey)
+    var scrollRestoreAnchor by remember { mutableStateOf<RulesListScrollAnchor?>(null) }
+    var sortMenuScrollGeneration by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(sortMenuScrollGeneration) {
+        if (sortMenuScrollGeneration == 0) return@LaunchedEffect
+        val anchor = scrollRestoreAnchor ?: return@LaunchedEffect
+        scrollRestoreAnchor = null
+        snapshotFlow {
+            val currentRules = reorderableRules
+            currentRules to lazyListState.layoutInfo.totalItemsCount
+        }.first { (currentRules, lazyTotal) ->
+            lazyTotal >= currentRules.size &&
+                currentRules.isNotEmpty() &&
+                currentRules.any { it.id == anchor.ruleId }
+        }
+        val targetIndex = reorderableRules.indexOfFirst { it.id == anchor.ruleId }
+        if (targetIndex < 0) return@LaunchedEffect
+        delay(48)
+        lazyListState.scrollToItem(targetIndex, anchor.scrollOffset.coerceAtLeast(0))
+    }
 
     BackHandler(enabled = hasSelection) {
         viewModel.clearSelection()
@@ -233,36 +297,123 @@ fun RulesScreen(
                                     expanded = sortMenuExpanded,
                                     onDismissRequest = { sortMenuExpanded = false }
                                 ) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
+                                    RulesSortMenuItem(
+                                        label = stringResource(R.string.history_sort_last_ran_newest),
+                                        selected = sortKey == HistorySortKey.LAST_RAN &&
+                                            sortDirection == HistorySortDirection.DESCENDING,
                                         onClick = {
                                             playTap()
-                                            viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
+                                            val firstIndex = lazyListState.firstVisibleItemIndex
+                                            scrollRestoreAnchor =
+                                                if (firstIndex >= 0 && firstIndex < reorderableRules.size) {
+                                                    RulesListScrollAnchor(
+                                                        ruleId = reorderableRules[firstIndex].id,
+                                                        scrollOffset = lazyListState.firstVisibleItemScrollOffset
+                                                    )
+                                                } else {
+                                                    null
+                                                }
+                                            viewModel.setSort(
+                                                HistorySortKey.LAST_RAN,
+                                                HistorySortDirection.DESCENDING
+                                            )
                                             sortMenuExpanded = false
+                                            sortMenuScrollGeneration++
                                         }
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
+                                    RulesSortMenuItem(
+                                        label = stringResource(R.string.history_sort_last_ran_oldest),
+                                        selected = sortKey == HistorySortKey.LAST_RAN &&
+                                            sortDirection == HistorySortDirection.ASCENDING,
                                         onClick = {
                                             playTap()
-                                            viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
+                                            val firstIndex = lazyListState.firstVisibleItemIndex
+                                            scrollRestoreAnchor =
+                                                if (firstIndex >= 0 && firstIndex < reorderableRules.size) {
+                                                    RulesListScrollAnchor(
+                                                        ruleId = reorderableRules[firstIndex].id,
+                                                        scrollOffset = lazyListState.firstVisibleItemScrollOffset
+                                                    )
+                                                } else {
+                                                    null
+                                                }
+                                            viewModel.setSort(
+                                                HistorySortKey.LAST_RAN,
+                                                HistorySortDirection.ASCENDING
+                                            )
                                             sortMenuExpanded = false
+                                            sortMenuScrollGeneration++
                                         }
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
+                                    RulesSortMenuItem(
+                                        label = stringResource(R.string.history_sort_rule_name_az),
+                                        selected = sortKey == HistorySortKey.RULE_NAME &&
+                                            sortDirection == HistorySortDirection.ASCENDING,
                                         onClick = {
                                             playTap()
-                                            viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
+                                            val firstIndex = lazyListState.firstVisibleItemIndex
+                                            scrollRestoreAnchor =
+                                                if (firstIndex >= 0 && firstIndex < reorderableRules.size) {
+                                                    RulesListScrollAnchor(
+                                                        ruleId = reorderableRules[firstIndex].id,
+                                                        scrollOffset = lazyListState.firstVisibleItemScrollOffset
+                                                    )
+                                                } else {
+                                                    null
+                                                }
+                                            viewModel.setSort(
+                                                HistorySortKey.RULE_NAME,
+                                                HistorySortDirection.ASCENDING
+                                            )
                                             sortMenuExpanded = false
+                                            sortMenuScrollGeneration++
                                         }
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
+                                    RulesSortMenuItem(
+                                        label = stringResource(R.string.history_sort_rule_name_za),
+                                        selected = sortKey == HistorySortKey.RULE_NAME &&
+                                            sortDirection == HistorySortDirection.DESCENDING,
                                         onClick = {
                                             playTap()
-                                            viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)
+                                            val firstIndex = lazyListState.firstVisibleItemIndex
+                                            scrollRestoreAnchor =
+                                                if (firstIndex >= 0 && firstIndex < reorderableRules.size) {
+                                                    RulesListScrollAnchor(
+                                                        ruleId = reorderableRules[firstIndex].id,
+                                                        scrollOffset = lazyListState.firstVisibleItemScrollOffset
+                                                    )
+                                                } else {
+                                                    null
+                                                }
+                                            viewModel.setSort(
+                                                HistorySortKey.RULE_NAME,
+                                                HistorySortDirection.DESCENDING
+                                            )
                                             sortMenuExpanded = false
+                                            sortMenuScrollGeneration++
+                                        }
+                                    )
+                                    RulesSortMenuItem(
+                                        label = stringResource(R.string.rules_sort_my_order),
+                                        selected = sortKey == HistorySortKey.MY_ORDER,
+                                        onClick = {
+                                            playTap()
+                                            val firstIndex = lazyListState.firstVisibleItemIndex
+                                            scrollRestoreAnchor =
+                                                if (firstIndex >= 0 && firstIndex < reorderableRules.size) {
+                                                    RulesListScrollAnchor(
+                                                        ruleId = reorderableRules[firstIndex].id,
+                                                        scrollOffset = lazyListState.firstVisibleItemScrollOffset
+                                                    )
+                                                } else {
+                                                    null
+                                                }
+                                            viewModel.setSort(
+                                                HistorySortKey.MY_ORDER,
+                                                HistorySortDirection.ASCENDING
+                                            )
+                                            sortMenuExpanded = false
+                                            sortMenuScrollGeneration++
                                         }
                                     )
                                 }
@@ -386,51 +537,87 @@ fun RulesScreen(
                     .padding(bottom = contentPadding.calculateBottomPadding())
             )
         } else {
+            val reorderLongPressActive = !isRunning
+            val listColumnPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = innerPadding.calculateTopPadding() + 8.dp,
+                bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 56.dp
+            )
+            val listModifier = Modifier
+                .fillMaxSize()
+                .then(scrollBlurModifier)
+
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(scrollBlurModifier),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = innerPadding.calculateTopPadding() + 8.dp,
-                    bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 56.dp
-                ),
+                state = lazyListState,
+                modifier = listModifier,
+                contentPadding = listColumnPadding,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(rules, key = { it.id }) { rule ->
-                    val isExpanded = viewModel.isCardExpanded(rule.id, isCompactMode, cardModeOverrides)
-                    val showInlineProgressCancel =
-                        manualRunCancelAnchor is ManualRunCancelAnchor.SingleRule &&
-                            manualRunCancelAnchor.ruleId == rule.id
-                    SwipeToDismissRuleCard(
-                        rule = rule,
-                        isSelected = rule.id in selectedRuleIds,
-                        isExpanded = isExpanded,
-                        progress = progressMap[rule.id],
-                        isAnyRuleRunning = isRunning,
-                        hasStaleFolder = rule.id in staleRuleIds,
-                        onStaleWarningClick = { onEditRule(rule.id) },
-                        swipeStartToEnd = swipeStartToEnd,
-                        swipeEndToStart = swipeEndToStart,
-                        onToggleEnabled = { enabled -> viewModel.toggleEnabled(rule, enabled) },
-                        onToggleSelectOrExpand = {
-                            if (hasSelection) viewModel.toggleSelection(rule.id)
-                            else viewModel.toggleCardExpansion(rule.id)
-                        },
-                        onLongClick = {
-                            viewModel.toggleSelection(rule.id)
-                        },
-                        onEdit = { onEditRule(rule.id) },
-                        onDelete = { pendingDeleteRule = rule },
-                        onDuplicate = { viewModel.duplicateRule(rule) },
-                        onRunRule = { viewModel.runRule(rule) },
-                        onCancelManualRun = { viewModel.cancelManualRun() },
-                        showInlineProgressCancel = showInlineProgressCancel,
-                        onPreviewRule = { viewModel.startPreview(rule) },
-                        onViewHistory = { onNavigateToRuleHistory(rule.id) },
-                        modifier = Modifier.animateItem()
-                    )
+                items(reorderableRules, key = { it.id }) { rule ->
+                    ReorderableItem(
+                        reorderableLazyListState,
+                        rule.id
+                    ) { isDragging ->
+                        val dragElevation by animateDpAsState(
+                            targetValue = if (isDragging) 8.dp else 0.dp,
+                            label = "ruleCardReorderShadow"
+                        )
+                        val reorderLongPressModifier = if (reorderLongPressActive) {
+                            Modifier.longPressDraggableHandle(
+                                onDragStopped = {
+                                    viewModel.applyDraggedOrder(
+                                        reorderableRules,
+                                        alsoSwitchSortToMyOrder = sortKeyState.value != HistorySortKey.MY_ORDER
+                                    )
+                                }
+                            )
+                        } else {
+                            Modifier
+                        }
+                        val isExpanded =
+                            viewModel.isCardExpanded(rule.id, isCompactMode, cardModeOverrides)
+                        val showInlineProgressCancel =
+                            manualRunCancelAnchor is ManualRunCancelAnchor.SingleRule &&
+                                manualRunCancelAnchor.ruleId == rule.id
+                        SwipeToDismissRuleCard(
+                            rule = rule,
+                            isSelected = rule.id in selectedRuleIds,
+                            isExpanded = isExpanded,
+                            progress = progressMap[rule.id],
+                            isAnyRuleRunning = isRunning,
+                            hasStaleFolder = rule.id in staleRuleIds,
+                            onStaleWarningClick = { onEditRule(rule.id) },
+                            swipeStartToEnd = swipeStartToEnd,
+                            swipeEndToStart = swipeEndToStart,
+                            onToggleEnabled = { enabled -> viewModel.toggleEnabled(rule, enabled) },
+                            onToggleSelectOrExpand = {
+                                if (hasSelection) viewModel.toggleSelection(rule.id)
+                                else viewModel.toggleCardExpansion(rule.id)
+                            },
+                            onLongClick = {
+                                viewModel.toggleSelection(rule.id)
+                            },
+                            onEdit = { onEditRule(rule.id) },
+                            onDelete = { pendingDeleteRule = rule },
+                            onDuplicate = { viewModel.duplicateRule(rule) },
+                            onRunRule = { viewModel.runRule(rule) },
+                            onCancelManualRun = { viewModel.cancelManualRun() },
+                            showInlineProgressCancel = showInlineProgressCancel,
+                            onPreviewRule = { viewModel.startPreview(rule) },
+                            onViewHistory = { onNavigateToRuleHistory(rule.id) },
+                            onLeadingLongClick = if (reorderLongPressActive) {
+                                { viewModel.toggleSelection(rule.id) }
+                            } else {
+                                null
+                            },
+                            reorderLongPressDragModifier = reorderLongPressModifier,
+                            suppressLongClickForReorder = reorderLongPressActive,
+                            modifier = Modifier
+                                .animateItem()
+                                .shadow(dragElevation, RoundedCornerShape(16.dp))
+                        )
+                    }
                 }
             }
         }
@@ -557,6 +744,42 @@ fun RulesScreen(
 }
 
 @Composable
+private fun RulesSortMenuItem(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val onSecondary = MaterialTheme.colorScheme.onSecondaryContainer
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    DropdownMenuItem(
+        modifier = if (selected) {
+            Modifier.background(MaterialTheme.colorScheme.secondaryContainer)
+        } else {
+            Modifier
+        },
+        text = {
+            Text(
+                label,
+                color = if (selected) onSecondary else onSurface
+            )
+        },
+        onClick = onClick,
+        leadingIcon = if (selected) {
+            {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = onSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        } else {
+            null
+        }
+    )
+}
+
+@Composable
 private fun SwipeToDismissRuleCard(
     rule: Rule,
     isSelected: Boolean,
@@ -578,6 +801,9 @@ private fun SwipeToDismissRuleCard(
     showInlineProgressCancel: Boolean,
     onPreviewRule: () -> Unit,
     onViewHistory: () -> Unit,
+    onLeadingLongClick: (() -> Unit)? = null,
+    reorderLongPressDragModifier: Modifier = Modifier,
+    suppressLongClickForReorder: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val cardShape = RoundedCornerShape(16.dp)
@@ -641,7 +867,10 @@ private fun SwipeToDismissRuleCard(
             onPreviewRule = onPreviewRule,
             onViewHistory = onViewHistory,
             hasStaleFolder = hasStaleFolder,
-            onStaleWarningClick = onStaleWarningClick
+            onStaleWarningClick = onStaleWarningClick,
+            onLeadingLongClick = onLeadingLongClick,
+            reorderLongPressDragModifier = reorderLongPressDragModifier,
+            suppressLongClickForReorder = suppressLongClickForReorder
         )
     }
 }

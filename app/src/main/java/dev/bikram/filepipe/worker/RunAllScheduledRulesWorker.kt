@@ -107,8 +107,8 @@ class RunAllScheduledRulesWorker @AssistedInject constructor(
             failed > 0 ->
                 appContext.getString(R.string.notification_summary_body_partial, moved, failed)
             operationMode == OperationMode.COPY ->
-                appContext.getString(R.string.notification_summary_body_copied, moved)
-            else -> appContext.getString(R.string.notification_summary_body_moved, moved)
+                appContext.getString(R.string.history_files_copied, moved)
+            else -> appContext.getString(R.string.history_files_moved, moved)
         }
         val builder = NotificationCompat.Builder(appContext, FileOrganizerWorker.SUMMARY_CHANNEL_ID)
             .setContentTitle(appContext.getString(R.string.notification_summary_title, ruleName))

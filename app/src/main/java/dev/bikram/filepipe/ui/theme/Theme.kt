@@ -6,7 +6,8 @@ import android.os.SystemClock
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import android.view.SoundEffectConstants
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -96,6 +97,49 @@ private fun ColorScheme.increaseBackgroundCardContrast(): ColorScheme {
     }
 }
 
+/**
+ * Subtle primary tint on container roles only (legacy). Used with gradient background so cards stay
+ * neutral against a saturated scrim and remain easy to tell apart from the gradient.
+ */
+private fun ColorScheme.boostSurfaceContainersTowardPrimaryForGradient(darkTheme: Boolean): ColorScheme {
+    val accentArgb = primary.toArgb()
+    val blendAmount = if (darkTheme) 0.2f else 0.12f
+    fun tinted(role: Color) = Color(ColorUtils.blendARGB(role.toArgb(), accentArgb, blendAmount))
+    return copy(
+        surfaceDim = tinted(surfaceDim),
+        surfaceBright = tinted(surfaceBright),
+        surfaceContainerLowest = tinted(surfaceContainerLowest),
+        surfaceContainerLow = tinted(surfaceContainerLow),
+        surfaceContainer = tinted(surfaceContainer),
+        surfaceContainerHigh = tinted(surfaceContainerHigh),
+        surfaceContainerHighest = tinted(surfaceContainerHighest)
+    )
+}
+
+/**
+ * Stronger tint for solid page backgrounds so list cards pick up visible hue (see [ElevatedCardTokens]).
+ */
+private fun ColorScheme.boostSurfaceContainersTowardPrimaryForSolidBackground(darkTheme: Boolean): ColorScheme {
+    val accentArgb = ColorUtils.blendARGB(
+        primary.toArgb(),
+        primaryContainer.toArgb(),
+        if (darkTheme) 0.4f else 0.3f
+    )
+    val blendAmount = if (darkTheme) 0.42f else 0.26f
+    fun tinted(role: Color) = Color(ColorUtils.blendARGB(role.toArgb(), accentArgb, blendAmount))
+    return copy(
+        surface = tinted(surface),
+        surfaceVariant = tinted(surfaceVariant),
+        surfaceDim = tinted(surfaceDim),
+        surfaceBright = tinted(surfaceBright),
+        surfaceContainerLowest = tinted(surfaceContainerLowest),
+        surfaceContainerLow = tinted(surfaceContainerLow),
+        surfaceContainer = tinted(surfaceContainer),
+        surfaceContainerHigh = tinted(surfaceContainerHigh),
+        surfaceContainerHighest = tinted(surfaceContainerHighest)
+    )
+}
+
 /** Keeps true-black OLED surfaces while preserving dynamic (Material You) accent colors. */
 private fun oledSurfacesFrom(dynamicScheme: ColorScheme): ColorScheme = dynamicScheme.copy(
     background = Color.Black,
@@ -109,12 +153,15 @@ private fun oledSurfacesFrom(dynamicScheme: ColorScheme): ColorScheme = dynamicS
     surfaceContainerHighest = OledSurfaceHighest
 )
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FilePipeTheme(
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     colorSource: AppColorSource = AppColorSource.DEFAULT,
     themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     hapticFeedbackEnabled: Boolean = true,
+    useGradientBackground: Boolean = true,
+    activeCustomSeedHex: String = "",
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -129,27 +176,47 @@ fun FilePipeTheme(
 
     val useDynamic = colorSource == AppColorSource.MATERIAL_YOU && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-    val seedPrimary = colorSource.seedPrimary()
-    val seedLightScheme = remember(seedPrimary, themePaletteStyle) {
-        seedPrimary?.let { colorSchemeFromSeed(it, themePaletteStyle, darkTheme = false) }
+    /** When not using wallpaper colors, all accents (including DEFAULT and CUSTOM) share the seed-based ramp. */
+    val staticSeedColor = if (useDynamic) {
+        null
+    } else {
+        when (colorSource) {
+            AppColorSource.CUSTOM -> parseSeedColorHexToColorOrNull(activeCustomSeedHex) ?: Blue40
+            else -> colorSource.seedPrimary() ?: Blue40
+        }
     }
-    val seedDarkScheme = remember(seedPrimary, themePaletteStyle) {
-        seedPrimary?.let { colorSchemeFromSeed(it, themePaletteStyle, darkTheme = true) }
+    val seedLightScheme = remember(staticSeedColor, themePaletteStyle) {
+        staticSeedColor?.let { colorSchemeFromSeed(it, themePaletteStyle, darkTheme = false) }
+    }
+    val seedDarkScheme = remember(staticSeedColor, themePaletteStyle) {
+        staticSeedColor?.let { colorSchemeFromSeed(it, themePaletteStyle, darkTheme = true) }
     }
 
-    val colorScheme = when {
+    val baseColorScheme = when {
         themeMode == AppThemeMode.BLACK && useDynamic ->
             oledSurfacesFrom(dynamicDarkColorScheme(context))
-        themeMode == AppThemeMode.BLACK && seedPrimary != null && seedDarkScheme != null ->
+        themeMode == AppThemeMode.BLACK && seedDarkScheme != null ->
             oledSurfacesFrom(seedDarkScheme)
         themeMode == AppThemeMode.BLACK -> BlackOledColors
         useDynamic && darkTheme -> dynamicDarkColorScheme(context)
         useDynamic && !darkTheme -> dynamicLightColorScheme(context)
-        seedPrimary != null && darkTheme && seedDarkScheme != null -> seedDarkScheme
-        seedPrimary != null && !darkTheme && seedLightScheme != null -> seedLightScheme
+        darkTheme && seedDarkScheme != null -> seedDarkScheme
+        !darkTheme && seedLightScheme != null -> seedLightScheme
         darkTheme -> DarkColors
         else -> LightColors
-    }.increaseBackgroundCardContrast()
+    }
+    val colorScheme = baseColorScheme
+        .let { base ->
+            if (useDynamic || staticSeedColor != null) base
+            else base.increaseBackgroundCardContrast()
+        }
+        .let { scheme ->
+            if (useGradientBackground) {
+                scheme.boostSurfaceContainersTowardPrimaryForGradient(darkTheme = darkTheme)
+            } else {
+                scheme.boostSurfaceContainersTowardPrimaryForSolidBackground(darkTheme = darkTheme)
+            }
+        }
 
     val view = LocalView.current
     SideEffect {
@@ -175,7 +242,7 @@ fun FilePipeTheme(
         LocalTapSound provides playTapSound,
         LocalHapticEnabled provides hapticFeedbackEnabled
     ) {
-        MaterialTheme(
+        MaterialExpressiveTheme(
             colorScheme = colorScheme,
             typography = AppTypography,
             content = content

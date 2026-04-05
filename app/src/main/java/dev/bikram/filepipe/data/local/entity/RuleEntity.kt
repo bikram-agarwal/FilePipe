@@ -18,6 +18,8 @@ data class RuleEntity(
     val destinationFolderPath: String,
     val fileExtensions: List<String>,
     val isEnabled: Boolean = true,
+    @ColumnInfo(defaultValue = "0")
+    val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val scheduleType: ScheduleType? = null,
@@ -48,6 +50,7 @@ fun RuleEntity.toDomain(): Rule = Rule(
     destinationFolderPath = destinationFolderPath,
     fileExtensions = fileExtensions,
     isEnabled = isEnabled,
+    sortOrder = sortOrder,
     createdAt = createdAt,
     updatedAt = updatedAt,
     schedule = when {
@@ -89,6 +92,7 @@ fun Rule.toEntity(): RuleEntity = RuleEntity(
     destinationFolderPath = destinationFolderPath,
     fileExtensions = fileExtensions,
     isEnabled = isEnabled,
+    sortOrder = sortOrder,
     createdAt = createdAt,
     updatedAt = updatedAt,
     scheduleType = schedule?.type,

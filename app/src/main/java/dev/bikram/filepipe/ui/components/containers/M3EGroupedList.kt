@@ -4,12 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import dev.bikram.filepipe.ui.theme.elevatedCardColors
 
 enum class GroupPosition { FIRST, MIDDLE, LAST, ONLY }
 
@@ -36,12 +36,12 @@ fun GroupedListItem(
     color: Color? = null,
     content: @Composable () -> Unit
 ) {
-    val elevated = CardDefaults.elevatedCardColors()
+    val cardColors = elevatedCardColors()
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = groupedItemShape(position),
-        color = color ?: elevated.containerColor,
-        contentColor = elevated.contentColor,
+        color = color ?: cardColors.containerColor,
+        contentColor = cardColors.contentColor,
         tonalElevation = 1.dp,
         shadowElevation = 0.dp
     ) {

@@ -4,6 +4,8 @@ agp = "9.1.0"
 kotlin = "2.2.20"
 ksp = "2.2.20-2.0.4"
 composeBom = "2025.02.00"
+# BOM material3 is older; this line tracks the expressive build used by the app (override BOM for this artifact).
+composeMaterial3Expressive = "1.5.0-alpha16"
 hilt = "2.59.2"
 hiltNav = "1.2.0"
 room = "2.7.0"
@@ -19,6 +21,7 @@ splashscreen = "1.0.1"
 datastore = "1.1.1"
 materialKolor = "5.0.0-alpha07"
 paging = "3.3.6"
+reorderable = "3.0.0"
 
 [libraries]
 # Compose BOM
@@ -28,6 +31,7 @@ compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+compose-material3-expressive = { group = "androidx.compose.material3", name = "material3", version.ref = "composeMaterial3Expressive" }
 compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
 compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -76,6 +80,7 @@ material-kolor = { group = "com.materialkolor", name = "material-kolor", version
 paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
 paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 room-paging = { group = "androidx.room", name = "room-paging", version.ref = "room" }
+reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

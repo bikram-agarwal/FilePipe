@@ -173,7 +173,7 @@ class HistoryViewModel @Inject constructor(
         sortDirection: HistorySortDirection,
     ): List<RunHistory> {
         return when (sortKey) {
-            HistorySortKey.LAST_RAN -> when (sortDirection) {
+            HistorySortKey.LAST_RAN, HistorySortKey.MY_ORDER -> when (sortDirection) {
                 HistorySortDirection.DESCENDING -> list.sortedByDescending { it.startedAt }
                 HistorySortDirection.ASCENDING -> list.sortedBy { it.startedAt }
             }

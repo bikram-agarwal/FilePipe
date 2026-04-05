@@ -52,7 +52,6 @@ import androidx.compose.material.icons.automirrored.filled.TextSnippet
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -106,6 +105,7 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RuleIcon
@@ -225,7 +225,7 @@ private fun RuleSectionCard(
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors()
+        colors = elevatedCardColors()
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(
@@ -850,7 +850,7 @@ fun RuleDetailScreen(
 
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.elevatedCardColors()
+                colors = elevatedCardColors()
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Row(
@@ -1325,7 +1325,7 @@ fun RuleDetailScreen(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     shape = PillShape
                 ) {
-                    Text(stringResource(R.string.template_skip))
+                    Text(stringResource(R.string.onboarding_wizard_start_blank))
                 }
                 Spacer(Modifier.height(24.dp))
             }

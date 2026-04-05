@@ -22,11 +22,26 @@ class RuleRepository @Inject constructor(
     suspend fun getEnabledRules(): List<Rule> =
         ruleDao.getEnabledRules().map { it.toDomain() }
 
-    suspend fun saveRule(rule: Rule): Long =
-        ruleDao.upsertRule(rule.toEntity())
+    suspend fun saveRule(rule: Rule): Long {
+        val entity = if (rule.id == 0L) {
+            val nextOrder = ruleDao.getMaxSortOrder() + 1
+            rule.copy(sortOrder = nextOrder).toEntity()
+        } else {
+            rule.toEntity()
+        }
+        return ruleDao.upsertRule(entity)
+    }
 
     suspend fun updateRule(rule: Rule) =
         ruleDao.updateRule(rule.toEntity())
+
+    /** One transaction so observers emit once; preserves drag order until sort mode updates. */
+    suspend fun persistOrderedSortIndices(ordered: List<Rule>) {
+        val entities = ordered.mapIndexed { index, rule ->
+            rule.copy(sortOrder = index).toEntity()
+        }
+        ruleDao.updateRulesSortOrders(entities)
+    }
 
     suspend fun deleteRule(ruleId: Long) =
         ruleDao.deleteRuleById(ruleId)
@@ -37,8 +52,8 @@ class RuleRepository @Inject constructor(
 
     suspend fun replaceAllRules(rules: List<Rule>) {
         ruleDao.deleteAllRules()
-        rules.forEach { rule ->
-            ruleDao.upsertRule(rule.copy(id = 0L).toEntity())
+        rules.forEachIndexed { index, rule ->
+            ruleDao.upsertRule(rule.copy(id = 0L, sortOrder = index).toEntity())
         }
     }
 }

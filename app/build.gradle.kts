@@ -13,6 +13,9 @@ plugins {
 
 kotlin {
     jvmToolchain(libs.versions.java.get().toInt())
+    compilerOptions {
+        freeCompilerArgs.add("-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi")
+    }
 }
 
 // Release signing only when keystore.properties exists (GitHub Actions writes it from secrets).
@@ -130,9 +133,10 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
-    implementation("androidx.compose.material3:material3:1.5.0-alpha16")
+    implementation(libs.compose.material3.expressive)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.material.icons.extended)
+    implementation(libs.reorderable)
     debugImplementation(libs.compose.ui.tooling)
 
     // Activity + Navigation

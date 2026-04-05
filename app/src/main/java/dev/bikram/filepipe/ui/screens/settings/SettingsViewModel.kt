@@ -120,6 +120,18 @@ class SettingsViewModel @Inject constructor(
         userPreferencesRepository.setColorSource(source)
     }
 
+    fun addCustomSeedHex(hex: String) = viewModelScope.launch {
+        userPreferencesRepository.addCustomSeedHex(hex)
+    }
+
+    fun selectCustomSeedHex(hex: String) = viewModelScope.launch {
+        userPreferencesRepository.selectCustomSeedHex(hex)
+    }
+
+    fun removeCustomSeedHex(hex: String) = viewModelScope.launch {
+        userPreferencesRepository.removeCustomSeedHex(hex)
+    }
+
     fun setThemePaletteStyle(style: ThemePaletteStyle) = viewModelScope.launch {
         userPreferencesRepository.setThemePaletteStyle(style)
     }
@@ -201,6 +213,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setUseGradientBackground(enabled: Boolean) = viewModelScope.launch {
         userPreferencesRepository.setUseGradientBackground(enabled)
+    }
+
+    fun setUseFixedCardColors(enabled: Boolean) = viewModelScope.launch {
+        userPreferencesRepository.setUseFixedCardColors(enabled)
     }
 
     fun setAutoCheckForUpdates(enabled: Boolean) = viewModelScope.launch {
