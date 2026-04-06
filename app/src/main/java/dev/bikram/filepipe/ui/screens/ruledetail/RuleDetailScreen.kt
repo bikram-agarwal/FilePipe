@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -94,6 +95,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -107,6 +109,7 @@ import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.domain.model.ConflictPolicy
+import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleTemplate
@@ -134,6 +137,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ToggleButton
@@ -257,6 +261,43 @@ private fun RuleSectionCard(
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 content = content
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToggleLabelHelpDropdown(
+    tipText: String,
+    contentDescription: String,
+    playTap: () -> Unit,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = {
+                playTap()
+                menuExpanded = true
+            },
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+            modifier = Modifier.widthIn(max = 300.dp)
+        ) {
+            Text(
+                text = tipText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
             )
         }
     }
@@ -425,35 +466,67 @@ fun RuleDetailScreen(
             }
 
             val folderAccessIssues =
-                state.inaccessibleSourcePaths.isNotEmpty() || state.destinationFolderInaccessible
+                state.inaccessibleSourceIssues.isNotEmpty() || state.destinationFolderAccessIssue != null
             if (folderAccessIssues) {
+                val anySourceUnavailable =
+                    state.inaccessibleSourceIssues.values.any { it == FolderAccessResult.Unavailable }
+                val anySourcePermission =
+                    state.inaccessibleSourceIssues.values.any { it == FolderAccessResult.PermissionDenied }
+                val destUnavailable = state.destinationFolderAccessIssue == FolderAccessResult.Unavailable
+                val destPermission = state.destinationFolderAccessIssue == FolderAccessResult.PermissionDenied
+                val showUnavailableHint = anySourceUnavailable || destUnavailable
+                val showPermissionHint = anySourcePermission || destPermission
                 RuleErrorAlertCard(
                     title = stringResource(R.string.rule_detail_folder_access_title),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    state.inaccessibleSourcePaths.forEach { path ->
-                        Text(
-                            text = stringResource(
-                                R.string.rule_detail_folder_access_source_line,
+                    state.inaccessibleSourceIssues.forEach { (path, issue) ->
+                        val line = when (issue) {
+                            FolderAccessResult.Unavailable -> stringResource(
+                                R.string.rule_detail_folder_access_source_unavailable,
                                 displayPath(path)
-                            ),
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                            )
+                            FolderAccessResult.PermissionDenied -> stringResource(
+                                R.string.rule_detail_folder_access_source_permission,
+                                displayPath(path)
+                            )
+                            FolderAccessResult.Accessible -> ""
+                        }
+                        if (line.isNotEmpty()) {
+                            Text(text = line, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
-                    if (state.destinationFolderInaccessible) {
-                        Text(
-                            text = stringResource(
-                                R.string.rule_detail_folder_access_destination_line,
+                    state.destinationFolderAccessIssue?.let { issue ->
+                        val line = when (issue) {
+                            FolderAccessResult.Unavailable -> stringResource(
+                                R.string.rule_detail_folder_access_destination_unavailable,
                                 displayPath(state.destinationFolderPath)
-                            ),
-                            style = MaterialTheme.typography.bodySmall
+                            )
+                            FolderAccessResult.PermissionDenied -> stringResource(
+                                R.string.rule_detail_folder_access_destination_permission,
+                                displayPath(state.destinationFolderPath)
+                            )
+                            FolderAccessResult.Accessible -> ""
+                        }
+                        if (line.isNotEmpty()) {
+                            Text(text = line, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    val hintColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.88f)
+                    if (showUnavailableHint) {
+                        Text(
+                            text = stringResource(R.string.rule_detail_folder_access_hint_unavailable),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = hintColor
                         )
                     }
-                    Text(
-                        text = stringResource(R.string.rule_detail_folder_access_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.88f)
-                    )
+                    if (showPermissionHint) {
+                        Text(
+                            text = stringResource(R.string.rule_detail_folder_access_hint_permission),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = hintColor
+                        )
+                    }
                 }
             }
 
@@ -509,7 +582,7 @@ fun RuleDetailScreen(
             ) {
                 state.sourceFolderPaths.forEach { path ->
                     val isSourceBookmarked = path in bookmarkedFolders
-                    val sourceNeedsAccess = path in state.inaccessibleSourcePaths
+                    val sourceNeedsAccess = path in state.inaccessibleSourceIssues
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -601,10 +674,24 @@ fun RuleDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = stringResource(R.string.rule_scan_subdirs_label),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.rule_scan_subdirs_label),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            ToggleLabelHelpDropdown(
+                                tipText = stringResource(R.string.rule_scan_subdirs_support),
+                                contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
+                                playTap = playTap
+                            )
+                        }
                         Switch(
                             checked = state.scanSubdirectories,
                             onCheckedChange = { enabled ->
@@ -612,14 +699,36 @@ fun RuleDetailScreen(
                             }
                         )
                     }
-                    if (state.scanSubdirectories) {
-                        Text(
-                            text = stringResource(R.string.rule_scan_subdirs_support),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp)
+                }
+                Column(Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.rule_suppress_missing_source_card_label),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            ToggleLabelHelpDropdown(
+                                tipText = stringResource(R.string.rule_suppress_missing_source_card_support),
+                                contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
+                                playTap = playTap
+                            )
+                        }
+                        Switch(
+                            checked = state.suppressMissingSourceFolderCardWarning,
+                            onCheckedChange = { enabled ->
+                                withTapSound { viewModel.setSuppressMissingSourceFolderCardWarning(enabled) }
+                            }
                         )
                     }
                 }
@@ -639,7 +748,7 @@ fun RuleDetailScreen(
                         Text(
                             text = displayPath(state.destinationFolderPath),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (state.destinationFolderInaccessible) {
+                            color = if (state.destinationFolderAccessIssue != null) {
                                 MaterialTheme.colorScheme.error
                             } else {
                                 MaterialTheme.colorScheme.primary

@@ -217,15 +217,23 @@ fun RulesScreen(
 
     LaunchedEffect(userMessage) {
         val msg = userMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(msg)
-        viewModel.clearUserMessage()
+        try {
+            snackbarHostState.showSnackbar(
+                message = msg,
+                duration = SnackbarDuration.Short
+            )
+        } finally {
+            viewModel.clearUserMessage()
+        }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, viewModel) {
+    DisposableEffect(lifecycleOwner, viewModel, snackbarHostState) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshStaleFolderAccess()
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> viewModel.refreshStaleFolderAccess()
+                Lifecycle.Event.ON_STOP -> snackbarHostState.currentSnackbarData?.dismiss()
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

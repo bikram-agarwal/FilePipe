@@ -8,8 +8,13 @@ import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,8 +61,11 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
@@ -68,10 +76,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -102,19 +117,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
+import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 import dev.bikram.filepipe.ui.components.AboutAuthorPhoto
@@ -164,10 +183,53 @@ fun SettingsScreen(
         }
     }
     var notificationsGranted by remember { mutableStateOf(computeNotificationsEnabled()) }
+    var pendingEnableUpdateNotificationsAfterPermission by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         notificationsGranted = granted
+        if (pendingEnableUpdateNotificationsAfterPermission) {
+            pendingEnableUpdateNotificationsAfterPermission = false
+            if (granted) {
+                coroutineScope.launch {
+                    if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                        snackbarHostState.showSnackbar(
+                            context.getString(R.string.settings_notify_updates_enable_notifications)
+                        )
+                        viewModel.openAppNotificationSettings()
+                        return@launch
+                    }
+                    val schedule = viewModel.preferencesFlow.first().updateCheckSchedule
+                    if (schedule != UpdateCheckSchedule.NEVER) {
+                        viewModel.setNotifyOnNewUpdates(true)
+                    }
+                }
+            }
+        }
+    }
+    var postNotificationPermissionLaunchAttempted by remember { mutableStateOf(false) }
+    fun requestPostNotificationPermissionOrOpenAppSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        val hostActivity = context as? ComponentActivity
+        val useAppNotificationSettingsFallback = hostActivity != null &&
+            postNotificationPermissionLaunchAttempted &&
+            !ActivityCompat.shouldShowRequestPermissionRationale(
+                hostActivity,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+        if (useAppNotificationSettingsFallback) {
+            viewModel.openAppNotificationSettings()
+        } else {
+            postNotificationPermissionLaunchAttempted = true
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -181,19 +243,34 @@ fun SettingsScreen(
     }
     val updateSheetChangelog by viewModel.updateSheetChangelog.collectAsStateWithLifecycle()
     val manualUpdateNoResult by viewModel.manualUpdateNoResult.collectAsStateWithLifecycle()
+    val openUpdateSheetFromNotification by viewModel.openUpdateSheetFromNotification.collectAsStateWithLifecycle()
     var showUpdateSheet by remember { mutableStateOf(false) }
     val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val configuration = LocalConfiguration.current
     val maxUpdateSheetHeight = (configuration.screenHeightDp * 0.85f).dp
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
-    val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(userMessage) {
         val message = userMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
-        viewModel.clearUserMessage()
+        try {
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short
+            )
+        } finally {
+            viewModel.clearUserMessage()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, snackbarHostState) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                snackbarHostState.currentSnackbarData?.dismiss()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val folderLauncher = rememberLauncherForActivityResult(
@@ -219,11 +296,16 @@ fun SettingsScreen(
         }
     }
 
+    var pendingBackupPickAction by remember { mutableStateOf<BackupImportPickAction?>(null) }
+    var showBackupImportRestoreHelp by remember { mutableStateOf(false) }
+
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        if (uri != null) {
-            viewModel.importFromUri(uri)
+        val action = pendingBackupPickAction
+        pendingBackupPickAction = null
+        if (uri != null && action != null) {
+            viewModel.importFromUri(uri, action)
         }
     }
 
@@ -235,6 +317,14 @@ fun SettingsScreen(
         if (showUpdateSheet) {
             updateSheetState.expand()
         }
+    }
+
+    LaunchedEffect(openUpdateSheetFromNotification) {
+        if (!openUpdateSheetFromNotification || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
+        showUpdateSheet = true
+        viewModel.loadChangelogForUpdateSheet()
+        viewModel.beginManualUpdateCheckFromSheet()
+        viewModel.consumeOpenUpdateSheetFromNotification()
     }
 
     if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
@@ -255,17 +345,42 @@ fun SettingsScreen(
                 manualUpdateNoResult = manualUpdateNoResult,
                 downloadProgress = downloadProgress,
                 changelogState = updateSheetChangelog,
+                showGithubExtraUi = BuildConfig.FLAVOR == "github",
                 onDownloadClick = { info ->
                     playTap()
                     if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.downloadUrl.isBlank()) {
                         val hostActivity = context as? ComponentActivity
                         viewModel.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
                     } else {
-                        viewModel.downloadAndInstall(info.downloadUrl)
+                        viewModel.downloadAndInstall(info)
+                    }
+                },
+                onSkipVersionClick = {
+                    playTap()
+                    updateInfo?.let { info ->
+                        viewModel.skipAcknowledgedGithubRelease(info)
+                        showUpdateSheet = false
+                        viewModel.dismissUpdateSheet()
                     }
                 }
             )
         }
+    }
+
+    if (showBackupImportRestoreHelp) {
+        AlertDialog(
+            onDismissRequest = { showBackupImportRestoreHelp = false },
+            title = { Text(stringResource(R.string.settings_backup_import_restore_help_title)) },
+            text = { Text(stringResource(R.string.settings_backup_import_restore_help_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    playTap()
+                    showBackupImportRestoreHelp = false
+                }) {
+                    Text(stringResource(R.string.settings_backup_help_ok))
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -461,9 +576,12 @@ fun SettingsScreen(
                                     onCheckedChange = { wantEnabled ->
                                         playTap()
                                         when {
-                                            wantEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
-                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                            wantEnabled && !NotificationManagerCompat.from(context).areNotificationsEnabled() ->
+                                            wantEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                                                pendingEnableUpdateNotificationsAfterPermission = false
+                                                requestPostNotificationPermissionOrOpenAppSettings()
+                                            }
+                                            wantEnabled &&
+                                                !NotificationManagerCompat.from(context).areNotificationsEnabled() ->
                                                 viewModel.openAppNotificationSettings()
                                             !wantEnabled ->
                                                 viewModel.openAppNotificationSettings()
@@ -475,7 +593,8 @@ fun SettingsScreen(
                                 playTap()
                                 if (!notificationsGranted) {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        pendingEnableUpdateNotificationsAfterPermission = false
+                                        requestPostNotificationPermissionOrOpenAppSettings()
                                     } else if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
                                         viewModel.openAppNotificationSettings()
                                     }
@@ -617,7 +736,8 @@ fun SettingsScreen(
                                 playTap()
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar(
-                                        context.getString(R.string.settings_export_select_folder_first)
+                                        message = context.getString(R.string.settings_export_select_folder_first),
+                                        duration = SnackbarDuration.Short
                                     )
                                 }
                             },
@@ -637,7 +757,8 @@ fun SettingsScreen(
                                 playTap()
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar(
-                                        context.getString(R.string.settings_export_select_folder_first)
+                                        message = context.getString(R.string.settings_export_select_folder_first),
+                                        duration = SnackbarDuration.Short
                                     )
                                 }
                             },
@@ -652,26 +773,75 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 OutlinedButton(
-                                    onClick = { playTap(); importLauncher.launch("application/json") },
+                                    onClick = {
+                                        playTap()
+                                        pendingBackupPickAction = BackupImportPickAction.ImportMerge
+                                        importLauncher.launch("application/json")
+                                    },
                                     modifier = Modifier.weight(1f)
-                                ) { Text(stringResource(R.string.settings_import_rules)) }
+                                ) {
+                                    Text(stringResource(R.string.settings_import_rules))
+                                }
                                 OutlinedButton(
                                     onClick = { playTap(); viewModel.requestManualExportPicker() },
                                     modifier = Modifier.weight(1f)
-                                ) { Text(stringResource(R.string.settings_export_now)) }
+                                ) {
+                                    Text(stringResource(R.string.settings_export_now))
+                                }
                             }
-                            Text(
-                                text = stringResource(R.string.settings_import_replace_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            val restoreOutline = MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
+                            val restoreLabelColor = MaterialTheme.colorScheme.error
+                            val restoreButtonShape = ButtonDefaults.outlinedShape
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp)
+                                    .clip(restoreButtonShape)
+                                    .border(BorderStroke(1.dp, restoreOutline), restoreButtonShape)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .clickable {
+                                            playTap()
+                                            pendingBackupPickAction = BackupImportPickAction.RestoreFull
+                                            importLauncher.launch("application/json")
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.settings_restore_backup),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = restoreLabelColor
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .fillMaxHeight()
+                                        .width(40.dp)
+                                        .clickable {
+                                            playTap()
+                                            showBackupImportRestoreHelp = true
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = stringResource(R.string.settings_backup_help_icon_cd),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = restoreLabelColor.copy(alpha = 0.75f)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -687,39 +857,106 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         GroupedListColumn {
-                            GroupedListItem(position = GroupPosition.ONLY) {
+                            GroupedListItem(position = GroupPosition.FIRST) {
+                                UpdateCheckScheduleDropdown(
+                                    selected = preferences.updateCheckSchedule,
+                                    onSelect = { schedule ->
+                                        playTap()
+                                        viewModel.setUpdateCheckSchedule(schedule)
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                            }
+                            if (BuildConfig.FLAVOR == "github") {
+                                GroupedListItem(position = GroupPosition.MIDDLE) {
+                                    SettingsToggleItem(
+                                        title = stringResource(R.string.settings_save_update_apk_to_downloads),
+                                        checked = preferences.saveUpdateApkToDownloads,
+                                        onCheckedChange = { enabled ->
+                                            playTap()
+                                            viewModel.setSaveUpdateApkToDownloads(enabled)
+                                        }
+                                    )
+                                }
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
                                 SettingsToggleItem(
-                                    title = stringResource(R.string.settings_auto_check_updates),
-                                    subtitle = stringResource(R.string.settings_auto_check_updates_desc),
-                                    checked = preferences.autoCheckForUpdates,
+                                    title = stringResource(R.string.settings_notify_new_updates),
+                                    checked = preferences.notifyOnNewUpdates,
                                     onCheckedChange = { enabled ->
                                         playTap()
-                                        viewModel.setAutoCheckForUpdates(enabled)
+                                        when {
+                                            !enabled -> {
+                                                pendingEnableUpdateNotificationsAfterPermission = false
+                                                viewModel.setNotifyOnNewUpdates(false)
+                                            }
+                                            preferences.updateCheckSchedule == UpdateCheckSchedule.NEVER -> {
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        context.getString(
+                                                            R.string.settings_notify_updates_need_auto_check
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                                ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.POST_NOTIFICATIONS
+                                                ) != PackageManager.PERMISSION_GRANTED -> {
+                                                pendingEnableUpdateNotificationsAfterPermission = true
+                                                requestPostNotificationPermissionOrOpenAppSettings()
+                                            }
+                                            !NotificationManagerCompat.from(context).areNotificationsEnabled() -> {
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        context.getString(
+                                                            R.string.settings_notify_updates_enable_notifications
+                                                        )
+                                                    )
+                                                }
+                                                viewModel.openAppNotificationSettings()
+                                            }
+                                            else -> viewModel.setNotifyOnNewUpdates(true)
+                                        }
                                     }
                                 )
                             }
-                        }
-                        Button(
-                            onClick = {
-                                playTap()
-                                viewModel.beginManualUpdateCheckFromSheet()
-                                viewModel.loadChangelogForUpdateSheet()
-                                showUpdateSheet = true
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.NewReleases,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = stringResource(R.string.settings_check_for_updates),
-                                fontWeight = FontWeight.Bold
-                            )
+                            GroupedListItem(position = GroupPosition.LAST) {
+                                ListItem(
+                                    headlineContent = {
+                                        val available = updateInfo
+                                        Text(
+                                            text = if (available != null) {
+                                                stringResource(
+                                                    R.string.settings_update_available_button,
+                                                    available.versionName
+                                                )
+                                            } else {
+                                                stringResource(R.string.settings_check_for_updates)
+                                            },
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    },
+                                    leadingContent = {
+                                        Icon(
+                                            imageVector = Icons.Default.NewReleases,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    modifier = Modifier.clickable {
+                                        playTap()
+                                        viewModel.beginManualUpdateCheckFromSheet()
+                                        viewModel.loadChangelogForUpdateSheet()
+                                        showUpdateSheet = true
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                )
+                            }
                         }
                     }
                 }
@@ -831,7 +1068,61 @@ fun SettingsScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun UpdateCheckScheduleDropdown(
+    selected: UpdateCheckSchedule,
+    onSelect: (UpdateCheckSchedule) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val playTap = rememberPlayTapSound()
+    var expanded by remember { mutableStateOf(false) }
+    val options = remember { UpdateCheckSchedule.entries }
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.settings_update_check_frequency),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        OutlinedButton(onClick = { playTap(); expanded = true }) {
+            Text(updateScheduleSummaryBeforeColon(selected))
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(updateScheduleLabel(option)) },
+                        onClick = { playTap(); onSelect(option); expanded = false }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun summaryLabelBeforeColon(fullScheduleLabel: String): String {
+    val colonIndex = fullScheduleLabel.indexOf(':')
+    return if (colonIndex >= 0) {
+        fullScheduleLabel.substring(0, colonIndex).trim()
+    } else {
+        fullScheduleLabel
+    }
+}
+
+@Composable
+private fun updateScheduleSummaryBeforeColon(schedule: UpdateCheckSchedule): String =
+    summaryLabelBeforeColon(updateScheduleLabel(schedule))
+
+@Composable
+private fun updateScheduleLabel(schedule: UpdateCheckSchedule): String = when (schedule) {
+    UpdateCheckSchedule.AT_APP_START -> stringResource(R.string.settings_update_schedule_app_start)
+    UpdateCheckSchedule.DAILY_AT_21 -> stringResource(R.string.settings_update_schedule_daily_21)
+    UpdateCheckSchedule.WEEKLY_MONDAY_AT_21 -> stringResource(R.string.settings_update_schedule_monday_21)
+    UpdateCheckSchedule.NEVER -> stringResource(R.string.settings_update_schedule_never)
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun UpdateCheckBottomSheetContent(
     maxSheetHeight: Dp,
@@ -840,16 +1131,19 @@ private fun UpdateCheckBottomSheetContent(
     manualUpdateNoResult: Boolean,
     downloadProgress: Float?,
     changelogState: ChangelogUiState,
-    onDownloadClick: (UpdateInfo) -> Unit
+    showGithubExtraUi: Boolean,
+    onDownloadClick: (UpdateInfo) -> Unit,
+    onSkipVersionClick: () -> Unit
 ) {
     val sheetScroll = rememberScrollState()
-    val changelogSurfaceColors = elevatedCardColors()
+    val pagerCoroutineScope = rememberCoroutineScope()
+    val scheme = MaterialTheme.colorScheme
     Column(
         Modifier
             .fillMaxWidth()
             .heightIn(max = maxSheetHeight)
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .verticalScroll(sheetScroll)
     ) {
         if (isCheckingUpdate) {
@@ -879,16 +1173,59 @@ private fun UpdateCheckBottomSheetContent(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = stringResource(
-                                R.string.settings_update_available,
-                                availableUpdate.versionName
-                            ),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (showGithubExtraUi) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(
+                                        R.string.settings_update_available,
+                                        availableUpdate.versionName
+                                    ),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TooltipBox(
+                                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                        TooltipAnchorPosition.Above
+                                    ),
+                                    tooltip = {
+                                        PlainTooltip {
+                                            Text(
+                                                text = stringResource(
+                                                    R.string.settings_update_sheet_false_positive_tooltip
+                                                ),
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    },
+                                    state = rememberTooltipState()
+                                ) {
+                                    IconButton(onClick = { }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = stringResource(
+                                                R.string.settings_update_sheet_false_positive_tooltip
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = stringResource(
+                                    R.string.settings_update_available,
+                                    availableUpdate.versionName
+                                ),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         Spacer(Modifier.height(12.dp))
                         Button(
                             onClick = { onDownloadClick(availableUpdate) },
@@ -904,6 +1241,12 @@ private fun UpdateCheckBottomSheetContent(
                                 ),
                                 maxLines = 1
                             )
+                        }
+                        if (showGithubExtraUi && availableUpdate.remoteApkAssetUpdatedAt.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = onSkipVersionClick) {
+                                Text(stringResource(R.string.settings_update_skip_version))
+                            }
                         }
                     }
                 }
@@ -926,65 +1269,200 @@ private fun UpdateCheckBottomSheetContent(
             }
         }
 
-        Spacer(Modifier.height(20.dp))
-        Text(
-            text = stringResource(R.string.settings_changelog_title),
-            style = MaterialTheme.typography.titleLarge
-        )
-        Spacer(Modifier.height(12.dp))
+        if (changelogState != ChangelogUiState.Hidden) {
+            Spacer(Modifier.height(12.dp))
+        }
         when (changelogState) {
             ChangelogUiState.Hidden -> {}
             ChangelogUiState.Loading -> {
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = changelogSurfaceColors.containerColor,
-                    contentColor = changelogSurfaceColors.contentColor,
+                    color = scheme.surfaceContainerHigh,
+                    contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
                     shadowElevation = 0.dp
                 ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .padding(8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = scheme.surfaceContainerLow,
+                        contentColor = scheme.onSurface
                     ) {
-                        LoadingIndicator(modifier = Modifier.size(40.dp))
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            LoadingIndicator(modifier = Modifier.size(40.dp))
+                        }
                     }
                 }
             }
             is ChangelogUiState.Ready -> {
+                val readyMarkdown = changelogState.text
+                val changelogPages = remember(readyMarkdown) { splitChangelogIntoPages(readyMarkdown) }
+                val changelogPagerState = rememberPagerState(pageCount = { changelogPages.size })
+                val changelogPagerMaxHeight = maxSheetHeight * 0.68f
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = changelogSurfaceColors.containerColor,
-                    contentColor = changelogSurfaceColors.contentColor,
+                    color = scheme.surfaceContainerHigh,
+                    contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
                     shadowElevation = 0.dp
                 ) {
-                    SimpleMarkdown(
-                        content = changelogState.text,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    )
+                    if (changelogPages.size <= 1) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = scheme.surfaceContainerLow,
+                            contentColor = scheme.onSurface
+                        ) {
+                            SimpleMarkdown(
+                                content = readyMarkdown,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            )
+                        }
+                    } else {
+                        Column(Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(32.dp)
+                                    .padding(horizontal = 2.dp, vertical = 0.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                val canGoBack = changelogPagerState.currentPage > 0
+                                val canGoForward = changelogPagerState.currentPage < changelogPages.lastIndex
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .clickable(
+                                            enabled = canGoBack,
+                                            onClick = {
+                                                pagerCoroutineScope.launch {
+                                                    changelogPagerState.animateScrollToPage(
+                                                        changelogPagerState.currentPage - 1
+                                                    )
+                                                }
+                                            }
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = stringResource(R.string.settings_changelog_previous),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = if (canGoBack) {
+                                            scheme.primary
+                                        } else {
+                                            scheme.onSurface.copy(alpha = 0.38f)
+                                        }
+                                    )
+                                }
+                                Text(
+                                    text = stringResource(
+                                        R.string.settings_changelog_page_indicator,
+                                        changelogPagerState.currentPage + 1,
+                                        changelogPages.size
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = scheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(horizontal = 6.dp)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .clickable(
+                                            enabled = canGoForward,
+                                            onClick = {
+                                                pagerCoroutineScope.launch {
+                                                    changelogPagerState.animateScrollToPage(
+                                                        changelogPagerState.currentPage + 1
+                                                    )
+                                                }
+                                            }
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                        contentDescription = stringResource(R.string.settings_changelog_next),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = if (canGoForward) {
+                                            scheme.primary
+                                        } else {
+                                            scheme.onSurface.copy(alpha = 0.38f)
+                                        }
+                                    )
+                                }
+                            }
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(changelogPagerMaxHeight)
+                                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                color = scheme.surfaceContainerLow,
+                                contentColor = scheme.onSurface
+                            ) {
+                                HorizontalPager(
+                                    state = changelogPagerState,
+                                    modifier = Modifier.fillMaxSize()
+                                ) { pageIndex ->
+                                    Column(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .verticalScroll(rememberScrollState())
+                                            .padding(16.dp)
+                                    ) {
+                                        SimpleMarkdown(content = changelogPages[pageIndex])
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             is ChangelogUiState.Failed -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = changelogSurfaceColors.containerColor,
-                    contentColor = changelogSurfaceColors.contentColor,
+                    color = scheme.surfaceContainerHigh,
+                    contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
                     shadowElevation = 0.dp
                 ) {
-                    Text(
-                        text = changelogState.message,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(16.dp)
-                    )
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = scheme.surfaceContainerLow,
+                        contentColor = scheme.onSurface
+                    ) {
+                        Text(
+                            text = changelogState.message,
+                            color = scheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
                 }
             }
         }

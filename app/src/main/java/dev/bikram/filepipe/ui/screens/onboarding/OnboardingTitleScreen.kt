@@ -1,6 +1,5 @@
 package dev.bikram.filepipe.ui.screens.onboarding
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,9 +38,8 @@ import androidx.compose.ui.Alignment
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,7 +69,6 @@ fun OnboardingTitleScreen(
     }
 
     val scheme = MaterialTheme.colorScheme
-    val context = LocalContext.current
     val iconEnter = remember {
         fadeIn(tween(durationMillis = 320)) +
             slideInVertically(tween(durationMillis = 320)) { fullHeight -> fullHeight / 3 }
@@ -80,18 +77,6 @@ fun OnboardingTitleScreen(
         fadeIn(tween(durationMillis = 280)) +
             slideInVertically(tween(durationMillis = 280)) { fullHeight -> fullHeight / 2 }
     }
-    val profileBitmap = remember(context) {
-        for (assetName in listOf("Me-600.webp", "Me-600.jpg")) {
-            val decoded = runCatching {
-                context.assets.open(assetName).use { stream ->
-                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
-                }
-            }.getOrNull()
-            if (decoded != null) return@remember decoded
-        }
-        null
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -157,16 +142,14 @@ fun OnboardingTitleScreen(
                     horizontalArrangement = Arrangement.Center,
                     modifier = Modifier.padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp)
                 ) {
-                    if (profileBitmap != null) {
-                        Image(
-                            bitmap = profileBitmap,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
+                    Image(
+                        painter = painterResource(R.drawable.me_600),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = stringResource(R.string.onboarding_byline),

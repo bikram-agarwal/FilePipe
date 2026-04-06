@@ -22,7 +22,12 @@ data class AppPreferences(
     val hasSeenIntro: Boolean = false,
     val hapticFeedbackEnabled: Boolean = true,
     val progressiveBlurEnabled: Boolean = true,
-    val autoCheckForUpdates: Boolean = true,
+    val updateCheckSchedule: UpdateCheckSchedule = UpdateCheckSchedule.AT_APP_START,
+    val notifyOnNewUpdates: Boolean = false,
+    /** Last [UpdateInfo.notificationDedupeKey] we posted an update notification for. */
+    val updateLastNotifiedDedupeKey: String = "",
+    /** GitHub flavor: copy downloaded update APK to MediaStore Downloads after download. */
+    val saveUpdateApkToDownloads: Boolean = false,
     val useGradientBackground: Boolean = true,
     /** Neutral light/dark greys for list cards instead of accent-tinted elevated surfaces. */
     val useFixedCardColors: Boolean = false

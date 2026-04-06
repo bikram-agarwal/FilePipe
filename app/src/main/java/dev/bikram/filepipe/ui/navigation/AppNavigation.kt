@@ -75,6 +75,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.screens.history.HistoryScreen
 import dev.bikram.filepipe.ui.screens.history.HistoryViewModel
@@ -130,6 +131,7 @@ fun AppNavigation(
     val playTap = rememberPlayTapSound()
     val navController = rememberNavController()
     val pendingHistoryId by pendingShortcutRepository.pendingHistoryDetailId.collectAsStateWithLifecycle()
+    val pendingOpenSettingsUpdates by pendingShortcutRepository.pendingOpenSettingsForUpdates.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
@@ -198,10 +200,25 @@ fun AppNavigation(
         if (introSeenAtLaunch) Screen.Rules.route else Screen.OnboardingTitle.createRoute()
     }
 
-    LaunchedEffect(hasSeenIntro, preferences.autoCheckForUpdates) {
-        if (hasSeenIntro && BuildConfig.SHOW_UPDATES && preferences.autoCheckForUpdates) {
+    LaunchedEffect(hasSeenIntro, preferences.updateCheckSchedule) {
+        if (hasSeenIntro && BuildConfig.SHOW_UPDATES &&
+            preferences.updateCheckSchedule == UpdateCheckSchedule.AT_APP_START
+        ) {
             settingsVm.checkForUpdate(silent = true)
         }
+    }
+
+    LaunchedEffect(hasSeenIntro, pendingOpenSettingsUpdates, navController) {
+        if (!pendingOpenSettingsUpdates || !hasSeenIntro) return@LaunchedEffect
+        navController.navigate(Screen.Settings.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+        settingsVm.flagOpenUpdateSheetFromNotification()
+        pendingShortcutRepository.clearPendingOpenSettingsForUpdates()
     }
 
     LaunchedEffect(hasSeenIntro, pendingHistoryId, navController) {

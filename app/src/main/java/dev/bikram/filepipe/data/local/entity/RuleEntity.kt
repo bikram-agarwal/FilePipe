@@ -31,6 +31,8 @@ data class RuleEntity(
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
     val scanSubdirectories: Boolean = false,
+    @ColumnInfo(name = "suppress_missing_source_folder_card", defaultValue = "0")
+    val suppressMissingSourceFolderCardWarning: Boolean = false,
     val iconKey: String = RuleIcon.DEFAULT.name,
     val iconEmoji: String? = null,
     // Advanced filters (added in DB version 2)
@@ -75,6 +77,7 @@ fun RuleEntity.toDomain(): Rule = Rule(
     conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
     operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),
     scanSubdirectories = scanSubdirectories,
+    suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
     icon = RuleIcon.fromStored(iconKey),
     iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
     filenamePattern = filenamePattern,
@@ -104,6 +107,7 @@ fun Rule.toEntity(): RuleEntity = RuleEntity(
     conflictPolicy = conflictPolicy.name,
     operationMode = operationMode.name,
     scanSubdirectories = scanSubdirectories,
+    suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
     iconKey = icon.name,
     iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
     filenamePattern = filenamePattern,

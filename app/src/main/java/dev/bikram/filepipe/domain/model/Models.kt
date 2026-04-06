@@ -19,6 +19,12 @@ data class Rule(
     val conflictPolicy: ConflictPolicy = ConflictPolicy.RENAME_SUFFIX,
     val operationMode: OperationMode = OperationMode.MOVE,
     val scanSubdirectories: Boolean = false,
+    /**
+     * When true, missing/unreadable **source** trees do not show the stale-folder banner on the rule
+     * card; rule edit still shows full folder diagnostics. Destination and permission-denied issues
+     * are never suppressed on the card.
+     */
+    val suppressMissingSourceFolderCardWarning: Boolean = false,
     val icon: RuleIcon = RuleIcon.DEFAULT,
     /** When non-blank, shown instead of [icon] in UI (system emoji font). */
     val iconEmoji: String? = null,

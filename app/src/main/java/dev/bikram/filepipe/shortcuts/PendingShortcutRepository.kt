@@ -17,6 +17,9 @@ class PendingShortcutRepository @Inject constructor() {
     private val _pendingHistoryDetailId = MutableStateFlow<Long?>(null)
     val pendingHistoryDetailId: StateFlow<Long?> = _pendingHistoryDetailId.asStateFlow()
 
+    private val _pendingOpenSettingsForUpdates = MutableStateFlow(false)
+    val pendingOpenSettingsForUpdates: StateFlow<Boolean> = _pendingOpenSettingsForUpdates.asStateFlow()
+
     fun requestRunRule(ruleId: Long) {
         _pendingRuleId.tryEmit(ruleId)
     }
@@ -29,7 +32,16 @@ class PendingShortcutRepository @Inject constructor() {
         _pendingHistoryDetailId.value = null
     }
 
+    fun requestOpenSettingsForUpdates() {
+        _pendingOpenSettingsForUpdates.value = true
+    }
+
+    fun clearPendingOpenSettingsForUpdates() {
+        _pendingOpenSettingsForUpdates.value = false
+    }
+
     companion object {
         const val EXTRA_OPEN_HISTORY_DETAIL_ID = "extra_open_history_detail_id"
+        const val EXTRA_OPEN_SETTINGS_UPDATES = "extra_open_settings_updates"
     }
 }

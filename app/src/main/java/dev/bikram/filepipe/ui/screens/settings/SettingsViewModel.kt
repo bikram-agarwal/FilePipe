@@ -12,21 +12,28 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
-import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.data.preferences.SwipeAction
+import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
+import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
+import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.domain.usecase.ImportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
+import dev.bikram.filepipe.update.FILEPIPE_UPDATE_APK_CACHE_NAME
 import dev.bikram.filepipe.update.PlayInAppUpdateStarter
 import dev.bikram.filepipe.update.PlayUpdateSessionHandle
+import dev.bikram.filepipe.update.UpdateAvailableNotifier
+import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
 import dev.bikram.filepipe.update.UpdateChecker
 import dev.bikram.filepipe.update.UpdateInfo
+import dev.bikram.filepipe.update.notificationDedupeKey
+import dev.bikram.filepipe.update.copyUpdateApkToMediaStoreDownloads
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
 import dev.bikram.filepipe.data.storage.treeUriFromDocumentUri
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -61,7 +68,9 @@ class SettingsViewModel @Inject constructor(
     private val rulesAutoExportTrigger: RulesAutoExportTrigger,
     private val updateChecker: UpdateChecker,
     private val playUpdateSessionHandle: PlayUpdateSessionHandle,
-    private val playInAppUpdateStarter: PlayInAppUpdateStarter
+    private val playInAppUpdateStarter: PlayInAppUpdateStarter,
+    private val updateAvailableNotifier: UpdateAvailableNotifier,
+    private val updateCheckWorkScheduler: UpdateCheckWorkScheduler
 ) : ViewModel() {
 
     val preferencesFlow = userPreferencesRepository.preferencesFlow
@@ -87,6 +96,9 @@ class SettingsViewModel @Inject constructor(
 
     private val _manualUpdateNoResult = MutableStateFlow(false)
     val manualUpdateNoResult: StateFlow<Boolean> = _manualUpdateNoResult.asStateFlow()
+
+    private val _openUpdateSheetFromNotification = MutableStateFlow(false)
+    val openUpdateSheetFromNotification: StateFlow<Boolean> = _openUpdateSheetFromNotification.asStateFlow()
 
     private val _manualExportPickerRequested = MutableSharedFlow<String>(
         extraBufferCapacity = 1,
@@ -219,8 +231,38 @@ class SettingsViewModel @Inject constructor(
         userPreferencesRepository.setUseFixedCardColors(enabled)
     }
 
-    fun setAutoCheckForUpdates(enabled: Boolean) = viewModelScope.launch {
-        userPreferencesRepository.setAutoCheckForUpdates(enabled)
+    fun setUpdateCheckSchedule(schedule: UpdateCheckSchedule) = viewModelScope.launch {
+        userPreferencesRepository.setUpdateCheckSchedule(schedule)
+        if (schedule == UpdateCheckSchedule.NEVER) {
+            userPreferencesRepository.setNotifyOnNewUpdates(false)
+        }
+        updateCheckWorkScheduler.syncFromPreferences()
+    }
+
+    fun setNotifyOnNewUpdates(enabled: Boolean) = viewModelScope.launch {
+        userPreferencesRepository.setNotifyOnNewUpdates(enabled)
+    }
+
+    fun flagOpenUpdateSheetFromNotification() {
+        _openUpdateSheetFromNotification.value = true
+    }
+
+    fun consumeOpenUpdateSheetFromNotification() {
+        _openUpdateSheetFromNotification.value = false
+    }
+
+    fun skipAcknowledgedGithubRelease(updateInfo: UpdateInfo) = viewModelScope.launch {
+        if (BuildConfig.FLAVOR != "github") return@launch
+        if (updateInfo.remoteApkAssetUpdatedAt.isBlank()) return@launch
+        userPreferencesRepository.writeGithubReleaseAck(
+            fingerprint = updateInfo.notificationDedupeKey(),
+            installedVersionName = BuildConfig.VERSION_NAME
+        )
+        _updateInfo.value = null
+    }
+
+    fun setSaveUpdateApkToDownloads(enabled: Boolean) = viewModelScope.launch {
+        userPreferencesRepository.setSaveUpdateApkToDownloads(enabled)
     }
 
     fun requestManualExportPicker() {
@@ -250,7 +292,7 @@ class SettingsViewModel @Inject constructor(
         return "filepipe_backup_$stamp.json"
     }
 
-    fun importFromUri(uri: Uri) = viewModelScope.launch {
+    fun importFromUri(uri: Uri, action: BackupImportPickAction) = viewModelScope.launch {
         val text = withContext(Dispatchers.IO) {
             context.contentResolver.openInputStream(uri)?.use { stream ->
                 stream.readBytes().decodeToString()
@@ -259,37 +301,57 @@ class SettingsViewModel @Inject constructor(
             _userMessage.value = "Could not read file"
             return@launch
         }
-        importRulesUseCase.importFromJson(text).fold(
-            onSuccess = { result ->
-                val parts = buildList {
-                    add("${result.rulesImported} rules")
-                    if (result.historyRunsImported > 0) {
-                        add("${result.historyRunsImported} history runs")
-                    }
-                    if (result.settingsRestored) add("settings")
-                }
-                _userMessage.value = context.getString(
-                    R.string.settings_import_success,
-                    parts.joinToString(", ")
+        when (action) {
+            BackupImportPickAction.ImportMerge ->
+                importRulesUseCase.mergeRulesFromJson(text).fold(
+                    onSuccess = { result ->
+                        _userMessage.value = context.getString(
+                            R.string.settings_import_merge_success,
+                            result.rulesAdded,
+                            result.rulesUpdated
+                        )
+                    },
+                    onFailure = { _userMessage.value = "Import failed: ${it.message}" }
                 )
-            },
-            onFailure = { _userMessage.value = "Import failed: ${it.message}" }
-        )
+            BackupImportPickAction.RestoreFull ->
+                importRulesUseCase.restoreFromBackupJson(text).fold(
+                    onSuccess = { result ->
+                        val parts = buildList {
+                            add("${result.rulesImported} rules")
+                            if (result.historyRunsImported > 0) {
+                                add("${result.historyRunsImported} history runs")
+                            }
+                            if (result.settingsRestored) add("settings")
+                        }
+                        _userMessage.value = context.getString(
+                            R.string.settings_restore_success,
+                            parts.joinToString(", ")
+                        )
+                    },
+                    onFailure = { _userMessage.value = "Restore failed: ${it.message}" }
+                )
+        }
     }
 
     fun checkForUpdate(silent: Boolean = false) = viewModelScope.launch {
         playUpdateSessionHandle.clearPendingPlayUpdate()
         _isCheckingUpdate.value = true
         _downloadProgress.value = null
-        _updateInfo.value = null
         val info = updateChecker.checkForUpdate()
         _isCheckingUpdate.value = false
         if (info != null) {
             _updateInfo.value = info
-        } else if (!silent) {
-            _userMessage.value = null
-            yield()
-            _userMessage.value = context.getString(R.string.settings_up_to_date)
+            if (BuildConfig.SHOW_UPDATES) {
+                val prefsSnapshot = userPreferencesRepository.getPreferencesSnapshot()
+                updateAvailableNotifier.notifyIfNewUpdateAvailable(info, prefsSnapshot)
+            }
+        } else {
+            _updateInfo.value = null
+            if (!silent) {
+                _userMessage.value = null
+                yield()
+                _userMessage.value = context.getString(R.string.settings_up_to_date)
+            }
         }
     }
 
@@ -301,14 +363,18 @@ class SettingsViewModel @Inject constructor(
         playUpdateSessionHandle.clearPendingPlayUpdate()
         _isCheckingUpdate.value = true
         _downloadProgress.value = null
-        _updateInfo.value = null
         _manualUpdateNoResult.value = false
         viewModelScope.launch {
             val info = updateChecker.checkForUpdate()
             _isCheckingUpdate.value = false
             if (info != null) {
                 _updateInfo.value = info
+                if (BuildConfig.SHOW_UPDATES) {
+                    val prefsSnapshot = userPreferencesRepository.getPreferencesSnapshot()
+                    updateAvailableNotifier.notifyIfNewUpdateAvailable(info, prefsSnapshot)
+                }
             } else {
+                _updateInfo.value = null
                 _manualUpdateNoResult.value = true
             }
         }
@@ -357,7 +423,8 @@ class SettingsViewModel @Inject constructor(
         return started
     }
 
-    fun downloadAndInstall(downloadUrl: String) = viewModelScope.launch {
+    fun downloadAndInstall(updateInfo: UpdateInfo) = viewModelScope.launch {
+        val downloadUrl = updateInfo.downloadUrl
         _downloadProgress.value = 0f
         val result = withContext(Dispatchers.IO) {
             runCatching {
@@ -366,7 +433,7 @@ class SettingsViewModel @Inject constructor(
                 try {
                     connection.connect()
                     val contentLength = connection.contentLength
-                    val file = File(context.cacheDir, "filepipe_update.apk")
+                    val file = File(context.cacheDir, FILEPIPE_UPDATE_APK_CACHE_NAME)
                     connection.inputStream.use { input ->
                         file.outputStream().use { output ->
                             val buffer = ByteArray(8192)
@@ -387,6 +454,23 @@ class SettingsViewModel @Inject constructor(
                             }
                         }
                     }
+                    if (BuildConfig.FLAVOR == "github") {
+                        val prefs = userPreferencesRepository.getPreferencesSnapshot()
+                        if (prefs.saveUpdateApkToDownloads && updateInfo.remoteApkFileName.isNotBlank()) {
+                            val copyResult = copyUpdateApkToMediaStoreDownloads(
+                                context,
+                                file,
+                                updateInfo.remoteApkFileName
+                            )
+                            if (copyResult.isFailure) {
+                                withContext(Dispatchers.Main) {
+                                    _userMessage.value = context.getString(
+                                        R.string.settings_update_apk_save_to_downloads_failed
+                                    )
+                                }
+                            }
+                        }
+                    }
                     _downloadProgress.value = -1f
                     val uri = FileProvider.getUriForFile(
                         context,
@@ -399,6 +483,12 @@ class SettingsViewModel @Inject constructor(
                     }
                     withContext(Dispatchers.Main) {
                         context.startActivity(installIntent)
+                    }
+                    if (BuildConfig.FLAVOR == "github" && updateInfo.remoteApkAssetUpdatedAt.isNotBlank()) {
+                        userPreferencesRepository.writeGithubReleaseAck(
+                            fingerprint = updateInfo.notificationDedupeKey(),
+                            installedVersionName = BuildConfig.VERSION_NAME
+                        )
                     }
                 } finally {
                     connection.disconnect()

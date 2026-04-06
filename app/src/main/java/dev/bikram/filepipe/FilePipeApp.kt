@@ -9,6 +9,9 @@ import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
 import dev.bikram.filepipe.manualrun.ManualRunProcessLifecycleBinder
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.update.UpdateApkCacheMaintenance
+import dev.bikram.filepipe.update.UpdateAvailableNotifier
+import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
 import dev.bikram.filepipe.worker.LogPruneWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +32,15 @@ class FilePipeApp : Application(), Configuration.Provider {
     @Inject
     lateinit var userPreferencesRepository: UserPreferencesRepository
 
+    @Inject
+    lateinit var updateApkCacheMaintenance: UpdateApkCacheMaintenance
+
+    @Inject
+    lateinit var updateCheckWorkScheduler: UpdateCheckWorkScheduler
+
+    @Inject
+    lateinit var updateAvailableNotifier: UpdateAvailableNotifier
+
     private val preferencesMigrationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
@@ -41,7 +53,11 @@ class FilePipeApp : Application(), Configuration.Provider {
         manualRunProcessLifecycleBinder.ensureRegistered()
         preferencesMigrationScope.launch {
             userPreferencesRepository.migrateLegacyCustomSeedIfNeeded()
+            userPreferencesRepository.migrateLegacyAutoCheckToScheduleIfNeeded()
+            updateCheckWorkScheduler.syncFromPreferences()
         }
+        updateAvailableNotifier.ensureNotificationChannel()
+        updateApkCacheMaintenance.enqueueStartupCleanup(preferencesMigrationScope)
         scheduleLogPruneWorker()
     }
 

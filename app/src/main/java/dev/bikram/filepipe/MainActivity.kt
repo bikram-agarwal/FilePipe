@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         handleShortcutIntent(intent)
         handleOpenHistoryDetailIntent(intent)
+        handleOpenSettingsUpdatesIntent(intent)
 
         setContent {
             val preferences by userPreferencesRepository.preferencesFlow
@@ -99,6 +100,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         handleShortcutIntent(intent)
         handleOpenHistoryDetailIntent(intent)
+        handleOpenSettingsUpdatesIntent(intent)
     }
 
     override fun onStop() {
@@ -123,6 +125,13 @@ class MainActivity : ComponentActivity() {
         if (historyId != -1L) {
             pendingShortcutRepository.requestOpenHistoryDetail(historyId)
             intent?.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID)
+        }
+    }
+
+    private fun handleOpenSettingsUpdatesIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES, false) == true) {
+            pendingShortcutRepository.requestOpenSettingsForUpdates()
+            intent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES)
         }
     }
 }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">File Pipe</string>
+    <string name="app_name">FilePipe</string>
 
     <!-- Bottom nav labels -->
     <string name="nav_rules">Rules</string>
@@ -16,7 +16,7 @@
     <string name="rule_card_from_none">No sources</string>
     <string name="rule_card_destination_not_set">Not set</string>
     <string name="rule_card_to">To</string>
-    <string name="rule_card_stale_folder_warning">One or more folders need re-selection — tap Edit</string>
+    <string name="rule_card_stale_folder_warning">One or more folders need attention - tap Edit</string>
     <string name="rule_card_progress_moving_file">Moving %1$s (%2$d / %3$d)</string>
     <string name="rule_card_progress_copying_file">Copying %1$s (%2$d / %3$d)</string>
     <string name="rule_card_progress_files_moved_summary">%1$d / %2$d files moved</string>
@@ -30,10 +30,13 @@
     <string name="edit_rule">Edit Rule</string>
     <string name="rule_name_label">Rule name</string>
     <string name="rule_name_placeholder">e.g. Photos Backup</string>
-    <string name="rule_detail_folder_access_title">Folder access needed</string>
-    <string name="rule_detail_folder_access_source_line">Source: %1$s</string>
-    <string name="rule_detail_folder_access_destination_line">Destination: %1$s</string>
-    <string name="rule_detail_folder_access_hint">Tap a highlighted folder below to re-grant access in the system picker.</string>
+    <string name="rule_detail_folder_access_title">Folders need attention</string>
+    <string name="rule_detail_folder_access_source_unavailable">Source (not available - folder may be missing): %1$s</string>
+    <string name="rule_detail_folder_access_source_permission">Source (access denied - pick again): %1$s</string>
+    <string name="rule_detail_folder_access_destination_unavailable">Destination (not available - folder may be missing): %1$s</string>
+    <string name="rule_detail_folder_access_destination_permission">Destination (access denied - pick again): %1$s</string>
+    <string name="rule_detail_folder_access_hint_unavailable">If you deleted that folder, recreate it or pick it again. Tap a highlighted path below.</string>
+    <string name="rule_detail_folder_access_hint_permission">FilePipe no longer has access to one or more trees. Tap a highlighted folder and grant access in the system picker.</string>
     <string name="rule_detail_validation_errors_title">Can\'t save this rule</string>
     <string name="source_folders_label">Source folders</string>
     <string name="add_source_folder">Pick folders</string>
@@ -144,11 +147,11 @@
 
     <!-- Permission screen -->
     <string name="permission_title">Storage Access Required</string>
-    <string name="permission_message">File Pipe needs access to all files to move media between folders. Please grant \"All files access\" in the next screen.</string>
+    <string name="permission_message">FilePipe needs access to all files to move media between folders. Please grant \"All files access\" in the next screen.</string>
     <string name="permission_grant">Grant Access</string>
 
     <!-- Notification -->
-    <string name="notification_channel_name">File Pipe</string>
+    <string name="notification_channel_name">FilePipe</string>
     <string name="notification_channel_desc">Shows progress when organizing files</string>
     <string name="notification_running">Running: %s</string>
     <string name="notification_running_batch">Running %d rules…</string>
@@ -193,18 +196,23 @@
     <string name="settings_gradient_background_desc">Tinted background using your theme color</string>
     <string name="settings_fixed_card_colors">Fixed card colors</string>
     <string name="settings_fixed_card_colors_desc">Neutral grey cards instead of accent-tinted</string>
-    <string name="settings_backup_section">Import/Export</string>
+    <string name="settings_backup_section">Backup &amp; Restore</string>
     <string name="settings_choose_export_folder">Choose export folder</string>
     <string name="settings_export_folder_hint">Folder for exporting backups (rules, history, settings).</string>
     <string name="settings_export_select_folder_first">Select an export folder first</string>
     <string name="settings_export_success">%1$s exported</string>
     <string name="settings_export_now">Export backup</string>
     <string name="settings_import_rules">Import backup</string>
-    <string name="settings_import_success">Backup imported (%1$s)</string>
-    <string name="settings_import_replace_hint">Import replaces all rules and run history with the backup. Settings in the file overwrite your current settings when the backup includes them.</string>
+    <string name="settings_restore_backup">Restore backup</string>
+    <string name="settings_backup_import_restore_help_title">Import vs restore</string>
+    <string name="settings_backup_import_restore_help_body">Import adds new rules from the file and updates rules that have the same name. Your run history and app settings stay as they are.\n\nRestore replaces everything in the app with the contents of the file: all rules, run history, and settings. Useful when moving to a new device.</string>
+    <string name="settings_backup_help_icon_cd">Explain import and restore</string>
+    <string name="settings_backup_help_ok">OK</string>
+    <string name="settings_import_merge_success">Rules imported: %1$d added, %2$d updated</string>
+    <string name="settings_restore_success">Backup restored (%1$s)</string>
     <string name="settings_auto_export_on_change">Auto-export on app exit</string>
     <string name="settings_auto_export_on_change_hint">Full backup on exit after rule changes.</string>
-    <string name="settings_scheduled_export">Daily scheduled export</string>
+    <string name="settings_scheduled_export">Daily scheduled backup</string>
     <string name="settings_scheduled_export_hint">Exports backup about once per day (requires export folder).</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
@@ -255,8 +263,23 @@
 
     <!-- Settings – Updates (GitHub builds) -->
     <string name="settings_updates_section">Updates</string>
-    <string name="settings_auto_check_updates">Auto check for updates</string>
-    <string name="settings_auto_check_updates_desc">Check for updates at app launch</string>
+    <string name="settings_update_check_frequency">Automatically check for updates</string>
+    <string name="settings_update_schedule_app_start">At Startup: When the app starts</string>
+    <string name="settings_update_schedule_daily_21">Daily: Every day at 9 PM</string>
+    <string name="settings_update_schedule_monday_21">Weekly: Every Monday at 9 PM</string>
+    <string name="settings_update_schedule_never">Never</string>
+    <string name="settings_notify_new_updates">Get notification for new updates</string>
+    <string name="settings_notify_updates_need_auto_check">Enable \"Automatically check for updates\" first.</string>
+    <string name="settings_notify_updates_enable_notifications">Allow notifications for FilePipe.</string>
+    <string name="settings_update_available_button">Update available - %1$s</string>
+    <string name="settings_update_skip_version">Skip version</string>
+    <string name="settings_update_sheet_false_positive_tooltip">If you installed an update outside this app (not using Download update here), this screen can still show an update. Tap Skip version. You will not be prompted again until the GitHub release changes.</string>
+    <string name="notification_channel_updates_name">App updates</string>
+    <string name="notification_channel_updates_description">Alerts when a new app version is available</string>
+    <string name="notification_update_available_title">Update available</string>
+    <string name="notification_update_available_text">Version %1$s is ready to install</string>
+    <string name="settings_save_update_apk_to_downloads">Save update APK to Downloads folder</string>
+    <string name="settings_update_apk_save_to_downloads_failed">Update downloaded, but saving a copy to Downloads failed</string>
     <string name="settings_see_whats_new">See What\'s New?</string>
     <string name="settings_check_for_updates">Check for updates</string>
     <string name="settings_download_install">Download Update (v%1$s)</string>
@@ -267,12 +290,18 @@
     <string name="settings_up_to_date">You\'re up to date</string>
     <string name="settings_changelog_title">What\'s New</string>
     <string name="settings_changelog_load_failed">Could not load changelog</string>
+    <string name="settings_changelog_previous">Previous</string>
+    <string name="settings_changelog_next">Next</string>
+    <string name="settings_changelog_page_indicator">%1$d of %2$d</string>
     <string name="settings_play_in_app_update_failed">Could not start the update. Try Check for updates again.</string>
 
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>
     <string name="rule_scan_subdirs_label">Scan subdirectories</string>
-    <string name="rule_scan_subdirs_support">Folder structure under each source is recreated under the destination.</string>
+    <string name="rule_scan_subdirs_support">Sub-Folders will be scanned for matching files and recreated at the destination.</string>
+    <string name="rule_suppress_missing_source_card_label">Suppress missing source folder errors</string>
+    <string name="rule_suppress_missing_source_card_support">When a source folder is missing, hide the warning on the rules list. You still see full details while editing this rule. Does not apply to the destination or revoked access.</string>
+    <string name="rule_toggle_tip_show_help">Show help</string>
     <string name="rule_section_operation_title">Operation</string>
     <string name="rule_operation_mode_label">Mode</string>
     <string name="operation_move">Move</string>

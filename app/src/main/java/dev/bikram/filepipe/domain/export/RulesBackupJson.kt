@@ -15,9 +15,22 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+/**
+ * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
+ * (`@Database`); Room KSP does not allow that annotation to reference this constant.
+ */
+const val APP_DATABASE_SCHEMA_VERSION = 4
+
+/**
+ * Root object for `filepipe_backup_*.json`.
+ *
+ * [version] defaults to [APP_DATABASE_SCHEMA_VERSION]. Room’s exported files under `app/schemas/` repeat the same
+ * integer because the Room compiler generates them from `@Database`; you do not edit `database.version` there by hand.
+ * Older backup files may still show a larger number (legacy backup-format counter); import does not branch on [version].
+ */
 @Serializable
 data class AppBackup(
-    val version: Int = 7,
+    val version: Int = APP_DATABASE_SCHEMA_VERSION,
     val exportedAtMillis: Long = System.currentTimeMillis(),
     val rules: List<RuleBackupDto>,
     val history: List<RunHistoryBackupDto> = emptyList(),
@@ -39,6 +52,7 @@ data class RuleBackupDto(
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
     val scanSubdirectories: Boolean = false,
+    val suppressMissingSourceFolderCardWarning: Boolean = false,
     val iconKey: String = RuleIcon.DEFAULT.name,
     val iconEmoji: String? = null,
     val filenamePattern: String? = null,
@@ -103,7 +117,11 @@ data class SettingsBackupDto(
     val hasSeenIntro: Boolean = false,
     val hapticFeedbackEnabled: Boolean = true,
     val progressiveBlurEnabled: Boolean = true,
-    val autoCheckForUpdates: Boolean = true,
+    /** Legacy import only; prefer [updateCheckSchedule]. */
+    val autoCheckForUpdates: Boolean? = null,
+    val updateCheckSchedule: String? = null,
+    val notifyOnNewUpdates: Boolean = false,
+    val saveUpdateApkToDownloads: Boolean = false,
     val useGradientBackground: Boolean = true,
     val useFixedCardColors: Boolean = false,
     val customSeedHex: String? = null,
@@ -129,6 +147,7 @@ fun Rule.toBackupDto(): RuleBackupDto = RuleBackupDto(
     conflictPolicy = conflictPolicy.name,
     operationMode = operationMode.name,
     scanSubdirectories = scanSubdirectories,
+    suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
     iconKey = icon.name,
     iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
     filenamePattern = filenamePattern,
@@ -189,7 +208,10 @@ fun AppPreferences.toBackupDto(): SettingsBackupDto = SettingsBackupDto(
     hasSeenIntro = hasSeenIntro,
     hapticFeedbackEnabled = hapticFeedbackEnabled,
     progressiveBlurEnabled = progressiveBlurEnabled,
-    autoCheckForUpdates = autoCheckForUpdates,
+    autoCheckForUpdates = null,
+    updateCheckSchedule = updateCheckSchedule.name,
+    notifyOnNewUpdates = notifyOnNewUpdates,
+    saveUpdateApkToDownloads = saveUpdateApkToDownloads,
     useGradientBackground = useGradientBackground,
     useFixedCardColors = useFixedCardColors,
     customSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },
@@ -209,6 +231,7 @@ fun RuleBackupDto.toDomain(): Rule = Rule(
     conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
     operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),
     scanSubdirectories = scanSubdirectories,
+    suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
     icon = RuleIcon.fromStored(iconKey),
     iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
     filenamePattern = filenamePattern,

@@ -1,6 +1,8 @@
-Ever wanted all your videos in one folder, regardless of which app downloaded them? Or wished your Downloads folder would just sort itself into Documents, Images, and everything else?
+FilePipe turns your chaotic storage into a perfectly organized library — automatically.
 
-That's exactly what <b>File Pipe</b> does. Write a rule, set a schedule, done. Define rules to split mixed folders by type, or pull scattered media files into one place.
+Ever wanted all your videos in one folder, regardless of which app downloaded them? Or wished your Downloads folder would just sort itself into Documents, Music, Images, and everything else?
+
+That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let the pipes do the work. Move or copy any media to its rightful place.
 
 <b>━━ RULES ━━</b>
 Use templates to start fast, or build your own. Create a rule by choosing source folders, file extensions, and a destination. Each rule can move or copy files, and you control what happens when a filename collision occurs — skip, overwrite, or rename automatically. Rules can scan subfolders recursively and each one gets its own schedule.
@@ -15,7 +17,7 @@ Not every file in a folder should match. Narrow things down with:
 All optional, all collapsed by default so simple rules stay simple.
 
 <b>━━ SIMULATE BEFORE YOU RUN ━━</b>
-Not sure a rule will pick up the right files? <b>Simulate</b> it first. File Pipe previews exactly which files would be moved — without touching anything on disk.
+Not sure a rule will pick up the right files? <b>Simulate</b> it first. FilePipe previews exactly which files would be moved — without touching anything on disk.
 
 <b>━━ FLEXIBLE SCHEDULES ━━</b>
 Run rules on demand, or schedule them to run:
