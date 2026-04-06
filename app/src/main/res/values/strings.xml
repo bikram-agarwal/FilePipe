@@ -16,7 +16,7 @@
     <string name="rule_card_from_none">No sources</string>
     <string name="rule_card_destination_not_set">Not set</string>
     <string name="rule_card_to">To</string>
-    <string name="rule_card_stale_folder_warning">One or more folders need re-selection — tap Edit</string>
+    <string name="rule_card_stale_folder_warning">One or more folders need attention - tap Edit</string>
     <string name="rule_card_progress_moving_file">Moving %1$s (%2$d / %3$d)</string>
     <string name="rule_card_progress_copying_file">Copying %1$s (%2$d / %3$d)</string>
     <string name="rule_card_progress_files_moved_summary">%1$d / %2$d files moved</string>
@@ -30,10 +30,13 @@
     <string name="edit_rule">Edit Rule</string>
     <string name="rule_name_label">Rule name</string>
     <string name="rule_name_placeholder">e.g. Photos Backup</string>
-    <string name="rule_detail_folder_access_title">Folder access needed</string>
-    <string name="rule_detail_folder_access_source_line">Source: %1$s</string>
-    <string name="rule_detail_folder_access_destination_line">Destination: %1$s</string>
-    <string name="rule_detail_folder_access_hint">Tap a highlighted folder below to re-grant access in the system picker.</string>
+    <string name="rule_detail_folder_access_title">Folders need attention</string>
+    <string name="rule_detail_folder_access_source_unavailable">Source (not available - folder may be missing): %1$s</string>
+    <string name="rule_detail_folder_access_source_permission">Source (access denied - pick again): %1$s</string>
+    <string name="rule_detail_folder_access_destination_unavailable">Destination (not available - folder may be missing): %1$s</string>
+    <string name="rule_detail_folder_access_destination_permission">Destination (access denied - pick again): %1$s</string>
+    <string name="rule_detail_folder_access_hint_unavailable">If you deleted that folder, recreate it or pick it again. Tap a highlighted path below.</string>
+    <string name="rule_detail_folder_access_hint_permission">File Pipe no longer has access to one or more trees. Tap a highlighted folder and grant access in the system picker.</string>
     <string name="rule_detail_validation_errors_title">Can\'t save this rule</string>
     <string name="source_folders_label">Source folders</string>
     <string name="add_source_folder">Pick folders</string>
@@ -267,12 +270,18 @@
     <string name="settings_up_to_date">You\'re up to date</string>
     <string name="settings_changelog_title">What\'s New</string>
     <string name="settings_changelog_load_failed">Could not load changelog</string>
+    <string name="settings_changelog_previous">Previous</string>
+    <string name="settings_changelog_next">Next</string>
+    <string name="settings_changelog_page_indicator">%1$d of %2$d</string>
     <string name="settings_play_in_app_update_failed">Could not start the update. Try Check for updates again.</string>
 
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>
     <string name="rule_scan_subdirs_label">Scan subdirectories</string>
-    <string name="rule_scan_subdirs_support">Folder structure under each source is recreated under the destination.</string>
+    <string name="rule_scan_subdirs_support">Sub-Folders will be scanned for matching files and recreated at the destination.</string>
+    <string name="rule_suppress_missing_source_card_label">Suppress missing source folder errors</string>
+    <string name="rule_suppress_missing_source_card_support">When a source folder is missing, hide the warning on the rules list. You still see full details while editing this rule. Does not apply to the destination or revoked access.</string>
+    <string name="rule_toggle_tip_show_help">Show help</string>
     <string name="rule_section_operation_title">Operation</string>
     <string name="rule_operation_mode_label">Mode</string>
     <string name="operation_move">Move</string>

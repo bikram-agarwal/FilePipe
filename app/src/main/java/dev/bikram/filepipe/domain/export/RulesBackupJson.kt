@@ -17,7 +17,7 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class AppBackup(
-    val version: Int = 7,
+    val version: Int = 8,
     val exportedAtMillis: Long = System.currentTimeMillis(),
     val rules: List<RuleBackupDto>,
     val history: List<RunHistoryBackupDto> = emptyList(),
@@ -39,6 +39,7 @@ data class RuleBackupDto(
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
     val scanSubdirectories: Boolean = false,
+    val suppressMissingSourceFolderCardWarning: Boolean = false,
     val iconKey: String = RuleIcon.DEFAULT.name,
     val iconEmoji: String? = null,
     val filenamePattern: String? = null,
@@ -129,6 +130,7 @@ fun Rule.toBackupDto(): RuleBackupDto = RuleBackupDto(
     conflictPolicy = conflictPolicy.name,
     operationMode = operationMode.name,
     scanSubdirectories = scanSubdirectories,
+    suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
     iconKey = icon.name,
     iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
     filenamePattern = filenamePattern,
@@ -209,6 +211,7 @@ fun RuleBackupDto.toDomain(): Rule = Rule(
     conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
     operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),
     scanSubdirectories = scanSubdirectories,
+    suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
     icon = RuleIcon.fromStored(iconKey),
     iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
     filenamePattern = filenamePattern,

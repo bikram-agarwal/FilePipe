@@ -1,3 +1,14 @@
+#v2.1.1 - Smoothing rough edges
+
+### 🔧 Improvements
+- Clearer alerts about folder issues. Different alerts for missing folder vs lost permission
+- New option to suppress missing source folder alerts
+- Long explanations of some features are now shown as tooltips, instead of inline subtitles
+- Fixed snackbar messages hanging around
+- Changelog is now paginated, so you don't get a wall of text
+
+---
+
 ## v2.1.0 - Custom colors, Custom rule order, Granular history & sorting
 
 ### 🆕 New features
