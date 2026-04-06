@@ -10,6 +10,7 @@ import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.PreviewFileResult
+import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.TriggerType
@@ -392,16 +393,51 @@ class RulesViewModel @Inject constructor(
                 }
                 append('\u0001')
                 append(rule.destinationFolderPath)
+                append('\u0001')
+                append(rule.suppressMissingSourceFolderCardWarning)
             }
         }
 
     private fun computeStaleRuleIds(ruleList: List<Rule>): Set<Long> =
-        ruleList.filter { rule ->
-            val allPaths = rule.sourceFolderPaths + listOfNotNull(rule.destinationFolderPath.takeIf { it.isNotBlank() })
-            allPaths.any { path ->
-                !path.startsWith("content://") || !fileOperationRepository.isAccessible(path)
+        ruleList.filter { rule -> ruleShowsStaleFolderWarningOnCard(rule) }.map { it.id }.toSet()
+
+    /**
+     * Stale banner on the rule list card. Honors [Rule.suppressMissingSourceFolderCardWarning] only
+     * when every problem is an [FolderAccessResult.Unavailable] on a **source** path; destination
+     * issues and permission denials always show.
+     */
+    private fun ruleShowsStaleFolderWarningOnCard(rule: Rule): Boolean {
+        var sourceHasPermissionOrNonContent = false
+        var sourceHasUnavailableOnly = false
+        for (path in rule.sourceFolderPaths) {
+            when {
+                !path.startsWith("content://") -> sourceHasPermissionOrNonContent = true
+                else -> when (fileOperationRepository.resolveFolderAccess(path)) {
+                    FolderAccessResult.PermissionDenied -> sourceHasPermissionOrNonContent = true
+                    FolderAccessResult.Unavailable -> sourceHasUnavailableOnly = true
+                    FolderAccessResult.Accessible -> Unit
+                }
             }
-        }.map { it.id }.toSet()
+        }
+        val destinationPath = rule.destinationFolderPath.takeIf { it.isNotBlank() }
+        var destinationShowsStale = false
+        destinationPath?.let { path ->
+            when {
+                !path.startsWith("content://") -> destinationShowsStale = true
+                else -> when (fileOperationRepository.resolveFolderAccess(path)) {
+                    FolderAccessResult.PermissionDenied -> return true
+                    FolderAccessResult.Unavailable -> destinationShowsStale = true
+                    FolderAccessResult.Accessible -> Unit
+                }
+            }
+        }
+        if (sourceHasPermissionOrNonContent) return true
+        if (destinationShowsStale) return true
+        if (sourceHasUnavailableOnly) {
+            return !rule.suppressMissingSourceFolderCardWarning
+        }
+        return false
+    }
 
     private fun sortRulesList(
         rules: List<Rule>,

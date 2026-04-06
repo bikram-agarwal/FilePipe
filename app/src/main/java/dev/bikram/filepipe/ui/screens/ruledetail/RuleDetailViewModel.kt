@@ -10,6 +10,7 @@ import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.domain.model.ConflictPolicy
+import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
@@ -45,6 +46,7 @@ data class RuleDetailUiState(
     val conflictPolicy: ConflictPolicy = ConflictPolicy.RENAME_SUFFIX,
     val operationMode: OperationMode = OperationMode.MOVE,
     val scanSubdirectories: Boolean = false,
+    val suppressMissingSourceFolderCardWarning: Boolean = false,
     val icon: RuleIcon = RuleIcon.DEFAULT,
     val iconEmoji: String? = null,
     // Advanced filters (shown as display strings in UI)
@@ -60,9 +62,16 @@ data class RuleDetailUiState(
     val previewFiles: List<FileEntry>? = null,
     val isPreviewLoading: Boolean = false,
     val removedRedundantFolders: List<String> = emptyList(),
-    /** Source URIs that are not usable (missing grant or not a storage folder link). */
-    val inaccessibleSourcePaths: List<String> = emptyList(),
-    val destinationFolderInaccessible: Boolean = false
+    /**
+     * Source tree URIs that are not usable. Values are [FolderAccessResult.Unavailable] or
+     * [FolderAccessResult.PermissionDenied] only.
+     */
+    val inaccessibleSourceIssues: Map<String, FolderAccessResult> = emptyMap(),
+    /**
+     * When the destination is set but not readable: [FolderAccessResult.Unavailable] or
+     * [FolderAccessResult.PermissionDenied]. Null when destination is blank or accessible.
+     */
+    val destinationFolderAccessIssue: FolderAccessResult? = null
 )
 
 private data class RuleSnapshot(
@@ -74,6 +83,7 @@ private data class RuleSnapshot(
     val conflictPolicy: ConflictPolicy,
     val operationMode: OperationMode,
     val scanSubdirectories: Boolean,
+    val suppressMissingSourceFolderCardWarning: Boolean,
     val icon: RuleIcon,
     val iconEmoji: String?,
     val filenamePattern: String,
@@ -93,6 +103,7 @@ private fun RuleDetailUiState.toSnapshot(): RuleSnapshot = RuleSnapshot(
     conflictPolicy = conflictPolicy,
     operationMode = operationMode,
     scanSubdirectories = scanSubdirectories,
+    suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
     icon = icon,
     iconEmoji = iconEmoji,
     filenamePattern = filenamePattern,
@@ -163,6 +174,7 @@ class RuleDetailViewModel @Inject constructor(
                     conflictPolicy = rule.conflictPolicy,
                     operationMode = rule.operationMode,
                     scanSubdirectories = rule.scanSubdirectories,
+                    suppressMissingSourceFolderCardWarning = rule.suppressMissingSourceFolderCardWarning,
                     icon = rule.icon,
                     iconEmoji = rule.iconEmoji,
                     filenamePattern = rule.filenamePattern ?: "",
@@ -182,22 +194,32 @@ class RuleDetailViewModel @Inject constructor(
         scheduleFolderAccessRecompute()
     }
 
-    private fun pathLacksFolderAccess(path: String): Boolean {
-        if (path.isBlank()) return false
-        return !path.startsWith("content://") || !fileOperationRepository.isAccessible(path)
-    }
-
     private fun scheduleFolderAccessRecompute() {
         viewModelScope.launch(Dispatchers.IO) {
             val snapshot = _uiState.value
-            val inaccessibleSources = snapshot.sourceFolderPaths.filter { path -> pathLacksFolderAccess(path) }
-            val destinationInaccessible =
-                snapshot.destinationFolderPath.isNotBlank() &&
-                    pathLacksFolderAccess(snapshot.destinationFolderPath)
+            val sourceIssues = snapshot.sourceFolderPaths.mapNotNull { path ->
+                val result = if (!path.startsWith("content://")) {
+                    FolderAccessResult.Unavailable
+                } else {
+                    fileOperationRepository.resolveFolderAccess(path)
+                }
+                if (result == FolderAccessResult.Accessible) null else path to result
+            }.toMap()
+            val destinationIssue =
+                if (snapshot.destinationFolderPath.isBlank()) {
+                    null
+                } else {
+                    val result = if (!snapshot.destinationFolderPath.startsWith("content://")) {
+                        FolderAccessResult.Unavailable
+                    } else {
+                        fileOperationRepository.resolveFolderAccess(snapshot.destinationFolderPath)
+                    }
+                    if (result == FolderAccessResult.Accessible) null else result
+                }
             _uiState.update {
                 it.copy(
-                    inaccessibleSourcePaths = inaccessibleSources,
-                    destinationFolderInaccessible = destinationInaccessible
+                    inaccessibleSourceIssues = sourceIssues,
+                    destinationFolderAccessIssue = destinationIssue
                 )
             }
         }
@@ -304,6 +326,9 @@ class RuleDetailViewModel @Inject constructor(
         }
         scheduleFolderAccessRecompute()
     }
+
+    fun setSuppressMissingSourceFolderCardWarning(enabled: Boolean) =
+        _uiState.update { it.copy(suppressMissingSourceFolderCardWarning = enabled) }
 
     fun dismissRedundantFolderNotice() = _uiState.update { it.copy(removedRedundantFolders = emptyList()) }
 
@@ -414,6 +439,7 @@ class RuleDetailViewModel @Inject constructor(
         conflictPolicy = state.conflictPolicy,
         operationMode = state.operationMode,
         scanSubdirectories = state.scanSubdirectories,
+        suppressMissingSourceFolderCardWarning = state.suppressMissingSourceFolderCardWarning,
         icon = state.icon,
         iconEmoji = state.iconEmoji?.takeIf { it.isNotBlank() },
         filenamePattern = state.filenamePattern.takeIf { it.isNotBlank() },

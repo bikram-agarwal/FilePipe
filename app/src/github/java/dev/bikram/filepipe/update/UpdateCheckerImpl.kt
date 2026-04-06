@@ -43,7 +43,8 @@ class UpdateCheckerImpl @Inject constructor() : UpdateChecker {
             UpdateInfo(
                 versionName = remoteVersion,
                 downloadUrl = apkAsset.browser_download_url,
-                releaseNotes = release.body
+                releaseNotes = release.body,
+                remoteApkFileName = apkAsset.name
             )
         }.getOrNull()
     }

@@ -8,8 +8,11 @@ import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +61,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
@@ -68,10 +72,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -192,8 +198,24 @@ fun SettingsScreen(
 
     LaunchedEffect(userMessage) {
         val message = userMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
-        viewModel.clearUserMessage()
+        try {
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short
+            )
+        } finally {
+            viewModel.clearUserMessage()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, snackbarHostState) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                snackbarHostState.currentSnackbarData?.dismiss()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val folderLauncher = rememberLauncherForActivityResult(
@@ -261,7 +283,7 @@ fun SettingsScreen(
                         val hostActivity = context as? ComponentActivity
                         viewModel.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
                     } else {
-                        viewModel.downloadAndInstall(info.downloadUrl)
+                        viewModel.downloadAndInstall(info)
                     }
                 }
             )
@@ -617,7 +639,8 @@ fun SettingsScreen(
                                 playTap()
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar(
-                                        context.getString(R.string.settings_export_select_folder_first)
+                                        message = context.getString(R.string.settings_export_select_folder_first),
+                                        duration = SnackbarDuration.Short
                                     )
                                 }
                             },
@@ -637,7 +660,8 @@ fun SettingsScreen(
                                 playTap()
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar(
-                                        context.getString(R.string.settings_export_select_folder_first)
+                                        message = context.getString(R.string.settings_export_select_folder_first),
+                                        duration = SnackbarDuration.Short
                                     )
                                 }
                             },
@@ -697,6 +721,22 @@ fun SettingsScreen(
                                         viewModel.setAutoCheckForUpdates(enabled)
                                     }
                                 )
+                            }
+                        }
+                        if (BuildConfig.FLAVOR == "github") {
+                            Spacer(Modifier.height(8.dp))
+                            GroupedListColumn {
+                                GroupedListItem(position = GroupPosition.ONLY) {
+                                    SettingsToggleItem(
+                                        title = stringResource(R.string.settings_save_update_apk_to_downloads),
+                                        subtitle = stringResource(R.string.settings_save_update_apk_to_downloads_desc),
+                                        checked = preferences.saveUpdateApkToDownloads,
+                                        onCheckedChange = { enabled ->
+                                            playTap()
+                                            viewModel.setSaveUpdateApkToDownloads(enabled)
+                                        }
+                                    )
+                                }
                             }
                         }
                         Button(
@@ -831,7 +871,7 @@ fun SettingsScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun UpdateCheckBottomSheetContent(
     maxSheetHeight: Dp,
@@ -843,13 +883,14 @@ private fun UpdateCheckBottomSheetContent(
     onDownloadClick: (UpdateInfo) -> Unit
 ) {
     val sheetScroll = rememberScrollState()
-    val changelogSurfaceColors = elevatedCardColors()
+    val pagerCoroutineScope = rememberCoroutineScope()
+    val scheme = MaterialTheme.colorScheme
     Column(
         Modifier
             .fillMaxWidth()
             .heightIn(max = maxSheetHeight)
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .verticalScroll(sheetScroll)
     ) {
         if (isCheckingUpdate) {
@@ -926,65 +967,200 @@ private fun UpdateCheckBottomSheetContent(
             }
         }
 
-        Spacer(Modifier.height(20.dp))
-        Text(
-            text = stringResource(R.string.settings_changelog_title),
-            style = MaterialTheme.typography.titleLarge
-        )
-        Spacer(Modifier.height(12.dp))
+        if (changelogState != ChangelogUiState.Hidden) {
+            Spacer(Modifier.height(12.dp))
+        }
         when (changelogState) {
             ChangelogUiState.Hidden -> {}
             ChangelogUiState.Loading -> {
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = changelogSurfaceColors.containerColor,
-                    contentColor = changelogSurfaceColors.contentColor,
+                    color = scheme.surfaceContainerHigh,
+                    contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
                     shadowElevation = 0.dp
                 ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .padding(8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = scheme.surfaceContainerLow,
+                        contentColor = scheme.onSurface
                     ) {
-                        LoadingIndicator(modifier = Modifier.size(40.dp))
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            LoadingIndicator(modifier = Modifier.size(40.dp))
+                        }
                     }
                 }
             }
             is ChangelogUiState.Ready -> {
+                val readyMarkdown = changelogState.text
+                val changelogPages = remember(readyMarkdown) { splitChangelogIntoPages(readyMarkdown) }
+                val changelogPagerState = rememberPagerState(pageCount = { changelogPages.size })
+                val changelogPagerMaxHeight = maxSheetHeight * 0.68f
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = changelogSurfaceColors.containerColor,
-                    contentColor = changelogSurfaceColors.contentColor,
+                    color = scheme.surfaceContainerHigh,
+                    contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
                     shadowElevation = 0.dp
                 ) {
-                    SimpleMarkdown(
-                        content = changelogState.text,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    )
+                    if (changelogPages.size <= 1) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = scheme.surfaceContainerLow,
+                            contentColor = scheme.onSurface
+                        ) {
+                            SimpleMarkdown(
+                                content = readyMarkdown,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            )
+                        }
+                    } else {
+                        Column(Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(32.dp)
+                                    .padding(horizontal = 2.dp, vertical = 0.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                val canGoBack = changelogPagerState.currentPage > 0
+                                val canGoForward = changelogPagerState.currentPage < changelogPages.lastIndex
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .clickable(
+                                            enabled = canGoBack,
+                                            onClick = {
+                                                pagerCoroutineScope.launch {
+                                                    changelogPagerState.animateScrollToPage(
+                                                        changelogPagerState.currentPage - 1
+                                                    )
+                                                }
+                                            }
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = stringResource(R.string.settings_changelog_previous),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = if (canGoBack) {
+                                            scheme.primary
+                                        } else {
+                                            scheme.onSurface.copy(alpha = 0.38f)
+                                        }
+                                    )
+                                }
+                                Text(
+                                    text = stringResource(
+                                        R.string.settings_changelog_page_indicator,
+                                        changelogPagerState.currentPage + 1,
+                                        changelogPages.size
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = scheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(horizontal = 6.dp)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .clickable(
+                                            enabled = canGoForward,
+                                            onClick = {
+                                                pagerCoroutineScope.launch {
+                                                    changelogPagerState.animateScrollToPage(
+                                                        changelogPagerState.currentPage + 1
+                                                    )
+                                                }
+                                            }
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                        contentDescription = stringResource(R.string.settings_changelog_next),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = if (canGoForward) {
+                                            scheme.primary
+                                        } else {
+                                            scheme.onSurface.copy(alpha = 0.38f)
+                                        }
+                                    )
+                                }
+                            }
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(changelogPagerMaxHeight)
+                                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                color = scheme.surfaceContainerLow,
+                                contentColor = scheme.onSurface
+                            ) {
+                                HorizontalPager(
+                                    state = changelogPagerState,
+                                    modifier = Modifier.fillMaxSize()
+                                ) { pageIndex ->
+                                    Column(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .verticalScroll(rememberScrollState())
+                                            .padding(16.dp)
+                                    ) {
+                                        SimpleMarkdown(content = changelogPages[pageIndex])
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             is ChangelogUiState.Failed -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = changelogSurfaceColors.containerColor,
-                    contentColor = changelogSurfaceColors.contentColor,
+                    color = scheme.surfaceContainerHigh,
+                    contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
                     shadowElevation = 0.dp
                 ) {
-                    Text(
-                        text = changelogState.message,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(16.dp)
-                    )
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = scheme.surfaceContainerLow,
+                        contentColor = scheme.onSurface
+                    ) {
+                        Text(
+                            text = changelogState.message,
+                            color = scheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
                 }
             }
         }

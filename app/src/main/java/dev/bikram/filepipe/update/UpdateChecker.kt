@@ -7,5 +7,7 @@ interface UpdateChecker {
 data class UpdateInfo(
     val versionName: String,
     val downloadUrl: String,
-    val releaseNotes: String
+    val releaseNotes: String,
+    /** GitHub release `.apk` asset file name; used for MediaStore Downloads [DISPLAY_NAME]. */
+    val remoteApkFileName: String = ""
 )

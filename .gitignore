@@ -2,6 +2,8 @@
 .gradle/
 .kotlin/
 build/
+localdocs/
+release.lnk 
 
 # Machine-local Android SDK path (never commit)
 local.properties

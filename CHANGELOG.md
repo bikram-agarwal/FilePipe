@@ -1,3 +1,42 @@
+## v2.1.1 - Smoothing rough edges
+
+### 🆕 New features
+- Added support for saving downloaded update APKs to Downloads folder.
+
+### 🔧 Improvements
+- Clearer alerts about folder issues. Different alerts for missing folder vs lost permission
+- New option to suppress missing source folder alerts
+- Long explanations of some features are now shown as tooltips, instead of inline subtitles
+- Fixed snackbar messages hanging around
+- Changelog is now paginated, so you don't get a wall of text
+
+---
+
+## v2.1.0 - Custom colors, Custom rule order, Granular history & sorting
+
+### 🆕 New features
+
+- **Cancel a running job** — A Cancel button now appears inline on whichever rule is running. Tap it to stop the operation mid-batch; the partial result (including a count of files that were queued but not touched) is saved to history.
+- **Custom rule order** — A new "My Order" sort option lets you drag and drop rules into any order you like. Long-press and drag a card to reorder; long-press and hold (without dragging) to enter multi-select.
+- **Custom accent colors** — You can now add your own accent color using any hex code, alongside the built-in presets.
+- **Fixed card colors** — New toggle in Appearance settings: use neutral grey card surfaces instead of accent-tinted ones.
+
+### 🔧 Improvements
+
+- **History: Cancelled and Undone filters** — Two new filter chips in the History screen to show only cancelled or undone runs.
+- **Maintain subdirectory structure** — When a rule scans subfolders, the destination now mirrors the source folder structure instead of flattening everything into one folder.
+- **Sort menus** — Sort and group menus on both the Rules and History screens now show which option is currently selected.
+- **Runs survive leaving the app** — Starting a manual run and switching to another app no longer risks the operation being cut short. File Pipe now keeps the run alive in the background until it finishes or you cancel it.
+ 
+### 🐛 Bug fixes
+
+- **Accurate "Last ran" sort** — The "Last ran" sort on the Rules screen now reflects actual run history rather than the rule's last-edited timestamp.
+- **Undo copy runs** — Undoing a copy rule now correctly removes the copied files from the destination, instead of "moving them back" to source folders. If the run created new folders at the destination, those are cleaned up too.
+- **Folder access refresh** — Returning to the Rules screen after granting folder access in the system picker now immediately clears the amber access-warning banner, without needing to restart the app.
+- **Minor UI fixes** — Sort change no longer causes the rules list to scroll unexpectedly. Compact mode run button height now matches the enabled toggle next to it.
+
+---
+
 ## v2.0.0 - Onboarding, more themes, advance filters
 
 ### ✨ New Features

@@ -53,6 +53,7 @@ private object PrefKeys {
     val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback_enabled")
     val PROGRESSIVE_BLUR = booleanPreferencesKey("progressive_blur_enabled")
     val AUTO_CHECK_UPDATES = booleanPreferencesKey("auto_check_for_updates")
+    val SAVE_UPDATE_APK_TO_DOWNLOADS = booleanPreferencesKey("save_update_apk_to_downloads")
     val USE_GRADIENT_BACKGROUND = booleanPreferencesKey("use_gradient_background")
     val FIXED_CARD_COLORS = booleanPreferencesKey("fixed_card_colors")
     /** Legacy; migrated into [CUSTOM_SEED_HEX_LIST] + [ACTIVE_CUSTOM_SEED_HEX]. */
@@ -126,6 +127,7 @@ class UserPreferencesRepository @Inject constructor(
             hapticFeedbackEnabled = prefs[PrefKeys.HAPTIC_FEEDBACK] ?: true,
             progressiveBlurEnabled = prefs[PrefKeys.PROGRESSIVE_BLUR] ?: true,
             autoCheckForUpdates = prefs[PrefKeys.AUTO_CHECK_UPDATES] ?: true,
+            saveUpdateApkToDownloads = prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] ?: false,
             useGradientBackground = prefs[PrefKeys.USE_GRADIENT_BACKGROUND] ?: true,
             useFixedCardColors = prefs[PrefKeys.FIXED_CARD_COLORS] ?: false
         )
@@ -202,6 +204,10 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setAutoCheckForUpdates(enabled: Boolean) {
         dataStore.edit { it[PrefKeys.AUTO_CHECK_UPDATES] = enabled }
+    }
+
+    suspend fun setSaveUpdateApkToDownloads(enabled: Boolean) {
+        dataStore.edit { it[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] = enabled }
     }
 
     suspend fun setUseGradientBackground(enabled: Boolean) {
@@ -348,6 +354,7 @@ class UserPreferencesRepository @Inject constructor(
             prefs[PrefKeys.HAPTIC_FEEDBACK] = dto.hapticFeedbackEnabled
             prefs[PrefKeys.PROGRESSIVE_BLUR] = dto.progressiveBlurEnabled
             prefs[PrefKeys.AUTO_CHECK_UPDATES] = dto.autoCheckForUpdates
+            prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] = dto.saveUpdateApkToDownloads
             prefs[PrefKeys.USE_GRADIENT_BACKGROUND] = dto.useGradientBackground
             prefs[PrefKeys.FIXED_CARD_COLORS] = dto.useFixedCardColors
 

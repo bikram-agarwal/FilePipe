@@ -6,6 +6,7 @@ import android.webkit.MimeTypeMap
 import androidx.documentfile.provider.DocumentFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.domain.model.ConflictPolicy
+import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
@@ -354,23 +355,33 @@ class FileOperationRepository @Inject constructor(
         }
     }
 
-    private val accessCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Boolean, Long>>()
+    private val accessCache = java.util.concurrent.ConcurrentHashMap<String, Pair<FolderAccessResult, Long>>()
     private val ACCESS_CACHE_TTL_MS = 5_000L
 
-    fun isAccessible(folderUriString: String): Boolean {
-        if (!folderUriString.startsWith("content://")) return false
+    fun resolveFolderAccess(folderUriString: String): FolderAccessResult {
+        if (!folderUriString.startsWith("content://")) {
+            return FolderAccessResult.Unavailable
+        }
         val cached = accessCache[folderUriString]
         if (cached != null && System.currentTimeMillis() - cached.second < ACCESS_CACHE_TTL_MS) {
             return cached.first
         }
-        val result = try {
-            DocumentFile.fromTreeUri(context, Uri.parse(folderUriString))?.canRead() == true
+        val resolved = try {
+            val document = DocumentFile.fromTreeUri(context, Uri.parse(folderUriString))
+            when {
+                document == null -> FolderAccessResult.Unavailable
+                !document.exists() || !document.canRead() -> FolderAccessResult.Unavailable
+                else -> FolderAccessResult.Accessible
+            }
         } catch (_: SecurityException) {
-            false
+            FolderAccessResult.PermissionDenied
         }
-        accessCache[folderUriString] = result to System.currentTimeMillis()
-        return result
+        accessCache[folderUriString] = resolved to System.currentTimeMillis()
+        return resolved
     }
+
+    fun isAccessible(folderUriString: String): Boolean =
+        resolveFolderAccess(folderUriString) == FolderAccessResult.Accessible
 
     fun invalidateAccessCache() {
         accessCache.clear()

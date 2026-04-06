@@ -23,10 +23,12 @@ import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
+import dev.bikram.filepipe.update.FILEPIPE_UPDATE_APK_CACHE_NAME
 import dev.bikram.filepipe.update.PlayInAppUpdateStarter
 import dev.bikram.filepipe.update.PlayUpdateSessionHandle
 import dev.bikram.filepipe.update.UpdateChecker
 import dev.bikram.filepipe.update.UpdateInfo
+import dev.bikram.filepipe.update.copyUpdateApkToMediaStoreDownloads
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
 import dev.bikram.filepipe.data.storage.treeUriFromDocumentUri
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -223,6 +225,10 @@ class SettingsViewModel @Inject constructor(
         userPreferencesRepository.setAutoCheckForUpdates(enabled)
     }
 
+    fun setSaveUpdateApkToDownloads(enabled: Boolean) = viewModelScope.launch {
+        userPreferencesRepository.setSaveUpdateApkToDownloads(enabled)
+    }
+
     fun requestManualExportPicker() {
         _manualExportPickerRequested.tryEmit(defaultManualExportFileName())
     }
@@ -357,7 +363,8 @@ class SettingsViewModel @Inject constructor(
         return started
     }
 
-    fun downloadAndInstall(downloadUrl: String) = viewModelScope.launch {
+    fun downloadAndInstall(updateInfo: UpdateInfo) = viewModelScope.launch {
+        val downloadUrl = updateInfo.downloadUrl
         _downloadProgress.value = 0f
         val result = withContext(Dispatchers.IO) {
             runCatching {
@@ -366,7 +373,7 @@ class SettingsViewModel @Inject constructor(
                 try {
                     connection.connect()
                     val contentLength = connection.contentLength
-                    val file = File(context.cacheDir, "filepipe_update.apk")
+                    val file = File(context.cacheDir, FILEPIPE_UPDATE_APK_CACHE_NAME)
                     connection.inputStream.use { input ->
                         file.outputStream().use { output ->
                             val buffer = ByteArray(8192)
@@ -383,6 +390,23 @@ class SettingsViewModel @Inject constructor(
                                 _downloadProgress.value = -2f
                                 while (input.read(buffer).also { readCount = it } != -1) {
                                     output.write(buffer, 0, readCount)
+                                }
+                            }
+                        }
+                    }
+                    if (BuildConfig.FLAVOR == "github") {
+                        val prefs = userPreferencesRepository.getPreferencesSnapshot()
+                        if (prefs.saveUpdateApkToDownloads && updateInfo.remoteApkFileName.isNotBlank()) {
+                            val copyResult = copyUpdateApkToMediaStoreDownloads(
+                                context,
+                                file,
+                                updateInfo.remoteApkFileName
+                            )
+                            if (copyResult.isFailure) {
+                                withContext(Dispatchers.Main) {
+                                    _userMessage.value = context.getString(
+                                        R.string.settings_update_apk_save_to_downloads_failed
+                                    )
                                 }
                             }
                         }
