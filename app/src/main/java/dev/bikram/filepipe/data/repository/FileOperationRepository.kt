@@ -873,8 +873,11 @@ class FileOperationRepository @Inject constructor(
         conflictPolicy: ConflictPolicy,
         filesystemAccessEnabled: Boolean = false
     ): PreviewFileResult = withContext(Dispatchers.IO) {
-        val pathSuffix = relativePathSuffixForDisplay(sourceEntry.relativeParentSegments, sourceEntry.name)
-        val simulatedRootPath = "$destFolderUriString/$pathSuffix"
+        val simulatedRootPath = buildSimulatedDestPreviewPath(
+            destFolderUriString,
+            sourceEntry.relativeParentSegments,
+            sourceEntry.name
+        )
 
         if (isFilesystemFolderPathString(destFolderUriString)) {
             if (!filesystemAccessEnabled) {
@@ -969,7 +972,7 @@ class FileOperationRepository @Inject constructor(
                             return@withContext PreviewFileResult(
                                 fileName = sourceEntry.name,
                                 sourcePath = sourceEntry.uri.toString(),
-                                simulatedDestPath = buildSimulatedDestUriString(
+                                simulatedDestPath = buildSimulatedDestPreviewPath(
                                     destFolderUriString,
                                     sourceEntry.relativeParentSegments,
                                     resolvedName
@@ -1048,7 +1051,7 @@ class FileOperationRepository @Inject constructor(
                         PreviewFileResult(
                             fileName = sourceEntry.name,
                             sourcePath = sourceEntry.uri.toString(),
-                            simulatedDestPath = buildSimulatedDestUriString(
+                            simulatedDestPath = buildSimulatedDestPreviewPath(
                                 destFolderUriString,
                                 sourceEntry.relativeParentSegments,
                                 resolvedName
@@ -1191,17 +1194,16 @@ class FileOperationRepository @Inject constructor(
         return if (clean.isEmpty()) fileName else clean.joinToString("/", postfix = "/") + fileName
     }
 
-    private fun buildSimulatedDestUriString(
+    private fun buildSimulatedDestPreviewPath(
         destFolderUriString: String,
         relativeParentSegments: List<String>,
         fileName: String
     ): String {
-        val clean = relativeParentSegments.map { it.trim() }
-            .filter { it.isNotEmpty() && it != "." && it != ".." }
-        return if (clean.isEmpty()) {
-            "$destFolderUriString/$fileName"
-        } else {
-            "$destFolderUriString/${clean.joinToString("/")}/$fileName"
+        val pathSuffix = relativePathSuffixForDisplay(relativeParentSegments, fileName)
+        return when {
+            destFolderUriString.startsWith("content://") -> pathSuffix
+            destFolderUriString.endsWith("/") -> destFolderUriString + pathSuffix
+            else -> "$destFolderUriString/$pathSuffix"
         }
     }
 

@@ -4,6 +4,13 @@ sealed class Screen(val route: String) {
     data object Rules : Screen("rules")
     data object History : Screen("history")
     data object Settings : Screen("settings")
+    data object Faq : Screen("faq?focusSection={focusSection}") {
+        const val ARG_FOCUS_SECTION = "focusSection"
+        const val FOCUS_STORAGE_ACCESS = "storage"
+
+        /** Use for [composable] route registration and [NavController.navigate]. */
+        fun createRoute(focusSection: String = ""): String = "faq?focusSection=$focusSection"
+    }
 
     data object RuleDetail : Screen(
         "rule_detail/{ruleId}?templateIndex={templateIndex}&skipTemplatePicker={skipTemplatePicker}"
@@ -38,10 +45,7 @@ sealed class Screen(val route: String) {
         const val ARG_RULE_ID = "ruleId"
     }
 
-    data object OnboardingTitle : Screen("onboarding_title?fromSettings={fromSettings}") {
-        fun createRoute(fromSettings: Boolean = false) = "onboarding_title?fromSettings=$fromSettings"
-        const val ARG = "fromSettings"
-    }
+    data object OnboardingTitle : Screen("onboarding_title")
 
     data object OnboardingPermissions : Screen("onboarding_permissions")
 

@@ -34,6 +34,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -128,6 +130,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import dev.bikram.filepipe.BuildConfig
@@ -143,7 +146,6 @@ import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 import dev.bikram.filepipe.ui.components.AboutAuthorPhoto
 import dev.bikram.filepipe.ui.components.AppIconImage
-import dev.bikram.filepipe.ui.screens.onboarding.PermissionsLearnMoreSheetContent
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
@@ -169,6 +171,7 @@ private val themePickerOrder = listOf(
 fun SettingsScreen(
     contentPadding: PaddingValues,
     onOpenIntro: () -> Unit = {},
+    onOpenFaqStorageSection: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val playTap = rememberPlayTapSound()
@@ -194,6 +197,30 @@ fun SettingsScreen(
     var pendingEnableUpdateNotificationsAfterPermission by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val folderAccessBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val notificationsBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val bringIntoViewTarget by viewModel.bringIntoViewSection.collectAsStateWithLifecycle()
+    LaunchedEffect(bringIntoViewTarget) {
+        when (bringIntoViewTarget) {
+            SettingsBringIntoViewSection.None -> return@LaunchedEffect
+            SettingsBringIntoViewSection.FolderAccess -> {
+                delay(80)
+                folderAccessBringIntoViewRequester.bringIntoView()
+                viewModel.clearBringIntoViewSectionRequest()
+            }
+            SettingsBringIntoViewSection.Notifications -> {
+                delay(80)
+                notificationsBringIntoViewRequester.bringIntoView()
+                viewModel.clearBringIntoViewSectionRequest()
+            }
+        }
+    }
+    val folderAccessSectionHighlight by viewModel.folderAccessSectionHighlight.collectAsStateWithLifecycle()
+    LaunchedEffect(folderAccessSectionHighlight) {
+        if (!folderAccessSectionHighlight) return@LaunchedEffect
+        delay(4500)
+        viewModel.clearFolderAccessSectionHighlight()
+    }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -328,14 +355,6 @@ fun SettingsScreen(
         }
     }
 
-    var folderAccessLearnMoreVisible by remember { mutableStateOf(false) }
-    val folderAccessLearnMoreSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    LaunchedEffect(folderAccessLearnMoreVisible) {
-        if (folderAccessLearnMoreVisible) {
-            folderAccessLearnMoreSheetState.expand()
-        }
-    }
-
     LaunchedEffect(openUpdateSheetFromNotification) {
         if (!openUpdateSheetFromNotification || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
         showUpdateSheet = true
@@ -384,15 +403,6 @@ fun SettingsScreen(
         }
     }
 
-    if (folderAccessLearnMoreVisible) {
-        ModalBottomSheet(
-            onDismissRequest = { folderAccessLearnMoreVisible = false },
-            sheetState = folderAccessLearnMoreSheetState
-        ) {
-            PermissionsLearnMoreSheetContent(scheme = MaterialTheme.colorScheme)
-        }
-    }
-
     fun applyFolderAccessMode(mode: FolderAccessMode) {
         playTap()
         if (preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED &&
@@ -417,14 +427,19 @@ fun SettingsScreen(
                     coroutineScope.launch {
                         val affectedRuleCount = viewModel.countRulesUsingFilesystemFolderPaths()
                         viewModel.setFolderAccessModeNow(confirmedTarget)
-                        val message = if (affectedRuleCount == 0) {
-                            context.getString(R.string.settings_folder_access_switched_selective_zero_rules)
-                        } else {
-                            context.resources.getQuantityString(
-                                R.plurals.settings_folder_access_switched_selective_snackbar,
-                                affectedRuleCount,
-                                affectedRuleCount
-                            )
+                        val message = when {
+                            affectedRuleCount <= 0 ->
+                                context.getString(R.string.settings_folder_access_switched_selective_zero_rules)
+                            affectedRuleCount == 1 ->
+                                context.getString(
+                                    R.string.settings_folder_access_switched_selective_snackbar_one,
+                                    affectedRuleCount
+                                )
+                            else ->
+                                context.getString(
+                                    R.string.settings_folder_access_switched_selective_snackbar_other,
+                                    affectedRuleCount
+                                )
                         }
                         snackbarHostState.showSnackbar(
                             message = message,
@@ -604,6 +619,25 @@ fun SettingsScreen(
             
             // ── Folder access ─────────────────────────────────────────────────
             item {
+                val folderAccessHighlightShape = RoundedCornerShape(16.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (folderAccessSectionHighlight) {
+                                Modifier
+                                    .border(
+                                        width = 3.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = folderAccessHighlightShape
+                                    )
+                                    .padding(10.dp)
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                Column(modifier = Modifier.bringIntoViewRequester(folderAccessBringIntoViewRequester)) {
                 SettingsSectionHeader(
                     icon = Icons.Default.FolderOpen,
                     title = stringResource(R.string.settings_folder_access_section)
@@ -698,7 +732,7 @@ fun SettingsScreen(
                             .padding(start = 8.dp)
                             .clickable {
                                 playTap()
-                                folderAccessLearnMoreVisible = true
+                                onOpenFaqStorageSection()
                             }
                     )
                 }
@@ -732,6 +766,8 @@ fun SettingsScreen(
                             )
                         )
                     }
+                }
+                }
                 }
             }
 
@@ -798,19 +834,21 @@ fun SettingsScreen(
                                     }
                                 )
                             },
-                            modifier = Modifier.clickable {
-                                playTap()
-                                if (!notificationsGranted) {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        pendingEnableUpdateNotificationsAfterPermission = false
-                                        requestPostNotificationPermissionOrOpenAppSettings()
-                                    } else if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                            modifier = Modifier
+                                .bringIntoViewRequester(notificationsBringIntoViewRequester)
+                                .clickable {
+                                    playTap()
+                                    if (!notificationsGranted) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            pendingEnableUpdateNotificationsAfterPermission = false
+                                            requestPostNotificationPermissionOrOpenAppSettings()
+                                        } else if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                                            viewModel.openAppNotificationSettings()
+                                        }
+                                    } else {
                                         viewModel.openAppNotificationSettings()
                                     }
-                                } else {
-                                    viewModel.openAppNotificationSettings()
-                                }
-                            },
+                                },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
                     }

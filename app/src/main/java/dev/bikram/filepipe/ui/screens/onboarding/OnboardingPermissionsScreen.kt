@@ -40,14 +40,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -80,10 +78,10 @@ private val PermissionCardLeadingIconSlotWidth = 44.dp
 @Composable
 fun OnboardingPermissionsScreen(
     onContinue: () -> Unit,
+    onOpenStorageAccessFaq: () -> Unit,
     viewModel: OnboardingPermissionsViewModel = hiltViewModel()
 ) {
     val selected by viewModel.onboardingFolderAccessSelectionState.collectAsStateWithLifecycle()
-    var learnMoreVisible by remember { mutableStateOf(false) }
     var grantPanelVisible by remember { mutableStateOf(false) }
     var showOpenSettingsInPanel by remember { mutableStateOf(false) }
     var awaitingSettingsReturn by remember { mutableStateOf(false) }
@@ -91,7 +89,6 @@ fun OnboardingPermissionsScreen(
     var hasEnteredAllFilesGrantFlow by remember { mutableStateOf(false) }
     var didAutoAdvanceFromGrant by remember { mutableStateOf(false) }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -108,12 +105,6 @@ fun OnboardingPermissionsScreen(
         awaitingSettingsReturn = false
         showAccessNotGrantedHint = false
         hasEnteredAllFilesGrantFlow = false
-    }
-
-    LaunchedEffect(learnMoreVisible) {
-        if (learnMoreVisible) {
-            sheetState.expand()
-        }
     }
 
     LaunchedEffect(grantPanelVisible, selected) {
@@ -157,15 +148,6 @@ fun OnboardingPermissionsScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    if (learnMoreVisible) {
-        ModalBottomSheet(
-            onDismissRequest = { learnMoreVisible = false },
-            sheetState = sheetState
-        ) {
-            PermissionsLearnMoreSheetContent(scheme = scheme)
-        }
     }
 
     Box(
@@ -241,7 +223,7 @@ fun OnboardingPermissionsScreen(
                 )
                 Spacer(Modifier.height(8.dp))
                 TextButton(
-                    onClick = { learnMoreVisible = true },
+                    onClick = onOpenStorageAccessFaq,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(stringResource(R.string.onboarding_permissions_learn_more))

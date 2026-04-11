@@ -63,6 +63,13 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
+/** Used from Help to scroll the settings list to a section after navigation. */
+enum class SettingsBringIntoViewSection {
+    None,
+    FolderAccess,
+    Notifications
+}
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -111,6 +118,30 @@ class SettingsViewModel @Inject constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     val manualExportPickerRequested = _manualExportPickerRequested.asSharedFlow()
+
+    private val _bringIntoViewSection = MutableStateFlow(SettingsBringIntoViewSection.None)
+    val bringIntoViewSection: StateFlow<SettingsBringIntoViewSection> = _bringIntoViewSection.asStateFlow()
+
+    private val _folderAccessSectionHighlight = MutableStateFlow(false)
+    val folderAccessSectionHighlight: StateFlow<Boolean> = _folderAccessSectionHighlight.asStateFlow()
+
+    fun requestBringSettingsSectionIntoView(section: SettingsBringIntoViewSection) {
+        if (section != SettingsBringIntoViewSection.None) {
+            _bringIntoViewSection.value = section
+        }
+    }
+
+    fun clearBringIntoViewSectionRequest() {
+        _bringIntoViewSection.value = SettingsBringIntoViewSection.None
+    }
+
+    fun requestFolderAccessSectionHighlight() {
+        _folderAccessSectionHighlight.value = true
+    }
+
+    fun clearFolderAccessSectionHighlight() {
+        _folderAccessSectionHighlight.value = false
+    }
 
     init {
         viewModelScope.launch {
@@ -549,6 +580,15 @@ class SettingsViewModel @Inject constructor(
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { context.startActivity(intent) }
+    }
+
+    fun openManageAllFilesAccessSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        val manageIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+            data = Uri.parse("package:${context.packageName}")
+        }
+        manageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(manageIntent) }
     }
 
     private fun fetchRawChangelog(): String {

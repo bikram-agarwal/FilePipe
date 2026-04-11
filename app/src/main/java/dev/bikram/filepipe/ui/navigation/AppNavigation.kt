@@ -26,11 +26,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Settings
@@ -81,11 +81,13 @@ import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.screens.history.HistoryScreen
 import dev.bikram.filepipe.ui.screens.history.HistoryViewModel
 import dev.bikram.filepipe.ui.screens.historydetail.HistoryDetailScreen
+import dev.bikram.filepipe.ui.screens.help.FaqScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingPermissionsScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingRuleWizardScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingTitleScreen
 import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
+import dev.bikram.filepipe.ui.screens.settings.SettingsBringIntoViewSection
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
@@ -147,6 +149,9 @@ fun AppNavigation(
     val isHistoryDetailRoute = currentDestination?.hierarchy?.any { destination ->
         destination.route == Screen.HistoryDetail.route
     } == true
+    val isFaqRoute = currentDestination?.hierarchy?.any { destination ->
+        destination.route == Screen.Faq.route
+    } == true
 
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -158,6 +163,7 @@ fun AppNavigation(
     val fullScreenBottomBlurShort = navBarInset + 48.dp
     val fullScreenBottomBlurRuleEdit = navBarInset + 88.dp
     val bottomBlurHeightDp = when {
+        isFaqRoute -> 0.dp
         showBottomBar -> scrimHeight
         isRuleDetailRoute -> fullScreenBottomBlurRuleEdit
         else -> fullScreenBottomBlurShort
@@ -172,12 +178,13 @@ fun AppNavigation(
         } else {
             val blurRadius =
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    if (isRuleDetailRoute) 56f else 44f
+                    if (isRuleDetailRoute || isFaqRoute) 56f else 44f
                 } else {
                     0f
                 }
             val overlayAlpha = when {
                 isRuleDetailRoute -> 0.38f
+                isFaqRoute -> 0.38f
                 isHistoryDetailRoute -> 0.30f
                 else -> 0.34f
             }
@@ -199,7 +206,7 @@ fun AppNavigation(
     // AppPreferences.DEFAULT.hasSeenIntro (false) and force onboarding on every cold start.
     // Still stable for the activity so live hasSeenIntro updates do not change startDestination.
     val lockedNavStartDestination = remember(introSeenAtLaunch) {
-        if (introSeenAtLaunch) Screen.Rules.route else Screen.OnboardingTitle.createRoute()
+        if (introSeenAtLaunch) Screen.Rules.route else Screen.OnboardingTitle.route
     }
 
     LaunchedEffect(hasSeenIntro, preferences.updateCheckSchedule) {
@@ -294,13 +301,8 @@ fun AppNavigation(
                 popExitTransition = { slideOutHorizontally { it } + fadeOut() }
             ) {
                 composable(
-                    route = Screen.OnboardingTitle.route,
-                    arguments = listOf(navArgument(Screen.OnboardingTitle.ARG) {
-                        type = NavType.BoolType
-                        defaultValue = false
-                    })
-                ) { backStack ->
-                    val fromSettings = backStack.arguments?.getBoolean(Screen.OnboardingTitle.ARG) ?: false
+                    route = Screen.OnboardingTitle.route
+                ) {
                     OnboardingTitleScreen(
                         onLetsBegan = {
                             navController.navigate(Screen.OnboardingPermissions.route)
@@ -314,6 +316,9 @@ fun AppNavigation(
                             navController.navigate(Screen.OnboardingRuleWizard.route) {
                                 launchSingleTop = true
                             }
+                        },
+                        onOpenStorageAccessFaq = {
+                            navController.navigate(Screen.Faq.createRoute(Screen.Faq.FOCUS_STORAGE_ACCESS))
                         }
                     )
                 }
@@ -393,7 +398,8 @@ fun AppNavigation(
                     )
                 ) {
                     RuleDetailScreen(
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onOpenFaq = { navController.navigate(Screen.Faq.createRoute()) }
                     )
                 }
                 composable(Screen.History.route) {
@@ -408,9 +414,53 @@ fun AppNavigation(
                     SettingsScreen(
                         contentPadding = PaddingValues(bottom = contentPaddingBottom),
                         onOpenIntro = {
-                            navController.navigate(Screen.OnboardingTitle.createRoute(fromSettings = true))
+                            navController.navigate(Screen.OnboardingTitle.route)
+                        },
+                        onOpenFaqStorageSection = {
+                            navController.navigate(Screen.Faq.createRoute(Screen.Faq.FOCUS_STORAGE_ACCESS))
                         },
                         viewModel = settingsVm
+                    )
+                }
+                composable(
+                    route = Screen.Faq.route,
+                    arguments = listOf(
+                        navArgument(Screen.Faq.ARG_FOCUS_SECTION) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        }
+                    )
+                ) { backStackEntry ->
+                    val focusSection =
+                        backStackEntry.arguments?.getString(Screen.Faq.ARG_FOCUS_SECTION).orEmpty()
+                    val goToSettingsFromFaq: () -> Unit = {
+                        val poppedToExistingSettings =
+                            navController.popBackStack(Screen.Settings.route, inclusive = false)
+                        if (!poppedToExistingSettings) {
+                            navController.popBackStack()
+                            navController.navigate(Screen.Settings.route) { launchSingleTop = true }
+                        }
+                    }
+                    val openFolderAccessInSettings: () -> Unit = {
+                        settingsVm.requestFolderAccessSectionHighlight()
+                        settingsVm.requestBringSettingsSectionIntoView(
+                            SettingsBringIntoViewSection.FolderAccess
+                        )
+                        goToSettingsFromFaq()
+                    }
+                    FaqScreen(
+                        initialFocusSectionId = focusSection,
+                        onNavigateBack = { navController.popBackStack() },
+                        onOpenFolderAccessInSettings = openFolderAccessInSettings,
+                        onOpenSettingsNotifications = {
+                            settingsVm.requestBringSettingsSectionIntoView(
+                                SettingsBringIntoViewSection.Notifications
+                            )
+                            goToSettingsFromFaq()
+                        },
+                        onOpenAppNotificationSettings = {
+                            settingsVm.openAppNotificationSettings()
+                        }
                     )
                 }
                 composable(
@@ -483,13 +533,16 @@ fun AppNavigation(
                         Screen.Settings -> FloatingActionButton(
                             onClick = {
                                 playTap()
-                                settingsVm.requestManualExportPicker()
+                                navController.navigate(Screen.Faq.createRoute())
                             },
                             modifier = fabModifier,
                             containerColor = containerColor,
                             contentColor = contentColor
                         ) {
-                            Icon(Icons.Default.SaveAlt, contentDescription = stringResource(R.string.settings_export_now))
+                            Icon(
+                                Icons.AutoMirrored.Filled.Help,
+                                contentDescription = stringResource(R.string.settings_fab_open_help)
+                            )
                         }
 
                         else -> {}

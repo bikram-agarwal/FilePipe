@@ -328,6 +328,7 @@ private fun ToggleLabelHelpDropdown(
 @Composable
 fun RuleDetailScreen(
     onNavigateBack: () -> Unit,
+    onOpenFaq: () -> Unit,
     viewModel: RuleDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -504,11 +505,15 @@ fun RuleDetailScreen(
                 RuleErrorAlertCard(
                     title = stringResource(R.string.rule_detail_validation_errors_title)
                 ) {
-                    state.errors.forEach { errorLine ->
-                        Text(
-                            text = "• $errorLine",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                    Text(
+                        text = stringResource(R.string.rule_detail_validation_errors_summary),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    TextButton(
+                        onClick = { withTapSound(onOpenFaq) },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(stringResource(R.string.rule_detail_open_faq))
                     }
                 }
             }
@@ -528,70 +533,27 @@ fun RuleDetailScreen(
                     title = stringResource(R.string.rule_detail_folder_access_title),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    state.inaccessibleSourceIssues.forEach { (path, issue) ->
-                        val line = when (issue) {
-                            FolderAccessResult.Unavailable -> stringResource(
-                                R.string.rule_detail_folder_access_source_unavailable,
-                                displayPath(path)
-                            )
-                            FolderAccessResult.PermissionDenied -> stringResource(
-                                R.string.rule_detail_folder_access_source_permission,
-                                displayPath(path)
-                            )
-                            FolderAccessResult.Accessible -> ""
-                        }
-                        if (line.isNotEmpty()) {
-                            Text(text = line, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    state.destinationFolderAccessIssue?.let { issue ->
-                        val line = when (issue) {
-                            FolderAccessResult.Unavailable -> stringResource(
-                                R.string.rule_detail_folder_access_destination_unavailable,
-                                displayPath(state.destinationFolderPath)
-                            )
-                            FolderAccessResult.PermissionDenied -> stringResource(
-                                R.string.rule_detail_folder_access_destination_permission,
-                                displayPath(state.destinationFolderPath)
-                            )
-                            FolderAccessResult.Accessible -> ""
-                        }
-                        if (line.isNotEmpty()) {
-                            Text(text = line, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    val hintColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.88f)
-                    if (showUnavailableHint) {
-                        Text(
-                            text = stringResource(R.string.rule_detail_folder_access_hint_unavailable),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = hintColor
-                        )
-                    }
-                    if (showPermissionHint) {
-                        Text(
-                            text = stringResource(R.string.rule_detail_folder_access_hint_permission),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = hintColor
-                        )
-                    }
                     val usesFilesystemPaths =
                         state.sourceFolderPaths.any { path -> !path.startsWith("content://") } ||
                             (state.destinationFolderPath.isNotBlank() &&
                                 !state.destinationFolderPath.startsWith("content://"))
-                    if (showPermissionHint && usesFilesystemPaths) {
-                        Text(
-                            text = stringResource(R.string.rule_detail_folder_access_hint_filesystem),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = hintColor
-                        )
+                    val summaryRes = when {
+                        showPermissionHint && usesFilesystemPaths ->
+                            R.string.rule_detail_folder_access_summary_filesystem
+                        showPermissionHint ->
+                            R.string.rule_detail_folder_access_summary_permission
+                        else ->
+                            R.string.rule_detail_folder_access_summary_unavailable
                     }
-                    if (showUnavailableHint || showPermissionHint) {
-                        Text(
-                            text = stringResource(R.string.rule_detail_folder_access_hint_backup_restore),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = hintColor
-                        )
+                    Text(
+                        text = stringResource(summaryRes),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    TextButton(
+                        onClick = { withTapSound(onOpenFaq) },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(stringResource(R.string.rule_detail_open_faq))
                     }
                 }
             }
@@ -1216,6 +1178,14 @@ fun RuleDetailScreen(
                 }
             },
             actions = {
+                IconButton(
+                    onClick = { withTapSound(onOpenFaq) }
+                ) {
+                    Icon(
+                        Icons.Outlined.Info,
+                        contentDescription = stringResource(R.string.rule_detail_open_faq)
+                    )
+                }
                 IconButton(
                     onClick = { withTapSound { viewModel.loadPreview() } },
                     enabled = state.sourceFolderPaths.isNotEmpty() && state.fileExtensions.isNotEmpty()

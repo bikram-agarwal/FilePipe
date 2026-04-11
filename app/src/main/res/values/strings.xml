@@ -39,6 +39,11 @@
     <string name="rule_detail_folder_access_hint_permission">FilePipe no longer has access to one or more trees. Tap a highlighted folder and grant access in the system picker.</string>
     <string name="rule_detail_folder_access_hint_filesystem">Paths that use the device file system need All files access. In FilePipe Settings choose All files access, then grant it in Android settings. If you switched to SAF-only mode, those paths stay saved but stop working until you change mode again or pick folders with the system picker.</string>
     <string name="rule_detail_folder_access_hint_backup_restore">After a backup restore, folder permissions are not restored. Re-grant All files in Android settings if you use that mode, or tap each SAF folder and Allow again.</string>
+    <string name="rule_detail_validation_errors_summary">Check the sections below, fix any required fields, then try saving again.</string>
+    <string name="rule_detail_folder_access_summary_unavailable">One or more folders are missing or no longer available. Tap the highlighted paths below to fix them.</string>
+    <string name="rule_detail_folder_access_summary_permission">One or more folders need access again. Tap the highlighted paths below and re-grant access.</string>
+    <string name="rule_detail_folder_access_summary_filesystem">One or more folders need access again or require All files access. Tap the highlighted paths below or change access mode in Settings.</string>
+    <string name="rule_detail_open_faq">Open FAQ</string>
     <string name="rule_section_source_saf_help">You are using SAF-only folder access. Android does not allow the picker to grant internal storage root, the Downloads root, or an SD card volume root. To use those locations, switch to All files access in Settings and grant it in Android settings.</string>
     <string name="rule_section_destination_saf_help">You are using SAF-only folder access. Android does not allow the picker to grant internal storage root, the Downloads root, or an SD card volume root. To use those locations, switch to All files access in Settings and grant it in Android settings.</string>
     <string name="rule_open_all_files_settings">Open All files access settings</string>
@@ -235,7 +240,7 @@
     <string name="onboarding_permissions_sheet_select_limitations">Limitations</string>
     <string name="onboarding_permissions_sheet_select_lim1">Some folders (like Download) can\'t be selected</string>
     <string name="onboarding_permissions_sheet_select_lim2">You\'ll need to approve each folder manually</string>
-    <string name="onboarding_permissions_sheet_footer_tip">💡 Not sure? Choose All Files Access - it works best for most setups. You can change this anytime in Settings.</string>
+    <string name="onboarding_permissions_sheet_footer_tip">Tip: Not sure? Choose All Files Access - it works best for most setups. You can change this anytime in Settings.</string>
 
     <!-- Onboarding wizard -->
     <string name="onboarding_wizard_title">Create your first rule</string>
@@ -256,10 +261,8 @@
     <string name="settings_folder_access_all_files_status_not_granted_required">All files access: Not Granted (Required)</string>
     <string name="settings_folder_access_all_files_status_not_granted_idle">All files access: Off</string>
     <string name="settings_folder_access_switched_selective_zero_rules">Switched to Selective Access mode.</string>
-    <plurals name="settings_folder_access_switched_selective_snackbar">
-        <item quantity="one">Switched to Selective Access mode.\n%1$d rule will need folder access updated</item>
-        <item quantity="other">Switched to Selective Access mode.\n%1$d rules will need folder access updated</item>
-    </plurals>
+    <string name="settings_folder_access_switched_selective_snackbar_one">Switched to Selective Access mode.\n%1$d rule will need folder access updated</string>
+    <string name="settings_folder_access_switched_selective_snackbar_other">Switched to Selective Access mode.\n%1$d rules will need folder access updated</string>
     <string name="settings_folder_access_open_manage">Manage All Files Access</string>
     <string name="settings_folder_access_grant_all_files">Grant All Files Access</string>
     <string name="settings_folder_access_switch_to_saf_title">Switch to Selective Access?</string>
@@ -276,6 +279,7 @@
     <string name="settings_export_select_folder_first">Select an export folder first</string>
     <string name="settings_export_success">%1$s exported</string>
     <string name="settings_export_now">Export backup</string>
+    <string name="settings_fab_open_help">Help and FAQs</string>
     <string name="settings_import_rules">Import backup</string>
     <string name="settings_restore_backup">Restore backup</string>
     <string name="settings_backup_import_restore_help_title">Import vs restore</string>
@@ -433,7 +437,86 @@
     <string name="bookmark_toggle_cd">Toggle bookmark</string>
     <string name="bookmarks_choose">Bookmarks</string>
 
-    <!-- Days of week -->
+    <!-- FAQ -->
+    <string name="faq_title">Help &amp; FAQs</string>
+    <string name="faq_subtitle">Quick answers to common questions about FilePipe</string>
+    <string name="faq_quick_actions_label">Shortcuts to Settings</string>
+    <string name="faq_expand_all_cd">Expand all topics</string>
+    <string name="faq_collapse_all_cd">Collapse all topics</string>
+    <string name="faq_quick_action_folder_access">Folder access in Settings</string>
+    <string name="faq_quick_action_notifications">Notifications in Settings</string>
+    <string name="faq_quick_actions_hint">Leaves this screen, opens the Settings tab, and scrolls to the section so you can change storage mode or notification options.</string>
+    <string name="faq_search_hint">Search help topics</string>
+    <string name="faq_clear_search">Clear search</string>
+    <string name="faq_no_results_title">No matching help topics</string>
+    <string name="faq_no_results_body">Try a simpler search, or browse the sections below without a filter.</string>
+    <string name="faq_action_switch_full_access">Switch mode in Settings</string>
+    <string name="faq_action_notification_settings">Open notification settings</string>
+    <string name="faq_section_fix_common_issues">Fix common issues</string>
+    <string name="faq_section_storage_access_modes">Storage access modes</string>
+    <string name="faq_section_managing_rules">Managing rules</string>
+    <string name="faq_section_automation_scheduling">Automation &amp; scheduling</string>
+    <string name="faq_section_privacy_permissions">Privacy &amp; permissions</string>
+    <string name="faq_section_backup_restore">Backup &amp; restore</string>
+    <string name="faq_question_rule_not_working">Fix a **rule** that isn\'t **working**</string>
+    <string name="faq_question_folder_access_denied">Fix **access denied** errors</string>
+    <string name="faq_question_files_not_moving_automatically">Files not **moving**?</string>
+    <string name="faq_question_cant_add_downloads_folder">I can\'t add the **Downloads** folder</string>
+    <string name="faq_question_create_rule">How do I create a rule?</string>
+    <string name="faq_question_rule_skipping_files">Why is my rule skipping files?</string>
+    <string name="faq_question_what_simulate_does">What does Simulate do?</string>
+    <string name="faq_question_scheduled_rules">How do scheduled rules work?</string>
+    <string name="faq_question_schedule_notifications">I\'m not getting **schedule** run **notifications**</string>
+    <string name="faq_question_rule_did_not_run">Why didn\'t my rule run?</string>
+    <string name="faq_question_data_privacy">Is my data private?</string>
+    <string name="faq_question_why_storage_access">Why does FilePipe need storage access?</string>
+    <string name="faq_question_backup_contents">What gets backed up?</string>
+    <string name="faq_question_permissions_after_restore">What do I fix after restore?</string>
+
+    <!-- FAQ answers: one non-blank line per bullet (parsed in FaqScreen; not string-arrays — avoids AAPT2 crashes). -->
+    <string name="faq_answer_rule_not_working">Check that the rule has a **name**, **source folder**, **destination folder**, and **file types**.
+Tap any **highlighted folder path** and **grant access** again.
+Switch to **All files access** if you use **Download**, **storage roots**, or many folders.</string>
+    <string name="faq_answer_folder_access_denied">This usually happens after **switching access mode**, **restoring a backup**, or **revoking folder permission**.
+Tap the folder in **Edit Rule** and **grant access** again.
+If the path looks like a **root-style** folder, switch to **All files access** in Settings.</string>
+    <string name="faq_answer_files_not_moving_automatically">Check that the rule is **enabled**.
+Check that a **schedule** is set if you expect **automatic runs**.
+Check **battery restrictions**, **folder access**, and **file filters**.</string>
+    <string name="faq_answer_cant_add_downloads_folder">**Select Folders Only** mode cannot grant the **Downloads** root or some **storage roots**.
+Switch to **Full Access** in Settings, then pick folders or paths as needed.
+Alternatively, choose a **subfolder inside Downloads** with the system picker if you stay on Selective Access.</string>
+    <string name="faq_answer_create_rule">Pick one or more **source folders**.
+Pick a **destination folder** and add the **file types** to match.
+**Save** the rule, then use **Preview** or **Simulate** before relying on it.</string>
+    <string name="faq_answer_rule_skipping_files">The file may not match the rule\'s **file types** or **advanced filters**.
+The **destination** may already contain the same file and your **conflict mode** may **skip** it.
+The file may be **outside** the selected folder scope if **access was lost**.</string>
+    <string name="faq_answer_what_simulate_does">**Simulate** previews what the rule **would do**.
+**No files** are moved or copied during preview.
+Use it to confirm **filters**, **destination**, and **folder access** before saving or running.</string>
+    <string name="faq_answer_scheduled_rules">**Scheduled rules** run in the **background** based on the **time** you choose.
+The rule still needs **valid folder access** and **matching files**.
+**Preview** the rule first so **automation** uses the setup you expect.</string>
+    <string name="faq_answer_rule_did_not_run">Check that the **schedule** is enabled and the rule itself is **enabled**.
+Check **Android battery restrictions** and **notification-related** background limits.
+Check that **folder access** is still valid and the rule still **finds matching files**.</string>
+    <string name="faq_answer_schedule_notifications">FilePipe does not post a notification for **every scheduled run** by default; check **Run history** to confirm runs.
+Turn on **notifications** in **Settings** and allow them in **Android app settings** if you expect alerts.
+**Battery saver** and **background restrictions** can delay or skip work; exclude FilePipe where needed.</string>
+    <string name="faq_answer_data_privacy">FilePipe works on-device.
+Your files are not uploaded or tracked.
+The app only acts on the rules you create.</string>
+    <string name="faq_answer_why_storage_access">FilePipe needs folder access to scan, move, or copy the files your rules target.
+Selective Access limits FilePipe to the folders you approve.
+All files access is required for Downloads, storage roots, and file-system paths.</string>
+    <string name="faq_answer_backup_contents">Backups include rules, history, and settings.
+Folder permissions are not restored from backup.
+After restore, review any rule with highlighted folder paths.</string>
+    <string name="faq_answer_permissions_after_restore">Tap each affected folder and grant access again if you use Selective Access.
+Re-enable All files access in Android settings if your rules use that mode.
+Use the edit screen highlights to quickly see which folders need attention.</string>
+
     <string-array name="days_of_week">
         <item>Monday</item>
         <item>Tuesday</item>
