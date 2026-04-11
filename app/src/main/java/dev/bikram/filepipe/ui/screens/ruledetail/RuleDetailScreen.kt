@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -38,7 +37,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -149,7 +147,6 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ToggleButton
@@ -283,43 +280,6 @@ private fun RuleSectionCard(
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 content = content
-            )
-        }
-    }
-}
-
-@Composable
-private fun ToggleLabelHelpDropdown(
-    tipText: String,
-    contentDescription: String,
-    playTap: () -> Unit,
-) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    Box {
-        IconButton(
-            onClick = {
-                playTap()
-                menuExpanded = true
-            },
-            modifier = Modifier.size(40.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Info,
-                contentDescription = contentDescription,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        DropdownMenu(
-            expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false },
-            modifier = Modifier.widthIn(max = 300.dp)
-        ) {
-            Text(
-                text = tipText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
             )
         }
     }
@@ -629,18 +589,7 @@ fun RuleDetailScreen(
             RuleSectionCard(
                 title = stringResource(R.string.source_folders_label),
                 subtitle = stringResource(R.string.rule_section_source_subtitle),
-                icon = Icons.Filled.Search,
-                titleTrailing = if (state.folderAccessMode.treatAsSafUi()) {
-                    @Composable {
-                        ToggleLabelHelpDropdown(
-                            tipText = stringResource(R.string.rule_section_saf_help),
-                            contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                            playTap = playTap
-                        )
-                    }
-                } else {
-                    null
-                }
+                icon = Icons.Filled.Search
             ) {
                 state.sourceFolderPaths.forEach { path ->
                     val isSourceBookmarked = path in bookmarkedFolders
@@ -753,24 +702,13 @@ fun RuleDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(
+                        Text(
+                            text = stringResource(R.string.rule_scan_subdirs_label),
+                            style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.rule_scan_subdirs_label),
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            ToggleLabelHelpDropdown(
-                                tipText = stringResource(R.string.rule_scan_subdirs_support),
-                                contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                                playTap = playTap
-                            )
-                        }
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         Switch(
                             checked = state.scanSubdirectories,
                             onCheckedChange = { enabled ->
@@ -785,24 +723,13 @@ fun RuleDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(
+                        Text(
+                            text = stringResource(R.string.rule_suppress_missing_source_card_label),
+                            style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.rule_suppress_missing_source_card_label),
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            ToggleLabelHelpDropdown(
-                                tipText = stringResource(R.string.rule_suppress_missing_source_card_support),
-                                contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                                playTap = playTap
-                            )
-                        }
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         Switch(
                             checked = state.suppressMissingSourceFolderCardWarning,
                             onCheckedChange = { enabled ->
@@ -816,18 +743,7 @@ fun RuleDetailScreen(
             RuleSectionCard(
                 title = stringResource(R.string.destination_label),
                 subtitle = stringResource(R.string.rule_section_destination_subtitle),
-                icon = Icons.Filled.FolderSpecial,
-                titleTrailing = if (state.folderAccessMode.treatAsSafUi()) {
-                    @Composable {
-                        ToggleLabelHelpDropdown(
-                            tipText = stringResource(R.string.rule_section_saf_help),
-                            contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                            playTap = playTap
-                        )
-                    }
-                } else {
-                    null
-                }
+                icon = Icons.Filled.FolderSpecial
             ) {
                 if (state.destinationFolderPath.isNotBlank()) {
                     val isDestBookmarked = state.destinationFolderPath in bookmarkedFolders
@@ -1197,14 +1113,6 @@ fun RuleDetailScreen(
                 }
             },
             actions = {
-                IconButton(
-                    onClick = { withTapSound(onOpenFaq) }
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Help,
-                        contentDescription = stringResource(R.string.rule_detail_open_faq)
-                    )
-                }
                 IconButton(
                     onClick = { withTapSound { viewModel.loadPreview() } },
                     enabled = state.sourceFolderPaths.isNotEmpty() && state.fileExtensions.isNotEmpty()

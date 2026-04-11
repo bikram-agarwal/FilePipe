@@ -32,8 +32,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 import javax.inject.Inject
 
@@ -193,12 +196,13 @@ class HistoryViewModel @Inject constructor(
     private fun buildDateGroupedItems(list: List<RunHistory>): List<HistoryItem> {
         if (list.isEmpty()) return emptyList()
         val result = mutableListOf<HistoryItem>()
-        var lastDayKey = ""
+        val zone = ZoneId.systemDefault()
+        var lastDay: LocalDate? = null
         for (history in list) {
-            val dayKey = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date(history.startedAt))
-            if (dayKey != lastDayKey) {
+            val day = Instant.ofEpochMilli(history.startedAt).atZone(zone).toLocalDate()
+            if (day != lastDay) {
                 result.add(HistoryItem.DateHeader(formatDateLabel(history.startedAt)))
-                lastDayKey = dayKey
+                lastDay = day
             }
             result.add(HistoryItem.Entry(history))
         }
@@ -253,19 +257,20 @@ class HistoryViewModel @Inject constructor(
     }
 
     private fun formatDateLabel(timestampMs: Long): String {
-        val dayFmt = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-        val now = System.currentTimeMillis()
-        val key = dayFmt.format(Date(timestampMs))
-        return when (key) {
-            dayFmt.format(Date(now)) -> "Today"
-            dayFmt.format(Date(now - 86_400_000L)) -> "Yesterday"
-            else -> SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(timestampMs))
+        val zone = ZoneId.systemDefault()
+        val day = Instant.ofEpochMilli(timestampMs).atZone(zone).toLocalDate()
+        val today = LocalDate.now(zone)
+        return when (day) {
+            today -> "Today"
+            today.minusDays(1) -> "Yesterday"
+            else -> day.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
         }
     }
 
     private fun isSameDay(t1: Long, t2: Long): Boolean {
-        val fmt = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-        return fmt.format(Date(t1)) == fmt.format(Date(t2))
+        val zone = ZoneId.systemDefault()
+        return Instant.ofEpochMilli(t1).atZone(zone).toLocalDate() ==
+            Instant.ofEpochMilli(t2).atZone(zone).toLocalDate()
     }
 }
 

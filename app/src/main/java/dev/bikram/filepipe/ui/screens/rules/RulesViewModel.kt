@@ -206,7 +206,7 @@ class RulesViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            var lastFolderSignature: String? = null
+            var lastFolderSignature: FolderSignature? = null
             combine(_rules, userPreferencesRepository.preferencesFlow) { ruleList, prefs ->
                 Triple(
                     ruleList,
@@ -395,21 +395,26 @@ class RulesViewModel @Inject constructor(
         _userMessage.value = "\"${copy.name}\" created"
     }
 
-    private fun folderPathsSignature(ruleList: List<Rule>, folderAccessMode: FolderAccessMode): String =
-        ruleList.sortedBy { it.id }.joinToString("\u0000") { rule ->
-            buildString {
-                append(rule.id)
-                append('\u0001')
-                rule.sourceFolderPaths.sorted().forEach { path ->
-                    append(path)
-                    append('\u0002')
-                }
-                append('\u0001')
-                append(rule.destinationFolderPath)
-                append('\u0001')
-                append(rule.suppressMissingSourceFolderCardWarning)
-            }
-        } + "\u0000${folderAccessMode.name}\u0000${Environment.isExternalStorageManager()}"
+    private data class FolderSignature(
+        val ruleIds: List<Long>,
+        val sourcePaths: List<List<String>>,
+        val destPaths: List<String>,
+        val suppressFlags: List<Boolean>,
+        val accessMode: FolderAccessMode,
+        val isExternalStorageManager: Boolean,
+    )
+
+    private fun folderPathsSignature(ruleList: List<Rule>, folderAccessMode: FolderAccessMode): FolderSignature {
+        val sorted = ruleList.sortedBy { it.id }
+        return FolderSignature(
+            ruleIds = sorted.map { it.id },
+            sourcePaths = sorted.map { it.sourceFolderPaths.sorted() },
+            destPaths = sorted.map { it.destinationFolderPath },
+            suppressFlags = sorted.map { it.suppressMissingSourceFolderCardWarning },
+            accessMode = folderAccessMode,
+            isExternalStorageManager = Environment.isExternalStorageManager(),
+        )
+    }
 
     private fun computeStaleRuleIds(ruleList: List<Rule>, filesystemAccessEnabled: Boolean): Set<Long> =
         ruleList.filter { rule -> ruleShowsStaleFolderWarningOnCard(rule, filesystemAccessEnabled) }

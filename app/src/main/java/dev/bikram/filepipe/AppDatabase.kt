@@ -20,6 +20,7 @@ import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 3, to = 4),
+        AutoMigration(from = 4, to = 5),
     ]
 )
 @TypeConverters(Converters::class)

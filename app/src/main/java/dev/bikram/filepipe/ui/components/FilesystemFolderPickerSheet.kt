@@ -33,10 +33,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -143,13 +146,14 @@ fun FilesystemFolderPickerSheetContent(
         buildBreadcrumbSegments(currentPath, primaryRoot, internalStorageLabel, sdCardLabel)
     }
 
-    val childDirectories = remember(currentPath, childListRefreshKey) {
-        File(currentPath).listFiles()
-            ?.filter { file ->
-                file.isDirectory && file.canRead() && !file.name.startsWith(".")
-            }
-            ?.sortedBy { child -> child.name.lowercase() }
-            ?: emptyList()
+    var childDirectories by remember(currentPath, childListRefreshKey) { mutableStateOf<List<File>>(emptyList()) }
+    LaunchedEffect(currentPath, childListRefreshKey) {
+        childDirectories = withContext(Dispatchers.IO) {
+            File(currentPath).listFiles()
+                ?.filter { file -> file.isDirectory && file.canRead() && !file.name.startsWith(".") }
+                ?.sortedBy { child -> child.name.lowercase() }
+                ?: emptyList()
+        }
     }
 
     val canConfirmSelection = remember(currentPath) {

@@ -28,9 +28,12 @@ interface RuleDao {
     @Update
     suspend fun updateRule(rule: RuleEntity)
 
+    @Update
+    suspend fun updateRules(rules: List<RuleEntity>)
+
     @Transaction
     suspend fun updateRulesSortOrders(rules: List<RuleEntity>) {
-        rules.forEach { updateRule(it) }
+        updateRules(rules)
     }
 
     @Delete

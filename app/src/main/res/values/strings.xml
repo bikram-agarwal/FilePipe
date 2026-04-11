@@ -31,14 +31,14 @@
     <string name="rule_name_label">Rule name</string>
     <string name="rule_name_placeholder">e.g. Photos Backup</string>
     <string name="rule_detail_folder_access_title">Folders need attention</string>
-    <string name="rule_detail_folder_access_source_unavailable">Source (not available - folder may be missing): %1$s</string>
-    <string name="rule_detail_folder_access_source_permission">Source (access denied - pick again): %1$s</string>
-    <string name="rule_detail_folder_access_destination_unavailable">Destination (not available - folder may be missing): %1$s</string>
-    <string name="rule_detail_folder_access_destination_permission">Destination (access denied - pick again): %1$s</string>
-    <string name="rule_detail_folder_access_hint_unavailable">If you deleted that folder, recreate it or pick it again. Tap a highlighted path below.</string>
-    <string name="rule_detail_folder_access_hint_permission">FilePipe no longer has access to one or more trees. Tap a highlighted folder and grant access in the system picker.</string>
-    <string name="rule_detail_folder_access_hint_filesystem">Paths that use the device file system need All files access. In FilePipe Settings choose All files access, then grant it in Android settings. If you switched to SAF-only mode, those paths stay saved but stop working until you change mode again or pick folders with the system picker.</string>
-    <string name="rule_detail_folder_access_hint_backup_restore">After a backup restore, folder permissions are not restored. Re-grant All files in Android settings if you use that mode, or tap each SAF folder and Allow again.</string>
+    <string name="rule_detail_folder_access_source_unavailable">Source folder missing: %1$s</string>
+    <string name="rule_detail_folder_access_source_permission">Source folder access denied: %1$s</string>
+    <string name="rule_detail_folder_access_destination_unavailable">Destination folder missing: %1$s</string>
+    <string name="rule_detail_folder_access_destination_permission">Destination folder access denied: %1$s</string>
+    <string name="rule_detail_folder_access_hint_unavailable">If you deleted this folder, recreate it or pick a new one. Tap the highlighted path below.</string>
+    <string name="rule_detail_folder_access_hint_permission">FilePipe lost access to one or more folders. Tap the highlighted path and pick the folder again.</string>
+    <string name="rule_detail_folder_access_hint_filesystem">Internal storage root and Download folder need All Files Access. Go to Settings, and select \"All Files Access\"; or pick a subfolder instead.</string>
+    <string name="rule_detail_folder_access_hint_backup_restore">After a backup restore, folder permissions are not restored. Turn All Files Access back on in Android settings if you used that mode, or tap each folder and allow access again.</string>
     <string name="rule_detail_validation_errors_summary">Check the sections below, fix any required fields, then try saving again.</string>
     <string name="rule_detail_folder_access_summary_unavailable">One or more folders are missing or no longer available. Tap the highlighted paths below to fix them.</string>
     <string name="rule_detail_folder_access_summary_permission">One or more folders need access again. Tap the highlighted paths below and re-grant access.</string>
@@ -81,7 +81,7 @@
     <string name="rule_section_extensions_title">File extensions</string>
     <string name="rule_section_extensions_subtitle">Which file types this rule applies to</string>
     <string name="rule_section_source_subtitle">Scan files from these folders</string>
-    <string name="rule_section_destination_subtitle">Files matching the extensions are moved here</string>
+    <string name="rule_section_destination_subtitle">Matching files go here</string>
     <string name="rule_section_schedule_subtitle">Optional automatic runs</string>
     <string name="remove_schedule">Remove schedule</string>
     <string name="add_schedule_chip">Add schedule</string>
@@ -101,7 +101,7 @@
     <string name="schedule_dialog_title">Set schedule</string>
     <string name="schedule_hourly">Hourly</string>
     <string name="schedule_interval_hours">Every (hours)</string>
-    <string name="schedule_interval_hours_helper">1 to 24 — use Daily for longer gaps</string>
+    <string name="schedule_interval_hours_helper">1-24 hours. For anything longer, use \"Daily\".</string>
     <string name="schedule_remove_short">Remove</string>
     <string name="schedule_pick_time">Choose time</string>
     <string name="schedule_time_picker_title">Pick time</string>
@@ -138,7 +138,7 @@
     <string name="history_detail_title">Run details</string>
     <string name="history_detail_files_moved_label">Files moved</string>
     <string name="history_detail_files_copied_label">Files copied</string>
-    <string name="history_detail_undo_files">Undo (%d file(s))</string>
+    <string name="history_detail_undo_files">Undo (%d files)</string>
     <string name="history_detail_not_processed_cancelled_label">Not processed (cancelled)</string>
     <string name="history_empty_title">No history yet</string>
     <string name="history_empty_subtitle">Run some rules to see your file move history here</string>
@@ -183,7 +183,7 @@
     <string name="notification_preparing">Preparing…</string>
     <string name="notification_working">Working…</string>
     <string name="notification_finishing">Finishing…</string>
-    <string name="notification_run_stopped_early">Stopped - not all files were processed</string>
+    <string name="notification_run_stopped_early">Stopped early — some files weren\'t processed</string>
     <string name="notification_run_failed_abbr">Stopped: %1$s</string>
     <string name="notification_moving_n_of_m">Moving %1$d of %2$d</string>
     <string name="notification_copying_n_of_m">Copying %1$d of %2$d</string>
@@ -247,7 +247,7 @@
     <string name="onboarding_wizard_back_to_permissions">Back</string>
     <string name="onboarding_wizard_skip">Skip for now</string>
     <string name="onboarding_wizard_start_blank">Start blank</string>
-    <string name="onboarding_wizard_start_blank_desc">You choose extensions</string>
+    <string name="onboarding_wizard_start_blank_desc">Choose your own file types</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -288,9 +288,9 @@
     <string name="settings_import_merge_success">Rules imported: %1$d added, %2$d updated</string>
     <string name="settings_restore_success">Backup restored (%1$s)</string>
     <string name="settings_auto_export_on_change">Auto-export on app exit</string>
-    <string name="settings_auto_export_on_change_hint">Full backup on exit after rule changes.</string>
+    <string name="settings_auto_export_on_change_hint">Saves a full backup when you exit the app after making changes.</string>
     <string name="settings_scheduled_export">Daily scheduled backup</string>
-    <string name="settings_scheduled_export_hint">Exports backup about once per day (requires export folder).</string>
+    <string name="settings_scheduled_export_hint">Automatically backs up once a day (requires an export folder).</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_system">System</string>
@@ -301,7 +301,7 @@
     <string name="settings_palette_style">Palette style</string>
     <string name="settings_custom_seed_label">Custom accent (hex)</string>
     <string name="settings_custom_seed_placeholder">#RRGGBB or RRGGBB</string>
-    <string name="settings_custom_seed_supporting">Invalid hex falls back to the default blue.</string>
+    <string name="settings_custom_seed_supporting">If the code isn\'t valid, the default blue is used.</string>
     <string name="settings_custom_seed_apply">Apply</string>
     <string name="settings_custom_seed_dialog_title">Add custom accent color</string>
     <string name="settings_custom_seed_dialog_add">Add</string>
@@ -350,13 +350,13 @@
     <string name="settings_notify_updates_enable_notifications">Allow notifications for FilePipe.</string>
     <string name="settings_update_available_button">Update available - %1$s</string>
     <string name="settings_update_skip_version">Skip version</string>
-    <string name="settings_update_sheet_false_positive_tooltip">If you installed an update outside this app (not using Download update here), this screen can still show an update. Tap Skip version. You will not be prompted again until the GitHub release changes.</string>
+    <string name="settings_update_sheet_false_positive_tooltip">Installed an update from outside the app? This screen might still show the update. Tap Skip version — you won\'t be prompted again until a new release is available.</string>
     <string name="notification_channel_updates_name">App updates</string>
     <string name="notification_channel_updates_description">Alerts when a new app version is available</string>
     <string name="notification_update_available_title">Update available</string>
     <string name="notification_update_available_text">Version %1$s is ready to install</string>
-    <string name="settings_save_update_apk_to_downloads">Save update APK to Downloads folder</string>
-    <string name="settings_update_apk_save_to_downloads_failed">Update downloaded, but saving a copy to Downloads failed</string>
+    <string name="settings_save_update_apk_to_downloads">Save update APK to Download folder</string>
+    <string name="settings_update_apk_save_to_downloads_failed">Update downloaded, but saving a copy to Download failed</string>
     <string name="settings_see_whats_new">See What\'s New?</string>
     <string name="settings_check_for_updates">Check for updates</string>
     <string name="settings_download_install">Download Update (v%1$s)</string>
@@ -375,9 +375,9 @@
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>
     <string name="rule_scan_subdirs_label">Scan subdirectories</string>
-    <string name="rule_scan_subdirs_support">Sub-Folders will be scanned for matching files and recreated at the destination.</string>
-    <string name="rule_suppress_missing_source_card_label">Suppress missing source folder errors</string>
-    <string name="rule_suppress_missing_source_card_support">When a source folder is missing, hide the warning on the rules list. You still see full details while editing this rule. Does not apply to the destination or revoked access.</string>
+    <string name="rule_scan_subdirs_support">Subfolders are scanned too, and their structure is recreated at the destination.</string>
+    <string name="rule_suppress_missing_source_card_label">Hide missing source folder warnings</string>
+    <string name="rule_suppress_missing_source_card_support">When a source folder is missing, hide the warning on the rules screen. You will still see it while editing this rule. Doesn\'t apply to the destination folder or lost access.</string>
     <string name="rule_toggle_tip_show_help">Show help</string>
     <string name="rule_section_operation_title">Operation</string>
     <string name="rule_operation_mode_label">Mode</string>
@@ -399,13 +399,13 @@
 
     <!-- Settings — history section -->
     <string name="settings_history_section">History</string>
-    <string name="settings_log_retention">Log retention</string>
-    <string name="settings_log_retention_hint">How long to keep run history records.</string>
+    <string name="settings_log_retention">Keep history for</string>
+    <string name="settings_log_retention_hint">Older records are deleted automatically.</string>
     <string name="log_retention_7_days">7 days</string>
     <string name="log_retention_14_days">14 days</string>
     <string name="log_retention_30_days">30 days</string>
     <string name="log_retention_90_days">90 days</string>
-    <string name="log_retention_never">Never</string>
+    <string name="log_retention_never">Forever</string>
 
     <!-- Notification actions -->
     <string name="notification_action_undo">Undo</string>
@@ -456,13 +456,13 @@
     <string name="faq_section_backup_restore">Backup &amp; restore</string>
     <string name="faq_question_rule_not_working">Fix a rule that isn\'t working</string>
     <string name="faq_question_folder_access_denied">Fix \"Folders need attention\" errors</string>
-    <string name="faq_question_files_not_moving_automatically">Files not moving?</string>
     <string name="faq_question_cant_add_downloads_folder">Can\'t add the Download folder?</string>
+    <string name="faq_question_files_not_moving_automatically">Files not moving?</string>
     <string name="faq_question_create_rule">How do I create a rule?</string>
     <string name="faq_question_rule_skipping_files">Why is my rule skipping files?</string>
     <string name="faq_question_what_preview_does">What does Preview do?</string>
     <string name="faq_question_scheduled_rules">How do scheduled rules work?</string>
-    <string name="faq_question_schedule_notifications">I am not getting schedule run notifications</string>
+    <string name="faq_question_schedule_notifications">Not getting scheduled run notifications?</string>
     <string name="faq_question_rule_did_not_run">Why did my rule not run?</string>
     <string name="faq_question_data_privacy">Is my data private?</string>
     <string name="faq_question_why_storage_access">Why does FilePipe need storage access?</string>
@@ -470,18 +470,18 @@
     <string name="faq_question_permissions_after_restore">What do I fix after restore?</string>
 
     <!-- FAQ answers: \\n between bullets; use ** only for mode names worth scanning. -->
-    <string name="faq_answer_rule_not_working">Give the rule a name, source folders, destination folder, and file types.\nTap any red folder path on the edit screen and grant access again.\nIf the rule uses Download or a storage root, switch to **All files access** in Settings.</string>
-    <string name="faq_answer_folder_access_denied">Common after changing **Selective Access** vs **All files access**, restoring a backup, or revoking a folder grant.\nOpen Edit rule, tap the highlighted path, and pick the folder again in the system picker.\nDownload and storage roots need **All files access**.</string>
-    <string name="faq_answer_cant_add_downloads_folder">In **Selective Access**, Android often blocks the Downloads root and some storage roots.\nTurn on **All files access** in Settings, then add the folder, or pick a subfolder inside Downloads with the picker.</string>
+    <string name="faq_answer_rule_not_working">Give the rule a name, source folders, destination folder, and file types.\nTap any red folder path on the edit screen and grant access again.\nIf the rule uses Download folder or a storage root, switch to **All files access** in Settings.</string>
+    <string name="faq_answer_folder_access_denied">Common after changing **Selective Access** vs **All files access**, restoring a backup, or revoking a folder grant.\nOpen Edit rule, tap the highlighted path, and pick the folder again in the folder picker.\nDownload folder and storage roots need **All files access**.</string>
+    <string name="faq_answer_cant_add_downloads_folder">In **Selective Access**, Android often blocks the Download folder and some storage roots.\nTurn on **All files access** in Settings, then add the folder, or pick a subfolder inside Download with the picker.</string>
     <string name="faq_answer_files_not_moving_automatically">Confirm the rule is enabled.\nFor automatic runs, set a schedule and keep the rule enabled.\nCheck folder access, battery restrictions for FilePipe, and advanced filters so files still match.</string>
     <string name="faq_answer_create_rule">Tap + on the Rules tab to start a new rule.\nPick source folders, file types, and a destination folder.\nChoose operation mode (move or copy) and how to handle duplicate files in the destination.\nAdd a schedule on the edit screen if you want background runs.\nUse Advanced filters for filename patterns, size or age limits, and exclude patterns.\nSave, then run Preview to see which files would be affected.</string>
     <string name="faq_answer_rule_skipping_files">The file may not match the extensions or advanced filters.\nIf the destination already has that name, your conflict setting may skip or rename instead of replacing.\nLost folder access can also hide files until you grant again.</string>
     <string name="faq_answer_what_preview_does">Preview lists files the rule would act on and shows the intended destination path.\nNothing is moved or copied until you run the rule for real.\nUse it to check filters, destination, and access before you rely on the rule.</string>
     <string name="faq_answer_scheduled_rules">Scheduled rules run in the background at the times you configure.\nThey still need valid folder access and files that match the rule.\nUse Preview after changes so automation matches what you expect.</string>
     <string name="faq_answer_rule_did_not_run">Confirm the schedule and the rule are both enabled.\nAndroid battery limits and notification settings can block or delay background work.\nRecheck folder access and that matching files still exist.</string>
-    <string name="faq_answer_schedule_notifications">FilePipe does not notify for every scheduled run by default; open Run history to confirm runs.\nEnable update notifications in app Settings and allow app notifications in Android settings if you want alerts.\nBattery saver and background restrictions can still delay work; exclude FilePipe if needed.</string>
+    <string name="faq_answer_schedule_notifications">FilePipe doesn\'t send a notification after every scheduled run. Check Run History to see what happened.\nTo get alerts, enable run notifications in Settings and allow app notifications in Android settings.\nBattery saver and background restrictions can delay runs — exclude FilePipe in battery settings if needed.</string>
     <string name="faq_answer_data_privacy">FilePipe works on your device.\nYour files are not uploaded or tracked.\nThe app only runs the rules you configure.</string>
-    <string name="faq_answer_why_storage_access">FilePipe needs access to the folders your rules use to scan, move, or copy files.\n**Selective Access** only sees folders you pick in the system dialog.\n**All files access** is needed for Downloads, storage roots, and plain file paths.</string>
+    <string name="faq_answer_why_storage_access">FilePipe needs access to the folders your rules use to scan, move, or copy files.\n**Selective Access** only sees folders you pick in the system dialog.\n**All files access** is needed for Download, storage roots, and plain file paths.</string>
     <string name="faq_answer_backup_contents">Backups include rules, run history, and settings.\nAndroid does not restore folder grants from a backup.\nAfter restore, revisit rules with highlighted paths and grant again.</string>
     <string name="faq_answer_permissions_after_restore">For **Selective Access**, tap each affected folder and grant again.\nIf rules used **All files access**, turn that back on in Android settings.\nHighlights on the edit screen show which folders still need attention.</string>
 

@@ -46,8 +46,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "dev.bikram.filepipe"
         minSdk = 30
         targetSdk = 36
-        versionCode = 220
-        versionName = "2.2.0"
+        versionCode = 300
+        versionName = "3.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

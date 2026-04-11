@@ -33,15 +33,16 @@ class FileOrganizerWorker @AssistedInject constructor(
     private val ruleRepository: RuleRepository
 ) : CoroutineWorker(appContext, workerParams) {
 
-    private val notificationManager: NotificationManager
-        get() = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    private val notificationManager: NotificationManager by lazy {
+        appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    }
 
     /** Distinct from other concurrent [FileOrganizerWorker] instances (shared 1001/1002 caused clashes). */
-    private val progressNotificationId: Int
-        get() = NOTIFICATION_ID_SLOT_BASE + (abs(id.hashCode()) % NOTIFICATION_ID_SLOT_COUNT) * 2
+    private val progressNotificationId: Int by lazy {
+        NOTIFICATION_ID_SLOT_BASE + (abs(id.hashCode()) % NOTIFICATION_ID_SLOT_COUNT) * 2
+    }
 
-    private val summaryNotificationIdForWork: Int
-        get() = progressNotificationId + 1
+    private val summaryNotificationIdForWork: Int by lazy { progressNotificationId + 1 }
 
     override suspend fun doWork(): Result {
         val ruleId = inputData.getLong(KEY_RULE_ID, -1L)
@@ -217,6 +218,9 @@ class FileOrganizerWorker @AssistedInject constructor(
         /** New id so upgrades get IMPORTANCE_DEFAULT without orphaned low-importance channel. */
         const val CHANNEL_ID = "rule_execution_v2"
         const val SUMMARY_CHANNEL_ID = "run_summary_channel"
+        // Each worker instance occupies 2 consecutive IDs (progress + summary).
+        // Base 30_000 avoids collisions with the fixed IDs used elsewhere in the app (< 1_000).
+        // 12_000 slots × 2 IDs = 24_000 IDs max, well within Android's Int range.
         private const val NOTIFICATION_ID_SLOT_BASE = 30_000
         private const val NOTIFICATION_ID_SLOT_COUNT = 12_000
     }

@@ -3,6 +3,7 @@ package dev.bikram.filepipe.domain.usecase
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
@@ -28,6 +29,8 @@ data class UndoResult(
     val errors: List<String>,
     val operationMode: OperationMode = OperationMode.MOVE
 )
+
+private const val TAG = "UndoRunUseCase"
 
 class UndoRunUseCase @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -240,7 +243,8 @@ class UndoRunUseCase @Inject constructor(
                 }
                 if (children != null && children.isNotEmpty()) continue
                 deleteDocumentUriWithFallback(folderUri)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to delete empty dest subfolder $folderDocumentId", e)
             }
         }
     }
@@ -327,7 +331,8 @@ class UndoRunUseCase @Inject constructor(
                 }
                 if (!children.isNullOrEmpty()) continue
                 deleteDocumentUriWithFallback(folderUri)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to delete empty recorded copy folder $uriString", e)
             }
         }
     }
@@ -384,7 +389,8 @@ class UndoRunUseCase @Inject constructor(
         }
         try {
             doc?.delete()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "DocumentFile fallback delete failed for $documentUri", e)
         }
     }
 

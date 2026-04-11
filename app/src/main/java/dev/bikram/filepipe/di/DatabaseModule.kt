@@ -35,23 +35,11 @@ object DatabaseModule {
         }
     }
 
-    /**
-     * Single 4→5 path: keep manual [Migration] only (same SupportSQLite pipeline as 2→3).
-     * Do not also declare [AutoMigration] for this pair or the column may be added twice and open fails.
-     */
-    private val migration4To5 = object : Migration(4, 5) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "ALTER TABLE files_moved ADD COLUMN relativeParentSegments TEXT NOT NULL DEFAULT '[]'"
-            )
-        }
-    }
-
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "media_organizer.db")
-            .addMigrations(migration2To3, migration4To5)
+            .addMigrations(migration2To3)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 

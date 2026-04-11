@@ -18,7 +18,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.yield
-import java.util.Collections
 import javax.inject.Inject
 
 class ExecuteRulesUseCase @Inject constructor(
@@ -49,8 +48,7 @@ class ExecuteRulesUseCase @Inject constructor(
         val allFiles = mutableListOf<FileMoved>()
         var totalPlanned = 0
         var completedSuccessfulMoves = 0
-        val copyCreatedDestFolders: MutableSet<String> =
-            Collections.synchronizedSet(linkedSetOf())
+        val copyCreatedDestFolders: MutableSet<String> = linkedSetOf()
 
         try {
             val filesystemAccessEnabled =
