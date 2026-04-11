@@ -15,7 +15,10 @@ class Converters {
     fun fromStringList(value: List<String>): String = json.encodeToString(value)
 
     @TypeConverter
-    fun toStringList(value: String): List<String> = json.decodeFromString(value)
+    fun toStringList(value: String): List<String> {
+        if (value.isBlank()) return emptyList()
+        return runCatching { json.decodeFromString<List<String>>(value) }.getOrElse { emptyList() }
+    }
 
     @TypeConverter
     fun fromScheduleType(value: ScheduleType?): String? = value?.name

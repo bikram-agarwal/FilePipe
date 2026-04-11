@@ -34,13 +34,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -166,6 +170,28 @@ private val themePickerOrder = listOf(
     AppThemeMode.BLACK
 )
 
+/**
+ * Indices of the first unconditional [LazyColumn] items (Appearance, Folder access, Touch & sound, …)
+ * before the optional Updates block. Used to scroll from Help quick actions.
+ */
+private const val SETTINGS_LIST_INDEX_FOLDER_ACCESS = 1
+private const val SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS = 2
+
+@Composable
+private fun rememberSectionHighlightPulseAlpha(active: Boolean): Float {
+    val infiniteTransition = rememberInfiniteTransition(label = "settingsSectionHighlight")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.42f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 850, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+    return if (active) pulse else 1f
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen(
@@ -197,20 +223,23 @@ fun SettingsScreen(
     var pendingEnableUpdateNotificationsAfterPermission by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    val folderAccessBringIntoViewRequester = remember { BringIntoViewRequester() }
-    val notificationsBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val settingsLazyListState = rememberLazyListState()
     val bringIntoViewTarget by viewModel.bringIntoViewSection.collectAsStateWithLifecycle()
     LaunchedEffect(bringIntoViewTarget) {
         when (bringIntoViewTarget) {
             SettingsBringIntoViewSection.None -> return@LaunchedEffect
-            SettingsBringIntoViewSection.FolderAccess -> {
-                delay(80)
-                folderAccessBringIntoViewRequester.bringIntoView()
-                viewModel.clearBringIntoViewSectionRequest()
-            }
+            SettingsBringIntoViewSection.FolderAccess,
             SettingsBringIntoViewSection.Notifications -> {
-                delay(80)
-                notificationsBringIntoViewRequester.bringIntoView()
+                val targetIndex = when (bringIntoViewTarget) {
+                    SettingsBringIntoViewSection.FolderAccess -> SETTINGS_LIST_INDEX_FOLDER_ACCESS
+                    SettingsBringIntoViewSection.Notifications ->
+                        SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS
+                    else -> return@LaunchedEffect
+                }
+                delay(220)
+                if (settingsLazyListState.layoutInfo.totalItemsCount > targetIndex) {
+                    settingsLazyListState.animateScrollToItem(targetIndex)
+                }
                 viewModel.clearBringIntoViewSectionRequest()
             }
         }
@@ -220,6 +249,12 @@ fun SettingsScreen(
         if (!folderAccessSectionHighlight) return@LaunchedEffect
         delay(4500)
         viewModel.clearFolderAccessSectionHighlight()
+    }
+    val notificationsSectionHighlight by viewModel.notificationsSectionHighlight.collectAsStateWithLifecycle()
+    LaunchedEffect(notificationsSectionHighlight) {
+        if (!notificationsSectionHighlight) return@LaunchedEffect
+        delay(4500)
+        viewModel.clearNotificationsSectionHighlight()
     }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -495,6 +530,7 @@ fun SettingsScreen(
         }
     ) { innerPadding ->
         LazyColumn(
+            state = settingsLazyListState,
             modifier = Modifier
                 .fillMaxSize()
                 .then(scrollBlurModifier),
@@ -620,6 +656,7 @@ fun SettingsScreen(
             // ── Folder access ─────────────────────────────────────────────────
             item {
                 val folderAccessHighlightShape = RoundedCornerShape(16.dp)
+                val folderHighlightPulse = rememberSectionHighlightPulseAlpha(folderAccessSectionHighlight)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -628,7 +665,9 @@ fun SettingsScreen(
                                 Modifier
                                     .border(
                                         width = 3.dp,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = MaterialTheme.colorScheme.primary.copy(
+                                            alpha = folderHighlightPulse
+                                        ),
                                         shape = folderAccessHighlightShape
                                     )
                                     .padding(10.dp)
@@ -637,7 +676,7 @@ fun SettingsScreen(
                             }
                         )
                 ) {
-                Column(modifier = Modifier.bringIntoViewRequester(folderAccessBringIntoViewRequester)) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                 SettingsSectionHeader(
                     icon = Icons.Default.FolderOpen,
                     title = stringResource(R.string.settings_folder_access_section)
@@ -773,84 +812,111 @@ fun SettingsScreen(
 
             // ── Touch & Sound ────────────────────────────────────────────────
             item {
-                SettingsSectionHeader(
-                    icon = Icons.Default.Vibration,
-                    title = stringResource(R.string.settings_touch_sound_section)
-                )
-                Spacer(Modifier.height(8.dp))
-                GroupedListColumn {
-                    GroupedListItem(position = GroupPosition.FIRST) {
-                        SettingsToggleItem(
-                            icon = Icons.Default.Vibration,
-                            title = stringResource(R.string.settings_haptic_feedback),
-                            subtitle = stringResource(R.string.settings_haptic_feedback_desc),
-                            checked = preferences.hapticFeedbackEnabled,
-                            onCheckedChange = { enabled ->
-                                playTap()
-                                viewModel.setHapticFeedbackEnabled(enabled)
+                val notificationsHighlightShape = RoundedCornerShape(16.dp)
+                val notificationsHighlightPulse =
+                    rememberSectionHighlightPulseAlpha(notificationsSectionHighlight)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (notificationsSectionHighlight) {
+                                Modifier
+                                    .border(
+                                        width = 3.dp,
+                                        color = MaterialTheme.colorScheme.primary.copy(
+                                            alpha = notificationsHighlightPulse
+                                        ),
+                                        shape = notificationsHighlightShape
+                                    )
+                                    .padding(10.dp)
+                            } else {
+                                Modifier
                             }
                         )
-                    }
-                    GroupedListItem(position = GroupPosition.LAST) {
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    stringResource(R.string.settings_notifications),
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            },
-                            supportingContent = {
-                                Text(
-                                    stringResource(R.string.settings_notifications_desc),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
-                            leadingContent = {
-                                Icon(
-                                    Icons.Default.Notifications,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            },
-                            trailingContent = {
-                                Switch(
-                                    checked = notificationsGranted,
-                                    onCheckedChange = { wantEnabled ->
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        SettingsSectionHeader(
+                            icon = Icons.Default.Vibration,
+                            title = stringResource(R.string.settings_touch_sound_section)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        GroupedListColumn {
+                            GroupedListItem(position = GroupPosition.FIRST) {
+                                SettingsToggleItem(
+                                    icon = Icons.Default.Vibration,
+                                    title = stringResource(R.string.settings_haptic_feedback),
+                                    subtitle = stringResource(R.string.settings_haptic_feedback_desc),
+                                    checked = preferences.hapticFeedbackEnabled,
+                                    onCheckedChange = { enabled ->
                                         playTap()
-                                        when {
-                                            wantEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                                        viewModel.setHapticFeedbackEnabled(enabled)
+                                    }
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.LAST) {
+                                ListItem(
+                                    headlineContent = {
+                                        Text(
+                                            stringResource(R.string.settings_notifications),
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            stringResource(R.string.settings_notifications_desc),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    leadingContent = {
+                                        Icon(
+                                            Icons.Default.Notifications,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    trailingContent = {
+                                        Switch(
+                                            checked = notificationsGranted,
+                                            onCheckedChange = { wantEnabled ->
+                                                playTap()
+                                                when {
+                                                    wantEnabled &&
+                                                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                                                        pendingEnableUpdateNotificationsAfterPermission = false
+                                                        requestPostNotificationPermissionOrOpenAppSettings()
+                                                    }
+                                                    wantEnabled &&
+                                                        !NotificationManagerCompat.from(context)
+                                                            .areNotificationsEnabled() ->
+                                                        viewModel.openAppNotificationSettings()
+                                                    !wantEnabled ->
+                                                        viewModel.openAppNotificationSettings()
+                                                }
+                                            }
+                                        )
+                                    },
+                                    modifier = Modifier.clickable {
+                                        playTap()
+                                        if (!notificationsGranted) {
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                                 pendingEnableUpdateNotificationsAfterPermission = false
                                                 requestPostNotificationPermissionOrOpenAppSettings()
+                                            } else if (!NotificationManagerCompat.from(context)
+                                                    .areNotificationsEnabled()
+                                            ) {
+                                                viewModel.openAppNotificationSettings()
                                             }
-                                            wantEnabled &&
-                                                !NotificationManagerCompat.from(context).areNotificationsEnabled() ->
-                                                viewModel.openAppNotificationSettings()
-                                            !wantEnabled ->
-                                                viewModel.openAppNotificationSettings()
-                                        }
-                                    }
-                                )
-                            },
-                            modifier = Modifier
-                                .bringIntoViewRequester(notificationsBringIntoViewRequester)
-                                .clickable {
-                                    playTap()
-                                    if (!notificationsGranted) {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                            pendingEnableUpdateNotificationsAfterPermission = false
-                                            requestPostNotificationPermissionOrOpenAppSettings()
-                                        } else if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                                        } else {
                                             viewModel.openAppNotificationSettings()
                                         }
-                                    } else {
-                                        viewModel.openAppNotificationSettings()
-                                    }
-                                },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                        )
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                )
+                            }
+                        }
                     }
                 }
             }

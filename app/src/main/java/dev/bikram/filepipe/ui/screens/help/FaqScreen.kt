@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,12 +50,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -174,7 +178,11 @@ private fun buildStorageSearchHaystack(vararg parts: String): String =
     parts.joinToString(" ").lowercase()
 
 private fun faqBulletLinesFromMultilineString(text: String): List<String> =
-    text.lineSequence().map { line -> line.trim() }.filter { line -> line.isNotEmpty() }.toList()
+    text.replace("\r\n", "\n")
+        .lineSequence()
+        .map { line -> line.trim() }
+        .filter { line -> line.isNotEmpty() }
+        .toList()
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -189,7 +197,9 @@ fun FaqScreen(
     val latestFolderAccess by rememberUpdatedState(onOpenFolderAccessInSettings)
     val latestNotifications by rememberUpdatedState(onOpenSettingsNotifications)
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    val expandedItemIds = remember { mutableStateListOf<String>() }
+    val activity = LocalContext.current as ComponentActivity
+    val faqViewModel: FaqViewModel = hiltViewModel(activity)
+    val expandedItemIds by faqViewModel.expandedItemIds.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer() ?: Modifier
 
@@ -212,6 +222,12 @@ fun FaqScreen(
                         inlineActions = listOf(FaqInlineAction.OPEN_FOLDER_ACCESS_IN_SETTINGS)
                     ),
                     FaqItemDefinition(
+                        id = "cant_add_downloads_folder",
+                        questionRes = R.string.faq_question_cant_add_downloads_folder,
+                        bulletTextRes = R.string.faq_answer_cant_add_downloads_folder,
+                        inlineActions = listOf(FaqInlineAction.OPEN_FOLDER_ACCESS_IN_SETTINGS)
+                    ),
+                    FaqItemDefinition(
                         id = "files_not_moving_automatically",
                         questionRes = R.string.faq_question_files_not_moving_automatically,
                         bulletTextRes = R.string.faq_answer_files_not_moving_automatically,
@@ -219,12 +235,6 @@ fun FaqScreen(
                             FaqInlineAction.OPEN_APP_NOTIFICATION_SETTINGS,
                             FaqInlineAction.OPEN_FOLDER_ACCESS_IN_SETTINGS
                         )
-                    ),
-                    FaqItemDefinition(
-                        id = "cant_add_downloads_folder",
-                        questionRes = R.string.faq_question_cant_add_downloads_folder,
-                        bulletTextRes = R.string.faq_answer_cant_add_downloads_folder,
-                        inlineActions = listOf(FaqInlineAction.OPEN_FOLDER_ACCESS_IN_SETTINGS)
                     )
                 )
             ),
@@ -264,9 +274,9 @@ fun FaqScreen(
                         bulletTextRes = R.string.faq_answer_rule_skipping_files
                     ),
                     FaqItemDefinition(
-                        id = "what_simulate_does",
-                        questionRes = R.string.faq_question_what_simulate_does,
-                        bulletTextRes = R.string.faq_answer_what_simulate_does
+                        id = "what_preview_does",
+                        questionRes = R.string.faq_question_what_preview_does,
+                        bulletTextRes = R.string.faq_answer_what_preview_does
                     )
                 )
             ),
@@ -338,6 +348,11 @@ fun FaqScreen(
 
     val allExpandableItemIds = remember {
         faqSections.flatMap { section -> section.items.map { item -> item.id } }
+    }
+
+    val allItemsExpanded = remember(expandedItemIds, allExpandableItemIds) {
+        allExpandableItemIds.isNotEmpty() &&
+            allExpandableItemIds.all { itemId -> itemId in expandedItemIds }
     }
 
     val resolvedSections = faqSections.map { sectionDefinition ->
@@ -421,10 +436,10 @@ fun FaqScreen(
     LaunchedEffect(initialFocusSectionId, filteredSections) {
         if (initialFocusSectionId != Screen.Faq.FOCUS_STORAGE_ACCESS) return@LaunchedEffect
         if (!expandedItemIds.contains("storage_all_files")) {
-            expandedItemIds.add("storage_all_files")
+            faqViewModel.setItemExpanded("storage_all_files", true)
         }
         if (!expandedItemIds.contains("storage_selective")) {
-            expandedItemIds.add("storage_selective")
+            faqViewModel.setItemExpanded("storage_selective", true)
         }
         val scrollIndex = computeLazyIndexForSectionHeader(
             focusSectionId = SECTION_STORAGE_ACCESS_MODES,
@@ -493,53 +508,41 @@ fun FaqScreen(
             ) {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            text = stringResource(R.string.faq_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = stringResource(R.string.faq_quick_actions_label),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = stringResource(R.string.faq_quick_actions_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Button(
-                                onClick = {
-                                    playTap()
-                                    latestFolderAccess()
-                                }
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Default.FolderOpen,
-                                    contentDescription = null,
-                                    modifier = Modifier.padding(end = 8.dp)
-                                )
-                                Text(stringResource(R.string.faq_quick_action_folder_access))
-                            }
-                            Button(
-                                onClick = {
-                                    playTap()
-                                    latestNotifications()
+                                Button(
+                                    onClick = {
+                                        playTap()
+                                        latestFolderAccess()
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.FolderOpen,
+                                        contentDescription = null,
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    )
+                                    Text(stringResource(R.string.faq_quick_action_folder_access))
                                 }
-                            ) {
-                                Icon(
-                                    Icons.Default.Notifications,
-                                    contentDescription = null,
-                                    modifier = Modifier.padding(end = 8.dp)
-                                )
-                                Text(stringResource(R.string.faq_quick_action_notifications))
+                                Button(
+                                    onClick = {
+                                        playTap()
+                                        latestNotifications()
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.Notifications,
+                                        contentDescription = null,
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    )
+                                    Text(stringResource(R.string.faq_quick_action_notifications))
+                                }
                             }
                         }
                         OutlinedTextField(
@@ -602,7 +605,7 @@ fun FaqScreen(
                         item(key = "section_${sectionContent.sectionId}") {
                             Text(
                                 text = sectionContent.title,
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -670,22 +673,18 @@ fun FaqScreen(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(16.dp))
                                     .clickable {
-                                        if (isExpanded) {
-                                            expandedItemIds.remove(itemContent.id)
-                                        } else {
-                                            expandedItemIds.add(itemContent.id)
-                                        }
+                                        faqViewModel.setItemExpanded(itemContent.id, !isExpanded)
                                     }
                             ) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                        .padding(horizontal = 16.dp, vertical = 14.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
                                             text = parseDoubleAsteriskEmphasis(itemContent.question),
@@ -703,13 +702,14 @@ fun FaqScreen(
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .animateContentSize()
-                                    ) {
-                                        if (isExpanded) {
-                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (isExpanded) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 10.dp)
+                                                .animateContentSize(),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
                                             when (itemContent.bodyKind) {
                                                 FaqItemBodyKind.STORAGE_FULL_MODE -> {
                                                     FolderAccessLearnMoreFullModeSection(
@@ -785,7 +785,6 @@ fun FaqScreen(
                                                     }
                                                 }
                                             }
-                                            }
                                         }
                                     }
                                 }
@@ -811,27 +810,27 @@ fun FaqScreen(
                 }
             },
             actions = {
-                IconButton(
+                FilledTonalIconButton(
                     onClick = {
                         playTap()
-                        expandedItemIds.clear()
-                        expandedItemIds.addAll(allExpandableItemIds)
+                        if (allItemsExpanded) {
+                            faqViewModel.collapseAll()
+                        } else {
+                            faqViewModel.expandAll(allExpandableItemIds)
+                        }
                     }
                 ) {
                     Icon(
-                        imageVector = Icons.Default.UnfoldMore,
-                        contentDescription = stringResource(R.string.faq_expand_all_cd)
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        playTap()
-                        expandedItemIds.clear()
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.UnfoldLess,
-                        contentDescription = stringResource(R.string.faq_collapse_all_cd)
+                        imageVector = if (allItemsExpanded) {
+                            Icons.Default.UnfoldLess
+                        } else {
+                            Icons.Default.UnfoldMore
+                        },
+                        contentDescription = if (allItemsExpanded) {
+                            stringResource(R.string.faq_collapse_all_cd)
+                        } else {
+                            stringResource(R.string.faq_expand_all_cd)
+                        }
                     )
                 }
             },

@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,6 +38,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -174,6 +177,7 @@ private fun RuleErrorAlertCard(
     title: String,
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(8.dp),
+    titleTrailing: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val onErrorContainer = MaterialTheme.colorScheme.onErrorContainer
@@ -187,7 +191,7 @@ private fun RuleErrorAlertCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(PaddingValues(top = 8.dp, start = 12.dp, end = 12.dp, bottom = 12.dp)),
                 verticalArrangement = verticalArrangement
             ) {
                 Row(
@@ -204,6 +208,7 @@ private fun RuleErrorAlertCard(
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.weight(1f)
                     )
+                    titleTrailing?.invoke(this)
                 }
                 content()
             }
@@ -503,17 +508,28 @@ fun RuleDetailScreen(
                 exit = fadeOut() + shrinkVertically(clip = false)
             ) {
                 RuleErrorAlertCard(
-                    title = stringResource(R.string.rule_detail_validation_errors_title)
+                    title = stringResource(R.string.rule_detail_validation_errors_title),
+                    titleTrailing = {
+                        Text(
+                            text = stringResource(R.string.rule_detail_open_faq),
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier
+                                .clickable { withTapSound(onOpenFaq) }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
                 ) {
                     Text(
                         text = stringResource(R.string.rule_detail_validation_errors_summary),
                         style = MaterialTheme.typography.bodySmall
                     )
-                    TextButton(
-                        onClick = { withTapSound(onOpenFaq) },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text(stringResource(R.string.rule_detail_open_faq))
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        state.errors.forEach { errorLine ->
+                            Text(
+                                text = "\u2022 $errorLine",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
             }
@@ -531,7 +547,16 @@ fun RuleDetailScreen(
                 val showPermissionHint = anySourcePermission || destPermission
                 RuleErrorAlertCard(
                     title = stringResource(R.string.rule_detail_folder_access_title),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    titleTrailing = {
+                        Text(
+                            text = stringResource(R.string.rule_detail_open_faq),
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier
+                                .clickable { withTapSound(onOpenFaq) }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
                 ) {
                     val usesFilesystemPaths =
                         state.sourceFolderPaths.any { path -> !path.startsWith("content://") } ||
@@ -549,12 +574,6 @@ fun RuleDetailScreen(
                         text = stringResource(summaryRes),
                         style = MaterialTheme.typography.bodySmall
                     )
-                    TextButton(
-                        onClick = { withTapSound(onOpenFaq) },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text(stringResource(R.string.rule_detail_open_faq))
-                    }
                 }
             }
 
@@ -614,7 +633,7 @@ fun RuleDetailScreen(
                 titleTrailing = if (state.folderAccessMode.treatAsSafUi()) {
                     @Composable {
                         ToggleLabelHelpDropdown(
-                            tipText = stringResource(R.string.rule_section_source_saf_help),
+                            tipText = stringResource(R.string.rule_section_saf_help),
                             contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
                             playTap = playTap
                         )
@@ -801,7 +820,7 @@ fun RuleDetailScreen(
                 titleTrailing = if (state.folderAccessMode.treatAsSafUi()) {
                     @Composable {
                         ToggleLabelHelpDropdown(
-                            tipText = stringResource(R.string.rule_section_destination_saf_help),
+                            tipText = stringResource(R.string.rule_section_saf_help),
                             contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
                             playTap = playTap
                         )
@@ -1182,7 +1201,7 @@ fun RuleDetailScreen(
                     onClick = { withTapSound(onOpenFaq) }
                 ) {
                     Icon(
-                        Icons.Outlined.Info,
+                        Icons.AutoMirrored.Filled.Help,
                         contentDescription = stringResource(R.string.rule_detail_open_faq)
                     )
                 }

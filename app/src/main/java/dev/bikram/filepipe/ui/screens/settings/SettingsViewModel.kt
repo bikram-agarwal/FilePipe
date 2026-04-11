@@ -125,6 +125,9 @@ class SettingsViewModel @Inject constructor(
     private val _folderAccessSectionHighlight = MutableStateFlow(false)
     val folderAccessSectionHighlight: StateFlow<Boolean> = _folderAccessSectionHighlight.asStateFlow()
 
+    private val _notificationsSectionHighlight = MutableStateFlow(false)
+    val notificationsSectionHighlight: StateFlow<Boolean> = _notificationsSectionHighlight.asStateFlow()
+
     fun requestBringSettingsSectionIntoView(section: SettingsBringIntoViewSection) {
         if (section != SettingsBringIntoViewSection.None) {
             _bringIntoViewSection.value = section
@@ -141,6 +144,14 @@ class SettingsViewModel @Inject constructor(
 
     fun clearFolderAccessSectionHighlight() {
         _folderAccessSectionHighlight.value = false
+    }
+
+    fun requestNotificationsSectionHighlight() {
+        _notificationsSectionHighlight.value = true
+    }
+
+    fun clearNotificationsSectionHighlight() {
+        _notificationsSectionHighlight.value = false
     }
 
     init {

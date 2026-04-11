@@ -35,6 +35,10 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * Single 4→5 path: keep manual [Migration] only (same SupportSQLite pipeline as 2→3).
+     * Do not also declare [AutoMigration] for this pair or the column may be added twice and open fails.
+     */
     private val migration4To5 = object : Migration(4, 5) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(

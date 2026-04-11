@@ -453,6 +453,7 @@ fun AppNavigation(
                         onNavigateBack = { navController.popBackStack() },
                         onOpenFolderAccessInSettings = openFolderAccessInSettings,
                         onOpenSettingsNotifications = {
+                            settingsVm.requestNotificationsSectionHighlight()
                             settingsVm.requestBringSettingsSectionIntoView(
                                 SettingsBringIntoViewSection.Notifications
                             )
