@@ -2,6 +2,7 @@ package dev.bikram.filepipe.domain.export
 
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
@@ -126,7 +127,8 @@ data class SettingsBackupDto(
     val useFixedCardColors: Boolean = false,
     val customSeedHex: String? = null,
     val customSeedHexes: List<String>? = null,
-    val activeCustomSeedHex: String? = null
+    val activeCustomSeedHex: String? = null,
+    val folderAccessMode: String? = null
 )
 
 private val jsonFormatter = Json {
@@ -216,7 +218,8 @@ fun AppPreferences.toBackupDto(): SettingsBackupDto = SettingsBackupDto(
     useFixedCardColors = useFixedCardColors,
     customSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },
     customSeedHexes = savedCustomSeedHexes.takeIf { it.isNotEmpty() },
-    activeCustomSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() }
+    activeCustomSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },
+    folderAccessMode = folderAccessMode.name
 )
 
 fun RuleBackupDto.toDomain(): Rule = Rule(

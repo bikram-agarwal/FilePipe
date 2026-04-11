@@ -65,12 +65,14 @@ private object PrefKeys {
     val GITHUB_ACK_FINGERPRINT = stringPreferencesKey("github_last_acknowledged_release_fingerprint")
     val GITHUB_ACK_INSTALLED_VERSION = stringPreferencesKey("github_acknowledged_for_installed_version")
     val SAVE_UPDATE_APK_TO_DOWNLOADS = booleanPreferencesKey("save_update_apk_to_downloads")
+    val UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED = booleanPreferencesKey("update_apk_downloads_copy_succeeded")
     val USE_GRADIENT_BACKGROUND = booleanPreferencesKey("use_gradient_background")
     val FIXED_CARD_COLORS = booleanPreferencesKey("fixed_card_colors")
     /** Legacy; migrated into [CUSTOM_SEED_HEX_LIST] + [ACTIVE_CUSTOM_SEED_HEX]. */
     val CUSTOM_SEED_HEX = stringPreferencesKey("custom_seed_hex")
     val CUSTOM_SEED_HEX_LIST = stringPreferencesKey("custom_seed_hex_list")
     val ACTIVE_CUSTOM_SEED_HEX = stringPreferencesKey("active_custom_seed_hex")
+    val FOLDER_ACCESS_MODE = stringPreferencesKey("folder_access_mode")
 }
 
 @Singleton
@@ -146,8 +148,14 @@ class UserPreferencesRepository @Inject constructor(
             notifyOnNewUpdates = prefs[PrefKeys.NOTIFY_ON_NEW_UPDATES] ?: false,
             updateLastNotifiedDedupeKey = prefs[PrefKeys.UPDATE_LAST_NOTIFIED_DEDUPE_KEY].orEmpty(),
             saveUpdateApkToDownloads = prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] ?: false,
+            updateApkDownloadsCopySucceeded = prefs[PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED] ?: false,
             useGradientBackground = prefs[PrefKeys.USE_GRADIENT_BACKGROUND] ?: true,
-            useFixedCardColors = prefs[PrefKeys.FIXED_CARD_COLORS] ?: false
+            useFixedCardColors = prefs[PrefKeys.FIXED_CARD_COLORS] ?: false,
+            folderAccessMode = normalizeFolderAccessModeStored(
+                prefs[PrefKeys.FOLDER_ACCESS_MODE]?.let { raw ->
+                    runCatching { FolderAccessMode.valueOf(raw) }.getOrNull()
+                }
+            )
         )
     }
 
@@ -270,7 +278,18 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     suspend fun setSaveUpdateApkToDownloads(enabled: Boolean) {
-        dataStore.edit { it[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] = enabled }
+        dataStore.edit { prefs ->
+            prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] = enabled
+            prefs.remove(PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED)
+        }
+    }
+
+    suspend fun clearUpdateApkDownloadsCopySucceeded() {
+        dataStore.edit { it.remove(PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED) }
+    }
+
+    suspend fun markUpdateApkDownloadsCopySucceeded() {
+        dataStore.edit { it[PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED] = true }
     }
 
     suspend fun setUseGradientBackground(enabled: Boolean) {
@@ -280,6 +299,28 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun setUseFixedCardColors(enabled: Boolean) {
         dataStore.edit { it[PrefKeys.FIXED_CARD_COLORS] = enabled }
     }
+
+    suspend fun setFolderAccessMode(mode: FolderAccessMode) {
+        dataStore.edit { it[PrefKeys.FOLDER_ACCESS_MODE] = mode.name }
+    }
+
+    /**
+     * One-time: persist [FolderAccessMode.SAF_ONLY] when legacy [FolderAccessMode.DEFERRED] was stored.
+     * Safe to call repeatedly.
+     */
+    suspend fun migrateDeferredFolderAccessIfNeeded() {
+        dataStore.edit { prefs ->
+            if (prefs[PrefKeys.FOLDER_ACCESS_MODE] != FolderAccessMode.DEFERRED.name) return@edit
+            prefs[PrefKeys.FOLDER_ACCESS_MODE] = FolderAccessMode.SAF_ONLY.name
+        }
+    }
+
+    private fun normalizeFolderAccessModeStored(mode: FolderAccessMode?): FolderAccessMode =
+        when (mode) {
+            null -> FolderAccessMode.SAF_ONLY
+            FolderAccessMode.DEFERRED -> FolderAccessMode.SAF_ONLY
+            else -> mode
+        }
 
     /**
      * One-time migration from single [PrefKeys.CUSTOM_SEED_HEX] to list + active keys.
@@ -427,8 +468,16 @@ class UserPreferencesRepository @Inject constructor(
             prefs.remove(PrefKeys.AUTO_CHECK_UPDATES)
             prefs[PrefKeys.NOTIFY_ON_NEW_UPDATES] = dto.notifyOnNewUpdates ?: false
             prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] = dto.saveUpdateApkToDownloads
+            prefs.remove(PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED)
             prefs[PrefKeys.USE_GRADIENT_BACKGROUND] = dto.useGradientBackground
             prefs[PrefKeys.FIXED_CARD_COLORS] = dto.useFixedCardColors
+
+            dto.folderAccessMode?.let { raw ->
+                runCatching { FolderAccessMode.valueOf(raw) }.getOrNull()?.let { mode ->
+                    val toStore = if (mode == FolderAccessMode.DEFERRED) FolderAccessMode.SAF_ONLY else mode
+                    prefs[PrefKeys.FOLDER_ACCESS_MODE] = toStore.name
+                }
+            }
 
             val restoredList: List<String>? = when {
                 dto.customSeedHexes != null -> dto.customSeedHexes

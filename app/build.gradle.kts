@@ -186,6 +186,9 @@ dependencies {
 
     implementation(libs.material.kolor)
 
+    // Play in-app update AARs merge extra manifest entries. App info may list permissions under the
+    // "Nearby devices" group on Android 12+ even though FilePipe does not declare them in src manifests.
+    // Inspect merged output: ./gradlew :app:processPlaystoreReleaseMainManifest
     add("playstoreImplementation", "com.google.android.play:app-update:2.1.0")
     add("playstoreImplementation", "com.google.android.play:app-update-ktx:2.1.0")
 }

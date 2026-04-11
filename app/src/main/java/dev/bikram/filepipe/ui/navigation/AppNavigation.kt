@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -74,12 +75,14 @@ import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.debug.AgentSessionLog
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.screens.history.HistoryScreen
 import dev.bikram.filepipe.ui.screens.history.HistoryViewModel
 import dev.bikram.filepipe.ui.screens.historydetail.HistoryDetailScreen
+import dev.bikram.filepipe.ui.screens.onboarding.OnboardingPermissionsScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingRuleWizardScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingTitleScreen
 import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
@@ -130,6 +133,7 @@ fun AppNavigation(
 ) {
     val playTap = rememberPlayTapSound()
     val navController = rememberNavController()
+    val appContext = LocalContext.current.applicationContext
     val pendingHistoryId by pendingShortcutRepository.pendingHistoryDetailId.collectAsStateWithLifecycle()
     val pendingOpenSettingsUpdates by pendingShortcutRepository.pendingOpenSettingsForUpdates.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -300,14 +304,35 @@ fun AppNavigation(
                 ) { backStack ->
                     val fromSettings = backStack.arguments?.getBoolean(Screen.OnboardingTitle.ARG) ?: false
                     OnboardingTitleScreen(
-                        fromSettings = fromSettings,
                         onLetsBegan = {
-                            if (fromSettings) {
-                                navController.popBackStack()
-                            } else {
-                                navController.navigate(Screen.OnboardingRuleWizard.route) {
-                                    popUpTo(Screen.OnboardingTitle.route) { inclusive = true }
-                                }
+                            // #region agent log
+                            AgentSessionLog.append(
+                                context = appContext,
+                                location = "AppNavigation.kt:OnboardingTitle.onLetsBegan",
+                                message = "lets_begin_tapped",
+                                hypothesisId = "A",
+                                data = mapOf("fromSettings" to fromSettings)
+                            )
+                            // #endregion
+                            navController.navigate(Screen.OnboardingPermissions.route)
+                        }
+                    )
+                }
+
+                composable(Screen.OnboardingPermissions.route) {
+                    OnboardingPermissionsScreen(
+                        onContinue = {
+                            // #region agent log
+                            AgentSessionLog.append(
+                                context = appContext,
+                                location = "AppNavigation.kt:OnboardingPermissions.onContinue",
+                                message = "navigate_wizard_keep_stack",
+                                hypothesisId = "B",
+                                data = emptyMap()
+                            )
+                            // #endregion
+                            navController.navigate(Screen.OnboardingRuleWizard.route) {
+                                launchSingleTop = true
                             }
                         }
                     )
@@ -315,7 +340,18 @@ fun AppNavigation(
 
                 composable(Screen.OnboardingRuleWizard.route) {
                     OnboardingRuleWizardScreen(
-                        bottomContentPadding = scrimHeight,
+                        onBackToPermissions = {
+                            // #region agent log
+                            AgentSessionLog.append(
+                                context = appContext,
+                                location = "AppNavigation.kt:OnboardingRuleWizard.onBack",
+                                message = "pop_back_to_permissions",
+                                hypothesisId = "B",
+                                data = emptyMap()
+                            )
+                            // #endregion
+                            navController.popBackStack()
+                        },
                         onUseTemplate = { templateIndex ->
                             navController.navigate(Screen.Rules.route) {
                                 popUpTo(navController.graph.id) { inclusive = true }

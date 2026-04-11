@@ -28,9 +28,16 @@ data class AppPreferences(
     val updateLastNotifiedDedupeKey: String = "",
     /** GitHub flavor: copy downloaded update APK to MediaStore Downloads after download. */
     val saveUpdateApkToDownloads: Boolean = false,
+    /**
+     * GitHub flavor: last update APK download completed a successful copy to Downloads (MediaStore).
+     * Used so cache cleanup runs only after a saved copy exists, not merely when the toggle is on.
+     */
+    val updateApkDownloadsCopySucceeded: Boolean = false,
     val useGradientBackground: Boolean = true,
     /** Neutral light/dark greys for list cards instead of accent-tinted elevated surfaces. */
-    val useFixedCardColors: Boolean = false
+    val useFixedCardColors: Boolean = false,
+    /** SAF vs All files. Legacy [FolderAccessMode.DEFERRED] is migrated to [FolderAccessMode.SAF_ONLY]. */
+    val folderAccessMode: FolderAccessMode = FolderAccessMode.SAF_ONLY
 ) {
     companion object {
         val DEFAULT = AppPreferences()

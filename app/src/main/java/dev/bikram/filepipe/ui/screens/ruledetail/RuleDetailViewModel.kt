@@ -1,14 +1,22 @@
 package dev.bikram.filepipe.ui.screens.ruledetail
 
 import android.net.Uri
+import android.os.Environment
+import java.io.File
 import android.provider.DocumentsContract
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
+import dev.bikram.filepipe.data.storage.isFilesystemFolderPathAllowedForRules
+import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
+import dev.bikram.filepipe.data.storage.primaryDownloadsDirectoryPath
+import dev.bikram.filepipe.data.storage.primaryScreenshotsDirectoryPath
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -16,6 +24,7 @@ import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.RuleTemplate
+import dev.bikram.filepipe.domain.model.TemplateAutoSource
 import dev.bikram.filepipe.domain.usecase.PreviewRuleUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
@@ -27,11 +36,16 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 data class RuleDetailUiState(
@@ -71,7 +85,9 @@ data class RuleDetailUiState(
      * When the destination is set but not readable: [FolderAccessResult.Unavailable] or
      * [FolderAccessResult.PermissionDenied]. Null when destination is blank or accessible.
      */
-    val destinationFolderAccessIssue: FolderAccessResult? = null
+    val destinationFolderAccessIssue: FolderAccessResult? = null,
+    val folderAccessMode: FolderAccessMode = FolderAccessMode.SAF_ONLY,
+    val allFilesAccessGranted: Boolean = false
 )
 
 private data class RuleSnapshot(
@@ -147,6 +163,11 @@ class RuleDetailViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
+        userPreferencesRepository.preferencesFlow
+            .map { prefs -> prefs.folderAccessMode }
+            .distinctUntilChanged()
+            .onEach { scheduleFolderAccessRecompute() }
+            .launchIn(viewModelScope)
         if (!isNewRule) {
             loadRule()
         } else {
@@ -196,28 +217,28 @@ class RuleDetailViewModel @Inject constructor(
 
     private fun scheduleFolderAccessRecompute() {
         viewModelScope.launch(Dispatchers.IO) {
+            val prefs = userPreferencesRepository.preferencesFlow.first()
+            val filesystemAccessEnabled = isFilesystemAccessEffective(prefs.folderAccessMode)
+            val allFilesGranted = Environment.isExternalStorageManager()
             val snapshot = _uiState.value
             val sourceIssues = snapshot.sourceFolderPaths.mapNotNull { path ->
-                val result = if (!path.startsWith("content://")) {
-                    FolderAccessResult.Unavailable
-                } else {
-                    fileOperationRepository.resolveFolderAccess(path)
-                }
+                val result = fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)
                 if (result == FolderAccessResult.Accessible) null else path to result
             }.toMap()
             val destinationIssue =
                 if (snapshot.destinationFolderPath.isBlank()) {
                     null
                 } else {
-                    val result = if (!snapshot.destinationFolderPath.startsWith("content://")) {
-                        FolderAccessResult.Unavailable
-                    } else {
-                        fileOperationRepository.resolveFolderAccess(snapshot.destinationFolderPath)
-                    }
+                    val result = fileOperationRepository.resolveFolderAccess(
+                        snapshot.destinationFolderPath,
+                        filesystemAccessEnabled
+                    )
                     if (result == FolderAccessResult.Accessible) null else result
                 }
             _uiState.update {
                 it.copy(
+                    folderAccessMode = prefs.folderAccessMode,
+                    allFilesAccessGranted = allFilesGranted,
                     inaccessibleSourceIssues = sourceIssues,
                     destinationFolderAccessIssue = destinationIssue
                 )
@@ -369,13 +390,41 @@ class RuleDetailViewModel @Inject constructor(
     }
 
     fun applyTemplate(template: RuleTemplate) {
+        val prefs = runBlocking(Dispatchers.IO) {
+            userPreferencesRepository.preferencesFlow.first()
+        }
+        val useAutoFilesystemSources =
+            isFilesystemAccessEffective(prefs.folderAccessMode) &&
+                Environment.isExternalStorageManager()
+        val autoSourcePaths: List<String> =
+            if (!useAutoFilesystemSources || template.autoFilesystemSource == null) {
+                emptyList()
+            } else {
+                val candidatePath = when (template.autoFilesystemSource) {
+                    TemplateAutoSource.SCREENSHOTS -> primaryScreenshotsDirectoryPath()
+                    TemplateAutoSource.DOWNLOADS -> primaryDownloadsDirectoryPath()
+                }
+                val normalized = normalizeFilesystemFolderPath(candidatePath)
+                if (normalized != null &&
+                    isFilesystemFolderPathAllowedForRules(normalized) &&
+                    File(normalized).isDirectory &&
+                    File(normalized).canRead()
+                ) {
+                    listOf(normalized)
+                } else {
+                    emptyList()
+                }
+            }
         _uiState.update { state ->
+            val sourcePaths =
+                if (autoSourcePaths.isNotEmpty()) autoSourcePaths else state.sourceFolderPaths
             val nextState = state.copy(
                 name = if (state.name.isBlank()) template.name else state.name,
                 fileExtensions = template.extensions,
                 operationMode = template.operationMode,
                 scanSubdirectories = template.scanSubdirectories,
-                icon = template.suggestedIcon
+                icon = template.suggestedIcon,
+                sourceFolderPaths = sourcePaths
             )
             if (nextState.scanSubdirectories) {
                 val (kept, removed) = removeRedundantPaths(nextState.sourceFolderPaths)

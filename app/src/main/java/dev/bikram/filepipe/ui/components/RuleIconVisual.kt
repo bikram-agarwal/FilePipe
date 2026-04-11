@@ -4,6 +4,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TextSnippet
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.Image
@@ -64,4 +65,5 @@ fun RuleIcon.toImageVector(): ImageVector = when (this) {
     RuleIcon.MUSIC -> Icons.Filled.MusicNote
     RuleIcon.DOWNLOAD -> Icons.Filled.Download
     RuleIcon.DOCUMENT -> Icons.AutoMirrored.Filled.TextSnippet
+    RuleIcon.INSTALLABLE -> Icons.Filled.Android
 }

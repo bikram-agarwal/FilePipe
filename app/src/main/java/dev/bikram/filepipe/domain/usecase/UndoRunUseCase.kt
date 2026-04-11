@@ -5,15 +5,21 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
+import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
+import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
+import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
 data class UndoResult(
@@ -27,7 +33,8 @@ class UndoRunUseCase @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val runHistoryRepository: RunHistoryRepository,
     private val fileOperationRepository: FileOperationRepository,
-    private val ruleRepository: RuleRepository
+    private val ruleRepository: RuleRepository,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) {
     suspend operator fun invoke(historyId: Long): UndoResult = withContext(Dispatchers.IO) {
         val history = runHistoryRepository.getHistoryById(historyId)
@@ -46,54 +53,111 @@ class UndoRunUseCase @Inject constructor(
         val movedFiles = runHistoryRepository.getFilesForRunOnce(historyId)
             .filter { it.success && !it.skipped && it.destinationUri.isNotBlank() }
 
+        val filesystemAccessEnabled =
+            isFilesystemAccessEffective(userPreferencesRepository.preferencesFlow.first().folderAccessMode)
+
         var reversed = 0
         var failed = 0
         val errors = mutableListOf<String>()
         val copyDeletedDestinationUris = mutableListOf<String>()
 
         movedFiles.forEach { fileMoved ->
-            val destUri = Uri.parse(fileMoved.destinationUri)
-            val destDoc = DocumentFile.fromSingleUri(context, destUri)
-            if (destDoc == null || !destDoc.exists()) {
-                errors.add("${fileMoved.fileName}: file no longer exists at destination")
-                failed++
-                return@forEach
-            }
-
             when (operationMode) {
                 OperationMode.COPY -> {
-                    val deleted = try {
-                        destDoc.delete()
-                    } catch (_: SecurityException) {
-                        false
-                    }
-                    if (deleted) {
-                        reversed++
-                        copyDeletedDestinationUris.add(fileMoved.destinationUri)
+                    if (fileMoved.destinationUri.startsWith("file:")) {
+                        val path = Uri.parse(fileMoved.destinationUri).path
+                        if (path.isNullOrBlank()) {
+                            errors.add("${fileMoved.fileName}: invalid destination path")
+                            failed++
+                            return@forEach
+                        }
+                        val destFile = File(path)
+                        if (!destFile.isFile) {
+                            errors.add("${fileMoved.fileName}: file no longer exists at destination")
+                            failed++
+                            return@forEach
+                        }
+                        val deleted = try {
+                            destFile.delete()
+                        } catch (_: SecurityException) {
+                            false
+                        }
+                        if (deleted) {
+                            reversed++
+                            copyDeletedDestinationUris.add(fileMoved.destinationUri)
+                        } else {
+                            failed++
+                            errors.add("${fileMoved.fileName}: could not delete at destination")
+                        }
                     } else {
-                        failed++
-                        errors.add("${fileMoved.fileName}: could not delete at destination")
+                        val destUri = Uri.parse(fileMoved.destinationUri)
+                        val destDoc = DocumentFile.fromSingleUri(context, destUri)
+                        if (destDoc == null || !destDoc.exists()) {
+                            errors.add("${fileMoved.fileName}: file no longer exists at destination")
+                            failed++
+                            return@forEach
+                        }
+                        val deleted = try {
+                            destDoc.delete()
+                        } catch (_: SecurityException) {
+                            false
+                        }
+                        if (deleted) {
+                            reversed++
+                            copyDeletedDestinationUris.add(fileMoved.destinationUri)
+                        } else {
+                            failed++
+                            errors.add("${fileMoved.fileName}: could not delete at destination")
+                        }
                     }
                 }
                 OperationMode.MOVE -> {
-                    val sourceFolderUriString = parentTreeUriString(fileMoved.sourceUri)
+                    val destUri = Uri.parse(fileMoved.destinationUri)
+                    val sourceFolderUriString = parentSourceFolderForUndo(fileMoved.sourceUri)
                     if (sourceFolderUriString == null) {
                         errors.add("${fileMoved.fileName}: cannot determine original source folder")
                         failed++
                         return@forEach
                     }
+                    val sizeBytes = when {
+                        fileMoved.destinationUri.startsWith("file:") -> {
+                            val path = destUri.path
+                            if (path.isNullOrBlank()) {
+                                errors.add("${fileMoved.fileName}: invalid destination path")
+                                failed++
+                                return@forEach
+                            }
+                            val destFile = File(path)
+                            if (!destFile.isFile) {
+                                errors.add("${fileMoved.fileName}: file no longer exists at destination")
+                                failed++
+                                return@forEach
+                            }
+                            destFile.length()
+                        }
+                        else -> {
+                            val destDoc = DocumentFile.fromSingleUri(context, destUri)
+                            if (destDoc == null || !destDoc.exists()) {
+                                errors.add("${fileMoved.fileName}: file no longer exists at destination")
+                                failed++
+                                return@forEach
+                            }
+                            destDoc.length()
+                        }
+                    }
 
                     val sourceEntry = FileEntry(
                         uri = destUri,
                         name = fileMoved.fileName,
-                        size = destDoc.length()
+                        size = sizeBytes
                     )
 
                     val reverseResult = fileOperationRepository.moveFile(
                         sourceEntry = sourceEntry,
                         destFolderUriString = sourceFolderUriString,
                         conflictPolicy = ConflictPolicy.RENAME_SUFFIX,
-                        operationMode = OperationMode.MOVE
+                        operationMode = OperationMode.MOVE,
+                        filesystemAccessEnabled = filesystemAccessEnabled
                     )
 
                     if (reverseResult.success) {
@@ -134,6 +198,10 @@ class UndoRunUseCase @Inject constructor(
         destTreeUriString: String,
         deletedFileDestinationUriStrings: List<String>
     ) {
+        if (isFilesystemFolderPathString(destTreeUriString)) {
+            deleteEmptyFilesystemFoldersAfterCopyUndo(destTreeUriString, deletedFileDestinationUriStrings)
+            return
+        }
         val treeUri = Uri.parse(destTreeUriString)
         val authority = treeUri.authority ?: return
         val treeDocumentId = try {
@@ -217,6 +285,22 @@ class UndoRunUseCase @Inject constructor(
         val distinctSorted = folderUriStrings.distinct().sortedByDescending { documentPathDepth(it) }
         for (uriString in distinctSorted) {
             try {
+                if (uriString.startsWith("file:")) {
+                    val path = Uri.parse(uriString).path ?: continue
+                    val dir = File(path)
+                    if (!dir.isDirectory) continue
+                    val listed = try {
+                        dir.list()
+                    } catch (_: Exception) {
+                        null
+                    }
+                    if (!listed.isNullOrEmpty()) continue
+                    try {
+                        dir.delete()
+                    } catch (_: Exception) {
+                    }
+                    continue
+                }
                 val folderUri = Uri.parse(uriString)
                 val folderDoc = try {
                     DocumentFile.fromSingleUri(context, folderUri)
@@ -247,6 +331,44 @@ class UndoRunUseCase @Inject constructor(
         }
     }
 
+    private fun deleteEmptyFilesystemFoldersAfterCopyUndo(
+        destRootRaw: String,
+        deletedFileUriStrings: List<String>
+    ) {
+        val destRoot = normalizeFilesystemFolderPath(destRootRaw) ?: return
+        val folderPaths = mutableSetOf<String>()
+        for (uriStr in deletedFileUriStrings) {
+            if (!uriStr.startsWith("file:")) continue
+            val filePath = Uri.parse(uriStr).path ?: continue
+            val file = File(filePath)
+            var parent = file.parentFile ?: continue
+            while (true) {
+                val canon = try {
+                    parent.canonicalPath
+                } catch (_: Exception) {
+                    break
+                }
+                if (canon == destRoot) break
+                if (!canon.startsWith(destRoot + File.separator)) break
+                folderPaths.add(canon)
+                parent = parent.parentFile ?: break
+            }
+        }
+        val deepestFirst = folderPaths.sortedByDescending { folderPath ->
+            folderPath.count { segment -> segment == '/' }
+        }
+        for (folderPath in deepestFirst) {
+            val dir = File(folderPath)
+            try {
+                if (!dir.isDirectory) continue
+                val listed = dir.list()
+                if (listed != null && listed.isNotEmpty()) continue
+                dir.delete()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     private fun deleteDocumentUriWithFallback(documentUri: Uri) {
         try {
             if (DocumentsContract.deleteDocument(context.contentResolver, documentUri)) {
@@ -266,6 +388,10 @@ class UndoRunUseCase @Inject constructor(
     }
 
     private fun documentPathDepth(uriString: String): Int {
+        if (uriString.startsWith("file:")) {
+            val path = Uri.parse(uriString).path ?: return 0
+            return path.trimEnd('/').count { it == '/' }
+        }
         if (!uriString.startsWith("content://")) return 0
         return try {
             val docId = DocumentsContract.getDocumentId(Uri.parse(uriString))
@@ -274,6 +400,16 @@ class UndoRunUseCase @Inject constructor(
         } catch (_: Exception) {
             0
         }
+    }
+
+    private fun parentSourceFolderForUndo(sourceUriString: String): String? {
+        if (sourceUriString.startsWith("content://")) return parentTreeUriString(sourceUriString)
+        if (sourceUriString.startsWith("file:")) {
+            val path = Uri.parse(sourceUriString).path ?: return null
+            val parent = File(path).parentFile ?: return null
+            return normalizeFilesystemFolderPath(parent.absolutePath)
+        }
+        return null
     }
 
     /**

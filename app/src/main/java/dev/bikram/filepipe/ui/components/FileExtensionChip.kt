@@ -34,6 +34,7 @@ private val EXTENSION_GROUPS = listOf(
     ExtensionGroup("Videos", listOf("mp4", "mkv", "avi", "mov", "m4v", "webm")),
     ExtensionGroup("Audio", listOf("mp3", "flac", "aac", "ogg", "m4a", "wav")),
     ExtensionGroup("Documents", listOf("pdf", "docx", "xlsx", "pptx", "txt", "odt")),
+    ExtensionGroup("Installables", listOf("apk", "apkm", "xapk", "zip")),
     ExtensionGroup("Archives", listOf("zip", "rar", "7z", "tar", "gz")),
 )
 

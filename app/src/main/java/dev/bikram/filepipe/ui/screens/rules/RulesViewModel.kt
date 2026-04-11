@@ -1,10 +1,13 @@
 package dev.bikram.filepipe.ui.screens.rules
 
+import android.os.Environment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
+import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.HistorySortDirection
@@ -38,6 +41,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -177,7 +181,9 @@ class RulesViewModel @Inject constructor(
     fun refreshStaleFolderAccess() {
         viewModelScope.launch(Dispatchers.IO) {
             fileOperationRepository.invalidateAccessCache()
-            _staleRuleIds.value = computeStaleRuleIds(_rules.value)
+            val prefs = userPreferencesRepository.preferencesFlow.first()
+            val filesystemAccessEnabled = isFilesystemAccessEffective(prefs.folderAccessMode)
+            _staleRuleIds.value = computeStaleRuleIds(_rules.value, filesystemAccessEnabled)
         }
     }
 
@@ -201,12 +207,17 @@ class RulesViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             var lastFolderSignature: String? = null
-            _rules.collect { ruleList ->
-                val signature = folderPathsSignature(ruleList)
+            combine(_rules, userPreferencesRepository.preferencesFlow) { ruleList, prefs ->
+                Triple(
+                    ruleList,
+                    folderPathsSignature(ruleList, prefs.folderAccessMode),
+                    isFilesystemAccessEffective(prefs.folderAccessMode)
+                )
+            }.collect { (ruleList, signature, filesystemAccessEnabled) ->
                 if (signature != lastFolderSignature) {
                     lastFolderSignature = signature
                     _staleRuleIds.value = withContext(Dispatchers.IO) {
-                        computeStaleRuleIds(ruleList)
+                        computeStaleRuleIds(ruleList, filesystemAccessEnabled)
                     }
                 }
             }
@@ -384,7 +395,7 @@ class RulesViewModel @Inject constructor(
         _userMessage.value = "\"${copy.name}\" created"
     }
 
-    private fun folderPathsSignature(ruleList: List<Rule>): String =
+    private fun folderPathsSignature(ruleList: List<Rule>, folderAccessMode: FolderAccessMode): String =
         ruleList.sortedBy { it.id }.joinToString("\u0000") { rule ->
             buildString {
                 append(rule.id)
@@ -398,44 +409,40 @@ class RulesViewModel @Inject constructor(
                 append('\u0001')
                 append(rule.suppressMissingSourceFolderCardWarning)
             }
-        }
+        } + "\u0000${folderAccessMode.name}\u0000${Environment.isExternalStorageManager()}"
 
-    private fun computeStaleRuleIds(ruleList: List<Rule>): Set<Long> =
-        ruleList.filter { rule -> ruleShowsStaleFolderWarningOnCard(rule) }.map { it.id }.toSet()
+    private fun computeStaleRuleIds(ruleList: List<Rule>, filesystemAccessEnabled: Boolean): Set<Long> =
+        ruleList.filter { rule -> ruleShowsStaleFolderWarningOnCard(rule, filesystemAccessEnabled) }
+            .map { it.id }
+            .toSet()
 
     /**
      * Stale banner on the rule list card. Honors [Rule.suppressMissingSourceFolderCardWarning] only
      * when every problem is an [FolderAccessResult.Unavailable] on a **source** path; destination
      * issues and permission denials always show.
      */
-    private fun ruleShowsStaleFolderWarningOnCard(rule: Rule): Boolean {
-        var sourceHasPermissionOrNonContent = false
-        var sourceHasUnavailableOnly = false
+    private fun ruleShowsStaleFolderWarningOnCard(rule: Rule, filesystemAccessEnabled: Boolean): Boolean {
+        var sourcePermissionDenied = false
+        var sourceHasUnavailable = false
         for (path in rule.sourceFolderPaths) {
-            when {
-                !path.startsWith("content://") -> sourceHasPermissionOrNonContent = true
-                else -> when (fileOperationRepository.resolveFolderAccess(path)) {
-                    FolderAccessResult.PermissionDenied -> sourceHasPermissionOrNonContent = true
-                    FolderAccessResult.Unavailable -> sourceHasUnavailableOnly = true
-                    FolderAccessResult.Accessible -> Unit
-                }
+            when (fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)) {
+                FolderAccessResult.PermissionDenied -> sourcePermissionDenied = true
+                FolderAccessResult.Unavailable -> sourceHasUnavailable = true
+                FolderAccessResult.Accessible -> Unit
             }
         }
         val destinationPath = rule.destinationFolderPath.takeIf { it.isNotBlank() }
         var destinationShowsStale = false
         destinationPath?.let { path ->
-            when {
-                !path.startsWith("content://") -> destinationShowsStale = true
-                else -> when (fileOperationRepository.resolveFolderAccess(path)) {
-                    FolderAccessResult.PermissionDenied -> return true
-                    FolderAccessResult.Unavailable -> destinationShowsStale = true
-                    FolderAccessResult.Accessible -> Unit
-                }
+            when (fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)) {
+                FolderAccessResult.PermissionDenied -> return true
+                FolderAccessResult.Unavailable -> destinationShowsStale = true
+                FolderAccessResult.Accessible -> Unit
             }
         }
-        if (sourceHasPermissionOrNonContent) return true
+        if (sourcePermissionDenied) return true
         if (destinationShowsStale) return true
-        if (sourceHasUnavailableOnly) {
+        if (sourceHasUnavailable) {
             return !rule.suppressMissingSourceFolderCardWarning
         }
         return false

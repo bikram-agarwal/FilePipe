@@ -43,5 +43,7 @@ sealed class Screen(val route: String) {
         const val ARG = "fromSettings"
     }
 
+    data object OnboardingPermissions : Screen("onboarding_permissions")
+
     data object OnboardingRuleWizard : Screen("onboarding_rule_wizard")
 }

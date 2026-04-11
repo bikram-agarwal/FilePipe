@@ -11,12 +11,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 
 /**
- * Renders the app launcher icon, including adaptive icons (API 26+).
- * `painterResource(R.mipmap.ic_launcher)` crashes on adaptive icons, so we
- * use PackageManager to get the fully-rendered drawable and rasterize it.
+ * Renders the app icon the same way the system launcher preview does, including adaptive icons
+ * (API 26+). [androidx.compose.ui.res.painterResource] for [R.mipmap.ic_launcher] is unsafe on
+ * adaptive resources, so we rasterize [android.content.pm.PackageManager.getApplicationIcon].
  *
- * The [ImageBitmap] is cached in [remember]: calling [Bitmap.asImageBitmap] on every recomposition
- * allocates a new wrapper and makes [Image] redraw, which reads as flicker.
+ * The [ImageBitmap] is cached in [remember] keyed by package name so [Bitmap.asImageBitmap] is
+ * not recreated every recomposition.
  */
 @Composable
 fun AppIconImage(modifier: Modifier = Modifier) {

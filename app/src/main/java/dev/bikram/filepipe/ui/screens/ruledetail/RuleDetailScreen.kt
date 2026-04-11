@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.Image
@@ -115,15 +114,24 @@ import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.components.FileExtensionChips
+import dev.bikram.filepipe.ui.components.FilesystemFolderPickerSheetContent
 import dev.bikram.filepipe.ui.components.FolderPickerButton
 import dev.bikram.filepipe.ui.components.RuleIconEmojiPresets
 import dev.bikram.filepipe.ui.components.RuleIconOrEmoji
 import dev.bikram.filepipe.ui.components.ScheduleDialog
 import dev.bikram.filepipe.ui.components.toImageVector
 import android.content.Intent
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import androidx.compose.ui.platform.LocalContext
+import dev.bikram.filepipe.data.preferences.treatAsSafUi
+import dev.bikram.filepipe.data.preferences.usesAllFilesPaths
+import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
+import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
 import dev.bikram.filepipe.ui.components.displayPath
+import java.io.File
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -150,6 +158,11 @@ private sealed class FolderPickIntent {
     data class ReplaceSource(val previousPath: String) : FolderPickIntent()
     data object SetDestination : FolderPickIntent()
 }
+
+private data class PendingFilesystemFolderPick(
+    val intent: FolderPickIntent,
+    val startDirectory: String
+)
 private val PillShape = RoundedCornerShape(50)
 
 /** ObtainX-style large faded icon at bottom-right of error cards (~alpha 28/255). */
@@ -216,6 +229,7 @@ private fun ruleIconOptionLabel(icon: RuleIcon): String = stringResource(
         RuleIcon.MUSIC -> R.string.rule_icon_label_music
         RuleIcon.DOWNLOAD -> R.string.rule_icon_label_download
         RuleIcon.DOCUMENT -> R.string.rule_icon_label_document
+        RuleIcon.INSTALLABLE -> R.string.rule_icon_label_installable
     }
 )
 
@@ -225,6 +239,7 @@ private fun RuleSectionCard(
     subtitle: String?,
     icon: ImageVector,
     modifier: Modifier = Modifier,
+    titleTrailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     ElevatedCard(
@@ -256,6 +271,7 @@ private fun RuleSectionCard(
                         )
                     }
                 }
+                titleTrailing?.invoke()
             }
             Spacer(Modifier.height(12.dp))
             Column(
@@ -328,6 +344,7 @@ fun RuleDetailScreen(
     val context = LocalContext.current
 
     var pendingFolderPick by remember { mutableStateOf<FolderPickIntent?>(null) }
+    var pendingFilesystemFolderPick by remember { mutableStateOf<PendingFilesystemFolderPick?>(null) }
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -355,7 +372,37 @@ fun RuleDetailScreen(
         }
     }
 
+    fun externalStorageRootPath(): String =
+        runCatching { Environment.getExternalStorageDirectory().canonicalPath }.getOrNull()
+            ?: "/storage/emulated/0"
+
+    fun resolveFilesystemPickerStartDirectory(initialPath: String?): String {
+        if (initialPath.isNullOrBlank()) return externalStorageRootPath()
+        if (initialPath.startsWith("content://")) {
+            val pathFromSaf = runCatching { safTreeUriToPath(Uri.parse(initialPath)) }.getOrNull()
+            val normalized = pathFromSaf?.let { normalizeFilesystemFolderPath(it) }
+            return normalized?.takeIf { candidate ->
+                val folder = File(candidate)
+                folder.isDirectory && folder.canRead()
+            } ?: externalStorageRootPath()
+        }
+        return normalizeFilesystemFolderPath(initialPath)
+            ?.takeIf { candidate ->
+                val folder = File(candidate)
+                folder.isDirectory && folder.canRead()
+            } ?: externalStorageRootPath()
+    }
+
     fun launchFolderPicker(intent: FolderPickIntent, initialPath: String?) {
+        val useFilesystemPicker =
+            !state.folderAccessMode.treatAsSafUi() && state.allFilesAccessGranted
+        if (useFilesystemPicker) {
+            pendingFilesystemFolderPick = PendingFilesystemFolderPick(
+                intent = intent,
+                startDirectory = resolveFilesystemPickerStartDirectory(initialPath)
+            )
+            return
+        }
         pendingFolderPick = intent
         folderPickerLauncher.launch(initialPath?.let { absoluteStoragePathToOpenTreeInitialUri(it) })
     }
@@ -527,6 +574,24 @@ fun RuleDetailScreen(
                             color = hintColor
                         )
                     }
+                    val usesFilesystemPaths =
+                        state.sourceFolderPaths.any { path -> !path.startsWith("content://") } ||
+                            (state.destinationFolderPath.isNotBlank() &&
+                                !state.destinationFolderPath.startsWith("content://"))
+                    if (showPermissionHint && usesFilesystemPaths) {
+                        Text(
+                            text = stringResource(R.string.rule_detail_folder_access_hint_filesystem),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = hintColor
+                        )
+                    }
+                    if (showUnavailableHint || showPermissionHint) {
+                        Text(
+                            text = stringResource(R.string.rule_detail_folder_access_hint_backup_restore),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = hintColor
+                        )
+                    }
                 }
             }
 
@@ -578,7 +643,18 @@ fun RuleDetailScreen(
             RuleSectionCard(
                 title = stringResource(R.string.source_folders_label),
                 subtitle = stringResource(R.string.rule_section_source_subtitle),
-                icon = Icons.Filled.Search
+                icon = Icons.Filled.Search,
+                titleTrailing = if (state.folderAccessMode.treatAsSafUi()) {
+                    @Composable {
+                        ToggleLabelHelpDropdown(
+                            tipText = stringResource(R.string.rule_section_source_saf_help),
+                            contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
+                            playTap = playTap
+                        )
+                    }
+                } else {
+                    null
+                }
             ) {
                 state.sourceFolderPaths.forEach { path ->
                     val isSourceBookmarked = path in bookmarkedFolders
@@ -668,6 +744,23 @@ fun RuleDetailScreen(
                         }
                     }
                 }
+                if (state.folderAccessMode.usesAllFilesPaths() && !state.allFilesAccessGranted &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                ) {
+                    TextButton(
+                        onClick = {
+                            withTapSound {
+                                val allFilesIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                context.startActivity(allFilesIntent)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.rule_open_all_files_settings))
+                    }
+                }
                 Column(Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -737,7 +830,18 @@ fun RuleDetailScreen(
             RuleSectionCard(
                 title = stringResource(R.string.destination_label),
                 subtitle = stringResource(R.string.rule_section_destination_subtitle),
-                icon = Icons.Filled.FolderSpecial
+                icon = Icons.Filled.FolderSpecial,
+                titleTrailing = if (state.folderAccessMode.treatAsSafUi()) {
+                    @Composable {
+                        ToggleLabelHelpDropdown(
+                            tipText = stringResource(R.string.rule_section_destination_saf_help),
+                            contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
+                            playTap = playTap
+                        )
+                    }
+                } else {
+                    null
+                }
             ) {
                 if (state.destinationFolderPath.isNotBlank()) {
                     val isDestBookmarked = state.destinationFolderPath in bookmarkedFolders
@@ -832,6 +936,23 @@ fun RuleDetailScreen(
                                 )
                             }
                         }
+                    }
+                }
+                if (state.folderAccessMode.usesAllFilesPaths() && !state.allFilesAccessGranted &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                ) {
+                    TextButton(
+                        onClick = {
+                            withTapSound {
+                                val allFilesIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                context.startActivity(allFilesIntent)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.rule_open_all_files_settings))
                     }
                 }
             }
@@ -1148,6 +1269,42 @@ fun RuleDetailScreen(
                     }
                 )
         )
+    }
+
+    if (pendingFilesystemFolderPick != null) {
+        val pickRequest = pendingFilesystemFolderPick!!
+        val pickedIntent = pickRequest.intent
+        ModalBottomSheet(
+            onDismissRequest = { pendingFilesystemFolderPick = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.filesystem_folder_picker_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                FilesystemFolderPickerSheetContent(
+                    initialDirectory = pickRequest.startDirectory,
+                    onDismiss = { pendingFilesystemFolderPick = null },
+                    onFolderChosen = { absolutePath ->
+                        when (pickedIntent) {
+                            FolderPickIntent.AddSource -> viewModel.addSourceFolder(absolutePath)
+                            is FolderPickIntent.ReplaceSource ->
+                                viewModel.replaceSourceFolder(pickedIntent.previousPath, absolutePath)
+                            FolderPickIntent.SetDestination -> viewModel.setDestination(absolutePath)
+                        }
+                        pendingFilesystemFolderPick = null
+                        viewModel.refreshFolderAccessAfterPermissionChange()
+                    }
+                )
+            }
+        }
     }
 
     if (showDiscardDialog) {

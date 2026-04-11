@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,6 +42,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -74,6 +77,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarDuration
@@ -131,6 +135,7 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
@@ -138,6 +143,7 @@ import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 import dev.bikram.filepipe.ui.components.AboutAuthorPhoto
 import dev.bikram.filepipe.ui.components.AppIconImage
+import dev.bikram.filepipe.ui.screens.onboarding.PermissionsLearnMoreSheetContent
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
@@ -183,6 +189,8 @@ fun SettingsScreen(
         }
     }
     var notificationsGranted by remember { mutableStateOf(computeNotificationsEnabled()) }
+    var allFilesAccessGranted by remember { mutableStateOf(Environment.isExternalStorageManager()) }
+    var pendingFolderAccessSwitch by remember { mutableStateOf<FolderAccessMode?>(null) }
     var pendingEnableUpdateNotificationsAfterPermission by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -236,6 +244,7 @@ fun SettingsScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 notificationsGranted = computeNotificationsEnabled()
+                allFilesAccessGranted = Environment.isExternalStorageManager()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -319,6 +328,14 @@ fun SettingsScreen(
         }
     }
 
+    var folderAccessLearnMoreVisible by remember { mutableStateOf(false) }
+    val folderAccessLearnMoreSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    LaunchedEffect(folderAccessLearnMoreVisible) {
+        if (folderAccessLearnMoreVisible) {
+            folderAccessLearnMoreSheetState.expand()
+        }
+    }
+
     LaunchedEffect(openUpdateSheetFromNotification) {
         if (!openUpdateSheetFromNotification || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
         showUpdateSheet = true
@@ -365,6 +382,65 @@ fun SettingsScreen(
                 }
             )
         }
+    }
+
+    if (folderAccessLearnMoreVisible) {
+        ModalBottomSheet(
+            onDismissRequest = { folderAccessLearnMoreVisible = false },
+            sheetState = folderAccessLearnMoreSheetState
+        ) {
+            PermissionsLearnMoreSheetContent(scheme = MaterialTheme.colorScheme)
+        }
+    }
+
+    fun applyFolderAccessMode(mode: FolderAccessMode) {
+        playTap()
+        if (preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED &&
+            mode != FolderAccessMode.ALL_FILES_PREFERRED
+        ) {
+            pendingFolderAccessSwitch = mode
+        } else {
+            viewModel.setFolderAccessMode(mode)
+        }
+    }
+
+    pendingFolderAccessSwitch?.let { targetMode ->
+        AlertDialog(
+            onDismissRequest = { pendingFolderAccessSwitch = null },
+            title = { Text(stringResource(R.string.settings_folder_access_switch_to_saf_title)) },
+            text = { Text(stringResource(R.string.settings_folder_access_switch_to_saf_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    playTap()
+                    val confirmedTarget = targetMode
+                    pendingFolderAccessSwitch = null
+                    coroutineScope.launch {
+                        val affectedRuleCount = viewModel.countRulesUsingFilesystemFolderPaths()
+                        viewModel.setFolderAccessModeNow(confirmedTarget)
+                        val message = if (affectedRuleCount == 0) {
+                            context.getString(R.string.settings_folder_access_switched_selective_zero_rules)
+                        } else {
+                            context.resources.getQuantityString(
+                                R.plurals.settings_folder_access_switched_selective_snackbar,
+                                affectedRuleCount,
+                                affectedRuleCount
+                            )
+                        }
+                        snackbarHostState.showSnackbar(
+                            message = message,
+                            duration = SnackbarDuration.Long
+                        )
+                    }
+                }) {
+                    Text(stringResource(R.string.settings_folder_access_switch_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingFolderAccessSwitch = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 
     if (showBackupImportRestoreHelp) {
@@ -521,6 +597,139 @@ fun SettingsScreen(
                                 playTap()
                                 viewModel.setProgressiveBlurEnabled(enabled)
                             }
+                        )
+                    }
+                }
+            }
+            
+            // ── Folder access ─────────────────────────────────────────────────
+            item {
+                SettingsSectionHeader(
+                    icon = Icons.Default.FolderOpen,
+                    title = stringResource(R.string.settings_folder_access_section)
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.onboarding_permissions_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                GroupedListColumn {
+                    GroupedListItem(position = GroupPosition.FIRST) {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    stringResource(R.string.settings_folder_access_saf_only),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            },
+                            trailingContent = {
+                                RadioButton(
+                                    selected = preferences.folderAccessMode == FolderAccessMode.SAF_ONLY,
+                                    onClick = { applyFolderAccessMode(FolderAccessMode.SAF_ONLY) }
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                applyFolderAccessMode(FolderAccessMode.SAF_ONLY)
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                    GroupedListItem(position = GroupPosition.LAST) {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    stringResource(R.string.settings_folder_access_all_files),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            },
+                            trailingContent = {
+                                RadioButton(
+                                    selected = preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED,
+                                    onClick = { applyFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED) }
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                applyFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                val selectiveLike =
+                    preferences.folderAccessMode == FolderAccessMode.SAF_ONLY ||
+                        preferences.folderAccessMode == FolderAccessMode.DEFERRED
+                val allFilesModeSelected =
+                    preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED
+                val allFilesStatusLine = when {
+                    selectiveLike && allFilesAccessGranted ->
+                        stringResource(R.string.settings_folder_access_all_files_status_granted_unused)
+                    selectiveLike && !allFilesAccessGranted ->
+                        stringResource(R.string.settings_folder_access_all_files_status_not_granted_idle)
+                    allFilesModeSelected && allFilesAccessGranted ->
+                        stringResource(R.string.settings_folder_access_all_files_status_granted_used)
+                    else ->
+                        stringResource(R.string.settings_folder_access_all_files_status_not_granted_required)
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val statusStyle = MaterialTheme.typography.bodySmall
+                    val statusColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    Text(
+                        text = allFilesStatusLine,
+                        style = statusStyle,
+                        color = statusColor,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = stringResource(R.string.onboarding_permissions_learn_more),
+                        style = statusStyle,
+                        color = statusColor,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .clickable {
+                                playTap()
+                                folderAccessLearnMoreVisible = true
+                            }
+                    )
+                }
+                val showAllFilesActionButton = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                    when {
+                        selectiveLike && !allFilesAccessGranted -> false
+                        selectiveLike && allFilesAccessGranted -> true
+                        allFilesModeSelected && !allFilesAccessGranted -> true
+                        allFilesModeSelected && allFilesAccessGranted -> false
+                        else -> false
+                    }
+                if (showAllFilesActionButton) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            playTap()
+                            val manageIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                            context.startActivity(manageIntent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            stringResource(
+                                if (selectiveLike) {
+                                    R.string.settings_folder_access_open_manage
+                                } else {
+                                    R.string.settings_folder_access_grant_all_files
+                                }
+                            )
                         )
                     }
                 }
@@ -688,7 +897,7 @@ fun SettingsScreen(
             // ── Import/Export ────────────────────────────────────────────────
             item {
                 SettingsSectionHeader(
-                    icon = Icons.Default.FolderOpen,
+                    icon = Icons.Default.Save,
                     title = stringResource(R.string.settings_backup_section)
                 )
                 Spacer(Modifier.height(8.dp))
@@ -1005,7 +1214,7 @@ fun SettingsScreen(
                                     AppIconImage(
                                         modifier = Modifier
                                             .size(84.dp)
-                                            .clip(RoundedCornerShape(18.dp))
+                                            .clip(RoundedCornerShape(percent = 25))
                                             .clickable {
                                                 playTap()
                                                 onOpenIntro()

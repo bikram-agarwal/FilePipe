@@ -54,6 +54,7 @@ class FilePipeApp : Application(), Configuration.Provider {
         preferencesMigrationScope.launch {
             userPreferencesRepository.migrateLegacyCustomSeedIfNeeded()
             userPreferencesRepository.migrateLegacyAutoCheckToScheduleIfNeeded()
+            userPreferencesRepository.migrateDeferredFolderAccessIfNeeded()
             updateCheckWorkScheduler.syncFromPreferences()
         }
         updateAvailableNotifier.ensureNotificationChannel()

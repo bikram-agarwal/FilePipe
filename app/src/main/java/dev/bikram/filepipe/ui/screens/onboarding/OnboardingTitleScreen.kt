@@ -49,7 +49,6 @@ import dev.bikram.filepipe.ui.components.AppIconImage
 
 @Composable
 fun OnboardingTitleScreen(
-    fromSettings: Boolean,
     onLetsBegan: () -> Unit
 ) {
     var iconVisible by remember { mutableStateOf(false) }

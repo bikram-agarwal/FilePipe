@@ -14,7 +14,9 @@ import kotlinx.coroutines.launch
 
 /**
  * GitHub flavor: if [save update APK to Downloads][dev.bikram.filepipe.data.preferences.AppPreferences.saveUpdateApkToDownloads]
- * is on and the cached update APK matches the installed base APK (SHA-256), deletes the cache file.
+ * is on, a copy to MediaStore Downloads succeeded for that download
+ * ([AppPreferences.updateApkDownloadsCopySucceeded]), and the cached update APK matches the installed
+ * base APK (SHA-256), deletes the cache file.
  * Skips when the app may be installed as split APKs ([ApplicationInfo.splitSourceDirs]).
  */
 @Singleton
@@ -33,6 +35,7 @@ class UpdateApkCacheMaintenance @Inject constructor(
     private suspend fun runCleanupIfNeeded() {
         val prefs = userPreferencesRepository.getPreferencesSnapshot()
         if (!prefs.saveUpdateApkToDownloads) return
+        if (!prefs.updateApkDownloadsCopySucceeded) return
         val cacheFile = File(context.cacheDir, FILEPIPE_UPDATE_APK_CACHE_NAME)
         if (!cacheFile.isFile) return
         val applicationInfo = context.applicationInfo

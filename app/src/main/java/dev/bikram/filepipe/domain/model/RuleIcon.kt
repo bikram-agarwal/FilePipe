@@ -7,7 +7,8 @@ enum class RuleIcon {
     VIDEO,
     MUSIC,
     DOWNLOAD,
-    DOCUMENT;
+    DOCUMENT,
+    INSTALLABLE;
 
     companion object {
         fun fromStored(key: String?): RuleIcon =

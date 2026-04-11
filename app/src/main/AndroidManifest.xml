@@ -2,7 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- No broad storage permissions — SAF grants access only to user-selected folders -->
+    <!-- Optional All files access: user opts in from onboarding/settings; required for Download/SD roots -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
 
     <uses-permission android:name="android.permission.INTERNET" />
 
