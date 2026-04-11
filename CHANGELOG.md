@@ -1,3 +1,24 @@
+## v3.0.0: You control access
+
+### ✨ New Features
+
+- **All Files Access mode**: a new access option that lets FilePipe work with any folder, including `Download`, SD card root, and internal storage root, folders that are restricted by Android in "Selective Access" mode. Now you can add folders without extra prompts per folder. Choose between `All Files Access` and `Selective Access` during setup or in Settings at any time.
+- **Help & FAQs**: a searchable help/FAQ section covering common questions about rules, storage access, scheduling, privacy, and backup. Accessible from Settings and from rule error banners.
+
+### 🔧 Improved Features
+
+- **Onboarding permissions screen** — You now choose between `Selective Access` and `All Files Access` with a clear side-by-side explanation. It walks you through granting required access.
+- **Folder access indicators** — the rule editor now distinguishes between a folder that's completely inaccessible in your current mode (🚫) and one that's allowed but may have a permission issue (⚠️).
+- **Settings deep-links from Help**: tapping a quick action in the FAQ scrolls Settings to the right section and briefly highlights it so you know exactly where to look.
+
+### 🐛 Bug Fixes
+
+- **Undo after copy**: undoing a rule that copied files now correctly reports success for files that were already manually deleted at the destination, instead of counting them as failures.
+- **APK update cache**: the downloaded update APK is no longer deleted from the app cache before the copy to your Downloads folder has finished.
+- **Backup restore**: run history is now correctly linked to the right rules after a restore, even if rule names aren't unique.
+
+---
+
 ## v2.2.0: Smart updates, Import & Restore
 
 ### 🆕 New features

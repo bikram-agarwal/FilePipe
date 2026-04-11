@@ -8,10 +8,11 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 
 ## 🛠️ How to use
 
-1. **Define the Source**: Pick any folder (or multiple) and decide if you want to scan subfolders.
-2. **Choose which files**: Target files by extension, size, age, or advanced name patterns.
-3. **Set the Destination**: Choose where the files belong and how to handle name conflicts.
-4. **Run Automate**: Run manually on-demand, or set an Hourly, Daily, or Weekly schedule.
+1. **Choose access mode**: `Selective Access` for granular control or `All Files Access` for ease of use. 
+2. **Define the Source**: Pick any folder (or multiple) and decide if you want to scan subfolders.
+3. **Choose which files**: Target files by extension, size, age, or advanced name patterns.
+4. **Set the Destination**: Choose where the files belong and how to handle name conflicts.
+5. **Run Automate**: Run manually on-demand, or set an Hourly, Daily, or Weekly schedule.
 
 ## ✨ Key Features
 
@@ -35,6 +36,7 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 - **Drag-and-Drop**: Organize your rules exactly how you want them with a custom sort order.
 - **Batch Actions**: Long-press to enter multi-select mode and run or delete multiple rules at once.
 - **Smart Updates**: Built-in smart update checker that detects hotfixes (newer assets) even when the version number stays the same.
+- **FAQ & Help**: Searchable help page covering common questions, grouped by topic with deep links into Settings.
 
 ### 🛡️ Safety & Reliability (Multiple Fail-Safes)
 
