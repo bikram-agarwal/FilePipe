@@ -1006,9 +1006,10 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.height(8.dp))
 
+                val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
                 val folderLabel = preferences.exportFolderUri
                     .takeIf { it.isNotBlank() }
-                    ?.let { displayPath(it) }
+                    ?.let { displayPath(it, internalStorageDisplayName) }
                     ?: stringResource(R.string.settings_choose_export_folder)
 
                 val exportFolderReady = preferences.exportFolderUri.isNotBlank()

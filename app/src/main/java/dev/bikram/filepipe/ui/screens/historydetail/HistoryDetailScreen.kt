@@ -335,6 +335,7 @@ private fun SummaryRow(label: String, value: String) {
 @Composable
 private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val isSuccess = file.success && !file.skipped
     val iconColor = when {
         file.skipped -> MaterialTheme.colorScheme.outline
@@ -407,7 +408,7 @@ private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
                 }
 
                 Text(
-                    "From: ${displayPath(file.sourceUri)}",
+                    "From: ${displayPath(file.sourceUri, internalStorageDisplayName)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -415,7 +416,7 @@ private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
                 )
                 if (isSuccess) {
                     Text(
-                        "To: ${displayPath(file.destinationUri)}",
+                        "To: ${displayPath(file.destinationUri, internalStorageDisplayName)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

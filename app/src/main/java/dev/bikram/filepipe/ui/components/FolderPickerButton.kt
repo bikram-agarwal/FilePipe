@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.ui.components
 
 import android.net.Uri
+import android.os.Environment
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import android.provider.DocumentsContract
 import dev.bikram.filepipe.data.storage.absoluteStoragePathToTreeUri
 import dev.bikram.filepipe.ui.feedback.LocalTapSound
+import java.io.File
 
 @Composable
 fun FolderPickerButton(
@@ -40,24 +42,46 @@ fun FolderPickerButton(
  * Accepts both SAF content:// URIs (new format) and legacy /storage/... absolute paths.
  * Examples:
  *   content://...tree/primary%3ADCIM%2FCamera  →  "DCIM/Camera"
+ *   content://... (primary volume root)        →  [internalStorageRootDisplayName]
+ *   /storage/emulated/0                        →  [internalStorageRootDisplayName] (e.g. "Internal Storage")
  *   /storage/emulated/0/Pictures               →  "Pictures"
  *   content://...tree/1A2B-3C4D%3AMovies       →  "SD Card/Movies"
  */
-fun displayPath(path: String): String {
+fun displayPath(
+    path: String,
+    internalStorageRootDisplayName: String
+): String {
     if (path.startsWith("content://")) {
         return try {
             val docId = DocumentsContract.getTreeDocumentId(Uri.parse(path))
             val relative = docId.substringAfter(":", "")
             when {
-                relative.isBlank() -> docId  // root of a volume
+                relative.isBlank() && docId.startsWith("primary", ignoreCase = true) ->
+                    internalStorageRootDisplayName
+                relative.isBlank() -> docId
                 docId.startsWith("primary", ignoreCase = true) -> relative
                 else -> "SD Card/$relative"
             }
         } catch (_: Exception) { path }
     }
-    // Legacy absolute path fallback
-    val primary = "/storage/emulated/0/"
-    if (path.startsWith(primary)) return path.removePrefix(primary)
+    val primaryExternalRoot = runCatching {
+        Environment.getExternalStorageDirectory().canonicalPath
+    }.getOrNull()
+    if (primaryExternalRoot != null) {
+        val pathCanonical = runCatching {
+            File(path.trim().trimEnd('/')).canonicalPath
+        }.getOrNull()
+        if (pathCanonical == primaryExternalRoot) return internalStorageRootDisplayName
+        val primaryPrefix = "$primaryExternalRoot/"
+        if (path.startsWith(primaryPrefix)) {
+            return path.removePrefix(primaryPrefix).trimStart('/')
+        }
+    } else {
+        val legacyRoot = "/storage/emulated/0"
+        if (path.trim().trimEnd('/') == legacyRoot) return internalStorageRootDisplayName
+        val legacyPrefix = "$legacyRoot/"
+        if (path.startsWith(legacyPrefix)) return path.removePrefix(legacyPrefix).trimStart('/')
+    }
     val sdCardPrefix = Regex("^/storage/[A-F0-9]{4}-[A-F0-9]{4}/")
     return path.replace(sdCardPrefix) { "SD Card/" }
 }

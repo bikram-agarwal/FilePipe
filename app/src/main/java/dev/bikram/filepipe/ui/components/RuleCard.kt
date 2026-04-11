@@ -190,12 +190,13 @@ private fun CompactContent(
     suppressLongClickForReorder: Boolean = false
 ) {
     val playTap = rememberPlayTapSound()
+    val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val runInProgress = progress != null && !progress.isComplete
     val runBlocked = isAnyRuleRunning && progress == null
 
     val typesText = rule.fileExtensions.take(4).joinToString(" · ") +
         if (rule.fileExtensions.size > 4) " +${rule.fileExtensions.size - 4}" else ""
-    val destText = displayPath(rule.destinationFolderPath).takeIf { it.isNotBlank() } ?: ""
+    val destText = displayPath(rule.destinationFolderPath, internalStorageDisplayName).takeIf { it.isNotBlank() } ?: ""
     val infoText = listOf(typesText, destText).filter { it.isNotBlank() }.joinToString("  |  ")
 
     val columnLongClick: (() -> Unit)? = when {
@@ -345,6 +346,7 @@ private fun ExpandedContent(
     suppressLongClickForReorder: Boolean = false
 ) {
     val playTap = rememberPlayTapSound()
+    val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val expandedColumnLongClick: (() -> Unit)? = when {
         suppressLongClickForReorder -> null
         onLeadingLongClick != null -> null
@@ -450,7 +452,8 @@ private fun ExpandedContent(
             } else {
                 val shown = rule.sourceFolderPaths.take(3)
                 val extra = rule.sourceFolderPaths.size - shown.size
-                shown.joinToString(", ") { displayPath(it) } + if (extra > 0) ", +$extra" else ""
+                shown.joinToString(", ") { displayPath(it, internalStorageDisplayName) } +
+                    if (extra > 0) ", +$extra" else ""
             }
             LabeledInfoSingleLine(
                 label = stringResource(R.string.rule_card_from),
@@ -460,7 +463,7 @@ private fun ExpandedContent(
             LabeledInfoSingleLine(
                 label = stringResource(R.string.rule_card_to),
                 value = if (rule.destinationFolderPath.isEmpty()) notSet
-                        else displayPath(rule.destinationFolderPath)
+                        else displayPath(rule.destinationFolderPath, internalStorageDisplayName)
             )
 
             if (hasStaleFolder) {

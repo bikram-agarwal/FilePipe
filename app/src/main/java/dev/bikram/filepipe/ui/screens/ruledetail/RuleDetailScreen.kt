@@ -127,8 +127,15 @@ import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import androidx.compose.ui.platform.LocalContext
+import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.treatAsSafUi
 import dev.bikram.filepipe.data.preferences.usesAllFilesPaths
+import dev.bikram.filepipe.data.storage.isFilesystemFolderPathAllowedForRules
+import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
+import dev.bikram.filepipe.data.storage.isFilesystemPathPrimarySharedStorageRoot
+import dev.bikram.filepipe.data.storage.isPublicDownloadsDirectoryOnUserAccessibleVolume
+import dev.bikram.filepipe.data.storage.isSafTreeUriPrimarySharedStorageRoot
+import dev.bikram.filepipe.data.storage.isSafTreeUriPublicDownloadRoot
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
@@ -153,6 +160,27 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.ui.text.input.KeyboardType
 
 private val SectionButtonShape = RoundedCornerShape(12.dp)
+
+/**
+ * No-entry when outside allowed volumes, or in selective access when the folder is a location Android
+ * typically does not expose as a SAF tree (primary shared root, public Download root). Otherwise warn for
+ * lost grants, unreadable trees, or paths fixable by re-picking SAF.
+ */
+private fun folderAccessIssueEmojiPrefix(path: String, folderAccessMode: FolderAccessMode): String {
+    if (isFilesystemFolderPathString(path)) {
+        if (!isFilesystemFolderPathAllowedForRules(path)) return "🚫 "
+        if (folderAccessMode.treatAsSafUi()) {
+            if (isFilesystemPathPrimarySharedStorageRoot(path)) return "🚫 "
+            if (isPublicDownloadsDirectoryOnUserAccessibleVolume(path)) return "🚫 "
+        }
+        return "⚠️ "
+    }
+    if (folderAccessMode.treatAsSafUi()) {
+        if (isSafTreeUriPrimarySharedStorageRoot(path)) return "🚫 "
+        if (isSafTreeUriPublicDownloadRoot(path)) return "🚫 "
+    }
+    return "⚠️ "
+}
 
 private sealed class FolderPickIntent {
     data object AddSource : FolderPickIntent()
@@ -309,6 +337,7 @@ fun RuleDetailScreen(
     var advancedExpanded by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
 
     var pendingFolderPick by remember { mutableStateOf<FolderPickIntent?>(null) }
     var pendingFilesystemFolderPick by remember { mutableStateOf<PendingFilesystemFolderPick?>(null) }
@@ -600,7 +629,12 @@ fun RuleDetailScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = displayPath(path),
+                            text = buildString {
+                                if (sourceNeedsAccess) {
+                                    append(folderAccessIssueEmojiPrefix(path, state.folderAccessMode))
+                                }
+                                append(displayPath(path, internalStorageDisplayName))
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (sourceNeedsAccess) {
                                 MaterialTheme.colorScheme.error
@@ -664,7 +698,7 @@ fun RuleDetailScreen(
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            text = displayPath(bookmarkPath),
+                                            text = displayPath(bookmarkPath, internalStorageDisplayName),
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     },
@@ -747,14 +781,25 @@ fun RuleDetailScreen(
             ) {
                 if (state.destinationFolderPath.isNotBlank()) {
                     val isDestBookmarked = state.destinationFolderPath in bookmarkedFolders
+                    val destinationAccessIssue = state.destinationFolderAccessIssue
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = displayPath(state.destinationFolderPath),
+                            text = buildString {
+                                if (destinationAccessIssue != null) {
+                                    append(
+                                        folderAccessIssueEmojiPrefix(
+                                            state.destinationFolderPath,
+                                            state.folderAccessMode
+                                        )
+                                    )
+                                }
+                                append(displayPath(state.destinationFolderPath, internalStorageDisplayName))
+                            },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (state.destinationFolderAccessIssue != null) {
+                            color = if (destinationAccessIssue != null) {
                                 MaterialTheme.colorScheme.error
                             } else {
                                 MaterialTheme.colorScheme.primary
@@ -825,7 +870,7 @@ fun RuleDetailScreen(
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            text = displayPath(bookmarkPath),
+                                            text = displayPath(bookmarkPath, internalStorageDisplayName),
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     },
