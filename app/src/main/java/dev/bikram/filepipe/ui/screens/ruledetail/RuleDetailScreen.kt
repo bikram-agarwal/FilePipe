@@ -62,6 +62,7 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.toShape
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
@@ -605,14 +606,18 @@ fun RuleDetailScreen(
                     modifier = Modifier
                         .padding(top = 4.dp)
                         .size(56.dp),
-                    shape = SectionButtonShape
+                    shape = SectionButtonShape,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
                 ) {
                     RuleIconOrEmoji(
                         iconEmoji = state.iconEmoji,
                         icon = state.icon,
                         vectorSize = 34.dp,
                         emojiFontSize = 32.sp,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        tint = MaterialTheme.colorScheme.primary,
                         contentDescription = stringResource(R.string.rule_icon_picker_cd),
                         modifier = Modifier
                     )
@@ -1400,13 +1405,17 @@ fun RuleDetailScreen(
                                 }
                             },
                             modifier = Modifier.size(ruleIconGridCell),
-                            shape = SectionButtonShape
+                            shape = SectionButtonShape,
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
                         ) {
                             Icon(
                                 imageVector = iconOption.toImageVector(),
                                 contentDescription = ruleIconOptionLabel(iconOption),
                                 modifier = Modifier.size(34.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -1422,7 +1431,7 @@ fun RuleDetailScreen(
                 val emojiTextStyle = TextStyle(
                     fontSize = 28.sp,
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    color = MaterialTheme.colorScheme.primary
                 )
                 BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                 val emojiCellSize = (maxWidth - 48.dp) / 7f
@@ -1441,7 +1450,7 @@ fun RuleDetailScreen(
                             },
                             modifier = Modifier.size(emojiCellSize),
                             shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh
                         ) {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
@@ -1558,7 +1567,7 @@ fun RuleDetailScreen(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 modifier = Modifier.size(48.dp)
                             ) {
                                 Box(
@@ -1568,7 +1577,7 @@ fun RuleDetailScreen(
                                     Icon(
                                         imageVector = template.suggestedIcon.toImageVector(),
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(32.dp)
                                     )
                                 }

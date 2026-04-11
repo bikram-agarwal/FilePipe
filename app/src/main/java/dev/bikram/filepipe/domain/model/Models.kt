@@ -101,6 +101,7 @@ data class FileMoved(
     val sourceUri: String,
     val destinationUri: String,
     val fileSizeBytes: Long,
+    val relativeParentSegments: List<String> = emptyList(),
     val movedAt: Long = System.currentTimeMillis(),
     val success: Boolean,
     val skipped: Boolean = false,

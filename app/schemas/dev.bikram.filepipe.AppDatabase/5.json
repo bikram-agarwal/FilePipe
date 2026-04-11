@@ -1,0 +1,392 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "38bfd2d1d2b7a44d19083fa3c8113e79",
+    "entities": [
+      {
+        "tableName": "rules",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `sourceFolderPaths` TEXT NOT NULL, `destinationFolderPath` TEXT NOT NULL, `fileExtensions` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL DEFAULT 0, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `scheduleType` TEXT, `scheduleDayOfWeek` INTEGER, `scheduleHour` INTEGER, `scheduleMinute` INTEGER, `scheduleIntervalHours` INTEGER, `workManagerTag` TEXT, `conflictPolicy` TEXT NOT NULL, `operationMode` TEXT NOT NULL, `scanSubdirectories` INTEGER NOT NULL, `suppress_missing_source_folder_card` INTEGER NOT NULL DEFAULT 0, `iconKey` TEXT NOT NULL, `iconEmoji` TEXT, `filenamePattern` TEXT, `minFileSizeBytes` INTEGER, `maxFileSizeBytes` INTEGER, `minAgeDays` INTEGER, `maxAgeDays` INTEGER, `excludePatterns` TEXT NOT NULL DEFAULT '[]')",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceFolderPaths",
+            "columnName": "sourceFolderPaths",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destinationFolderPath",
+            "columnName": "destinationFolderPath",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileExtensions",
+            "columnName": "fileExtensions",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isEnabled",
+            "columnName": "isEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduleType",
+            "columnName": "scheduleType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "scheduleDayOfWeek",
+            "columnName": "scheduleDayOfWeek",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "scheduleHour",
+            "columnName": "scheduleHour",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "scheduleMinute",
+            "columnName": "scheduleMinute",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "scheduleIntervalHours",
+            "columnName": "scheduleIntervalHours",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "workManagerTag",
+            "columnName": "workManagerTag",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "conflictPolicy",
+            "columnName": "conflictPolicy",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operationMode",
+            "columnName": "operationMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scanSubdirectories",
+            "columnName": "scanSubdirectories",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "suppressMissingSourceFolderCardWarning",
+            "columnName": "suppress_missing_source_folder_card",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "iconKey",
+            "columnName": "iconKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iconEmoji",
+            "columnName": "iconEmoji",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "filenamePattern",
+            "columnName": "filenamePattern",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "minFileSizeBytes",
+            "columnName": "minFileSizeBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "maxFileSizeBytes",
+            "columnName": "maxFileSizeBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "minAgeDays",
+            "columnName": "minAgeDays",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "maxAgeDays",
+            "columnName": "maxAgeDays",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "excludePatterns",
+            "columnName": "excludePatterns",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'[]'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "run_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ruleId` INTEGER, `ruleName` TEXT NOT NULL, `triggeredBy` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `completedAt` INTEGER, `status` TEXT NOT NULL, `totalFilesFound` INTEGER NOT NULL, `cancelledUnprocessedCount` INTEGER NOT NULL DEFAULT 0, `totalFilesMoved` INTEGER NOT NULL, `totalFilesFailed` INTEGER NOT NULL, `errorMessage` TEXT, `isReversed` INTEGER NOT NULL, `operationMode` TEXT NOT NULL DEFAULT 'MOVE', `copyCreatedDestFolderUris` TEXT NOT NULL DEFAULT '[]')",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ruleId",
+            "columnName": "ruleId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "ruleName",
+            "columnName": "ruleName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "triggeredBy",
+            "columnName": "triggeredBy",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedAt",
+            "columnName": "completedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalFilesFound",
+            "columnName": "totalFilesFound",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cancelledUnprocessedCount",
+            "columnName": "cancelledUnprocessedCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "totalFilesMoved",
+            "columnName": "totalFilesMoved",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalFilesFailed",
+            "columnName": "totalFilesFailed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "errorMessage",
+            "columnName": "errorMessage",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isReversed",
+            "columnName": "isReversed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operationMode",
+            "columnName": "operationMode",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'MOVE'"
+          },
+          {
+            "fieldPath": "copyCreatedDestFolderUris",
+            "columnName": "copyCreatedDestFolderUris",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'[]'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_run_history_ruleId",
+            "unique": false,
+            "columnNames": [
+              "ruleId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_run_history_ruleId` ON `${TABLE_NAME}` (`ruleId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "files_moved",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `runHistoryId` INTEGER NOT NULL, `fileName` TEXT NOT NULL, `sourceUri` TEXT NOT NULL, `destinationUri` TEXT NOT NULL, `fileSizeBytes` INTEGER NOT NULL, `relativeParentSegments` TEXT NOT NULL, `movedAt` INTEGER NOT NULL, `success` INTEGER NOT NULL, `skipped` INTEGER NOT NULL, `errorMessage` TEXT, FOREIGN KEY(`runHistoryId`) REFERENCES `run_history`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runHistoryId",
+            "columnName": "runHistoryId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileName",
+            "columnName": "fileName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceUri",
+            "columnName": "sourceUri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destinationUri",
+            "columnName": "destinationUri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileSizeBytes",
+            "columnName": "fileSizeBytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relativeParentSegments",
+            "columnName": "relativeParentSegments",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "movedAt",
+            "columnName": "movedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "success",
+            "columnName": "success",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skipped",
+            "columnName": "skipped",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "errorMessage",
+            "columnName": "errorMessage",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_files_moved_runHistoryId",
+            "unique": false,
+            "columnNames": [
+              "runHistoryId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_files_moved_runHistoryId` ON `${TABLE_NAME}` (`runHistoryId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "run_history",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "runHistoryId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '38bfd2d1d2b7a44d19083fa3c8113e79')"
+    ]
+  }
+}

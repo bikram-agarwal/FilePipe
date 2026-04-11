@@ -171,10 +171,15 @@ class RuleDetailViewModel @Inject constructor(
             loadRule()
         } else {
             val template = RuleTemplate.ALL.getOrNull(templateIndex)
-            if (template != null) applyTemplate(template)
-            _uiState.update { it.copy(isLoading = false) }
-            _baseline.value = _uiState.value.toSnapshot()
-            if (template == null) scheduleFolderAccessRecompute()
+            viewModelScope.launch {
+                if (template != null) {
+                    applyTemplateInternal(template)
+                } else {
+                    scheduleFolderAccessRecompute()
+                }
+                _uiState.update { it.copy(isLoading = false) }
+                _baseline.value = _uiState.value.toSnapshot()
+            }
         }
     }
 
@@ -389,6 +394,10 @@ class RuleDetailViewModel @Inject constructor(
     }
 
     fun applyTemplate(template: RuleTemplate) = viewModelScope.launch {
+        applyTemplateInternal(template)
+    }
+
+    private suspend fun applyTemplateInternal(template: RuleTemplate) {
         val prefs = userPreferencesRepository.preferencesFlow.first()
         val useAutoFilesystemSources =
             isFilesystemAccessEffective(prefs.folderAccessMode) &&

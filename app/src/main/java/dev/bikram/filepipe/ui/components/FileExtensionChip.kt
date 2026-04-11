@@ -15,6 +15,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.InputChipDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,6 +65,11 @@ fun FileExtensionChips(
                     onRemove(ext)
                 },
                 label = { Text(ext) },
+                colors = InputChipDefaults.inputChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ),
                 trailingIcon = {
                     Icon(
                         Icons.Default.Close,

@@ -20,7 +20,7 @@ import kotlinx.serialization.json.Json
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
  * (`@Database`); Room KSP does not allow that annotation to reference this constant.
  */
-const val APP_DATABASE_SCHEMA_VERSION = 4
+const val APP_DATABASE_SCHEMA_VERSION = 5
 
 /**
  * Root object for `filepipe_backup_*.json`.
@@ -96,6 +96,7 @@ data class FileMovedBackupDto(
     val sourceUri: String,
     val destinationUri: String,
     val fileSizeBytes: Long,
+    val relativeParentSegments: List<String> = emptyList(),
     val movedAt: Long,
     val success: Boolean,
     val skipped: Boolean = false,
@@ -189,6 +190,7 @@ fun FileMoved.toBackupDto(): FileMovedBackupDto = FileMovedBackupDto(
     sourceUri = sourceUri,
     destinationUri = destinationUri,
     fileSizeBytes = fileSizeBytes,
+    relativeParentSegments = relativeParentSegments,
     movedAt = movedAt,
     success = success,
     skipped = skipped,

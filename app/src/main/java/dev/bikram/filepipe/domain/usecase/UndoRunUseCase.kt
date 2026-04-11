@@ -149,7 +149,8 @@ class UndoRunUseCase @Inject constructor(
                     val sourceEntry = FileEntry(
                         uri = destUri,
                         name = fileMoved.fileName,
-                        size = sizeBytes
+                        size = sizeBytes,
+                        relativeParentSegments = fileMoved.relativeParentSegments
                     )
 
                     val reverseResult = fileOperationRepository.moveFile(

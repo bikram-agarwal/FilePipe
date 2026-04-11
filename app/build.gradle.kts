@@ -68,6 +68,22 @@ extensions.configure<ApplicationExtension>("android") {
     }
 
     buildTypes {
+        debug {
+        }
+        create("devRelease") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            matchingFallbacks += listOf("release")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

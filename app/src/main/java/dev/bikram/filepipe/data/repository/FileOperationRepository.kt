@@ -241,6 +241,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "All files access is required for this source path"
             )
@@ -251,6 +252,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "All files access is required for this destination path"
             )
@@ -304,6 +306,7 @@ class FileOperationRepository @Inject constructor(
             sourceUri = sourceEntry.uri.toString(),
             destinationUri = "",
             fileSizeBytes = sourceEntry.size,
+            relativeParentSegments = sourceEntry.relativeParentSegments,
             success = false,
             errorMessage = "Invalid source path"
         )
@@ -314,6 +317,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Source file not accessible"
             )
@@ -323,6 +327,7 @@ class FileOperationRepository @Inject constructor(
             sourceUri = sourceEntry.uri.toString(),
             destinationUri = "",
             fileSizeBytes = sourceEntry.size,
+            relativeParentSegments = sourceEntry.relativeParentSegments,
             success = false,
             errorMessage = "Invalid destination folder"
         )
@@ -332,6 +337,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Destination outside allowed storage"
             )
@@ -343,6 +349,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Destination folder not accessible"
             )
@@ -353,6 +360,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Could not create destination folder structure"
             )
@@ -365,6 +373,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = existing.toUri().toString(),
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = true,
                     skipped = true
                 )
@@ -394,6 +403,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = destFile.toUri().toString(),
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = true
             )
         } catch (e: Exception) {
@@ -402,6 +412,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = e.message ?: "IO error"
             )
@@ -420,6 +431,7 @@ class FileOperationRepository @Inject constructor(
             sourceUri = sourceEntry.uri.toString(),
             destinationUri = "",
             fileSizeBytes = sourceEntry.size,
+            relativeParentSegments = sourceEntry.relativeParentSegments,
             success = false,
             errorMessage = "Invalid source path"
         )
@@ -430,6 +442,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Source file not accessible"
             )
@@ -440,6 +453,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Destination folder not accessible"
             )
@@ -449,6 +463,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Destination folder not accessible"
             )
@@ -459,6 +474,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Could not create destination folder structure"
             )
@@ -470,6 +486,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = existing.uri.toString(),
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = true,
                     skipped = true
                 )
@@ -490,6 +507,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = "",
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = false,
                     errorMessage = "Could not create destination file"
                 )
@@ -503,6 +521,7 @@ class FileOperationRepository @Inject constructor(
                         sourceUri = sourceEntry.uri.toString(),
                         destinationUri = "",
                         fileSizeBytes = sourceEntry.size,
+                        relativeParentSegments = sourceEntry.relativeParentSegments,
                         success = false,
                         errorMessage = "Could not write destination file"
                     )
@@ -516,6 +535,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = destDoc.uri.toString(),
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = true
             )
         } catch (e: IOException) {
@@ -524,6 +544,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = e.message ?: "IO error"
             )
@@ -542,6 +563,7 @@ class FileOperationRepository @Inject constructor(
             sourceUri = sourceEntry.uri.toString(),
             destinationUri = "",
             fileSizeBytes = sourceEntry.size,
+            relativeParentSegments = sourceEntry.relativeParentSegments,
             success = false,
             errorMessage = "Invalid destination folder"
         )
@@ -551,6 +573,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Destination outside allowed storage"
             )
@@ -562,6 +585,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Destination folder not accessible"
             )
@@ -572,6 +596,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Could not create destination folder structure"
             )
@@ -584,6 +609,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = existing.toUri().toString(),
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = true,
                     skipped = true
                 )
@@ -601,6 +627,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = "",
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = false,
                     errorMessage = "Could not read source file"
                 )
@@ -616,6 +643,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = "",
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = false,
                     errorMessage = "No data was copied"
                 )
@@ -628,6 +656,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = destFile.toUri().toString(),
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = true
             )
         } catch (e: IOException) {
@@ -637,6 +666,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = e.message ?: "IO error"
             )
@@ -657,6 +687,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Destination folder not accessible"
             )
@@ -672,6 +703,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = "Could not create destination folder structure"
             )
@@ -684,6 +716,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = existing.uri.toString(),
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = true,
                     skipped = true
                 )
@@ -708,6 +741,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = "",
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = false,
                     errorMessage = "Could not create destination file"
                 )
@@ -720,6 +754,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = "",
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = false,
                     errorMessage = "Could not read source file"
                 )
@@ -734,6 +769,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = "",
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = false,
                     errorMessage = "Could not write destination file"
                 )
@@ -752,6 +788,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = "",
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = false,
                     errorMessage = e.message ?: "IO error"
                 )
@@ -764,6 +801,7 @@ class FileOperationRepository @Inject constructor(
                     sourceUri = sourceEntry.uri.toString(),
                     destinationUri = "",
                     fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
                     success = false,
                     errorMessage = "No data was copied"
                 )
@@ -778,6 +816,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = destFile.uri.toString(),
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = true
             )
         } catch (e: IOException) {
@@ -786,6 +825,7 @@ class FileOperationRepository @Inject constructor(
                 sourceUri = sourceEntry.uri.toString(),
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
                 success = false,
                 errorMessage = e.message ?: "IO error"
             )

@@ -35,11 +35,19 @@ object DatabaseModule {
         }
     }
 
+    private val migration4To5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE files_moved ADD COLUMN relativeParentSegments TEXT NOT NULL DEFAULT '[]'"
+            )
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "media_organizer.db")
-            .addMigrations(migration2To3)
+            .addMigrations(migration2To3, migration4To5)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 

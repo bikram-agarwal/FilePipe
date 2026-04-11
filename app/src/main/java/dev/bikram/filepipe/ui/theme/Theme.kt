@@ -140,6 +140,58 @@ private fun ColorScheme.boostSurfaceContainersTowardPrimaryForSolidBackground(da
     )
 }
 
+/**
+ * Seed-generated schemes can leave outline roles too neutral once surfaces are tinted toward primary.
+ * Nudge borders slightly toward the active accent while also pulling them closer to on-surface contrast.
+ */
+private fun ColorScheme.boostOutlineRolesForSeedThemes(darkTheme: Boolean): ColorScheme {
+    val targetOutline = Color(
+        ColorUtils.blendARGB(
+            onSurface.toArgb(),
+            primary.toArgb(),
+            if (darkTheme) 0.18f else 0.12f
+        )
+    )
+    val targetOutlineVariant = Color(
+        ColorUtils.blendARGB(
+            onSurfaceVariant.toArgb(),
+            primary.toArgb(),
+            if (darkTheme) 0.12f else 0.08f
+        )
+    )
+    return copy(
+        outline = Color(
+            ColorUtils.blendARGB(
+                outline.toArgb(),
+                targetOutline.toArgb(),
+                if (darkTheme) 0.4f else 0.3f
+            )
+        ),
+        outlineVariant = Color(
+            ColorUtils.blendARGB(
+                outlineVariant.toArgb(),
+                targetOutlineVariant.toArgb(),
+                if (darkTheme) 0.32f else 0.24f
+            )
+        )
+    )
+}
+
+/**
+ * Seed-generated [primaryContainer] can read hotter than the equivalent Material You badge tone.
+ * Nudge it toward elevated surfaces so compact rule icons and expanded extension chips keep the
+ * softer badge look without switching to a different semantic role.
+ */
+private fun ColorScheme.softenPrimaryContainerForSeedThemes(darkTheme: Boolean): ColorScheme = copy(
+    primaryContainer = Color(
+        ColorUtils.blendARGB(
+            primaryContainer.toArgb(),
+            surfaceContainerHighest.toArgb(),
+            if (darkTheme) 0.34f else 0.42f
+        )
+    )
+)
+
 /** Keeps true-black OLED surfaces while preserving dynamic (Material You) accent colors. */
 private fun oledSurfacesFrom(dynamicScheme: ColorScheme): ColorScheme = dynamicScheme.copy(
     background = Color.Black,
@@ -215,6 +267,15 @@ fun FilePipeTheme(
                 scheme.boostSurfaceContainersTowardPrimaryForGradient(darkTheme = darkTheme)
             } else {
                 scheme.boostSurfaceContainersTowardPrimaryForSolidBackground(darkTheme = darkTheme)
+            }
+        }
+        .let { scheme ->
+            if (staticSeedColor != null) {
+                scheme
+                    .softenPrimaryContainerForSeedThemes(darkTheme = darkTheme)
+                    .boostOutlineRolesForSeedThemes(darkTheme = darkTheme)
+            } else {
+                scheme
             }
         }
 
