@@ -377,7 +377,7 @@ class FileOperationRepository @Inject constructor(
                     success = true,
                     skipped = true
                 )
-                ConflictPolicy.OVERWRITE -> existing.delete()
+                ConflictPolicy.OVERWRITE -> Unit
                 ConflictPolicy.RENAME_SUFFIX -> {
                     destName = resolveDestNameFile(destParent, sourceEntry.name)
                 }
@@ -1128,7 +1128,8 @@ class FileOperationRepository @Inject constructor(
                 val document = DocumentFile.fromTreeUri(context, Uri.parse(folderPathOrUri))
                 when {
                     document == null -> FolderAccessResult.Unavailable
-                    !document.exists() || !document.canRead() -> FolderAccessResult.Unavailable
+                    !document.exists() -> FolderAccessResult.Unavailable
+                    !document.canRead() -> FolderAccessResult.PermissionDenied
                     else -> FolderAccessResult.Accessible
                 }
             } catch (_: SecurityException) {

@@ -76,6 +76,11 @@ data class ScheduleBackupDto(
 @Serializable
 data class RunHistoryBackupDto(
     val ruleName: String,
+    /**
+     * Index of the rule in the backup's [AppBackup.rules] list at export time. When set, restore maps
+     * history to the correct rule even if several rules share the same [ruleName]. Null in older backups.
+     */
+    val ruleIndexInBackup: Int? = null,
     val triggeredBy: String,
     val startedAt: Long,
     val completedAt: Long? = null,
@@ -169,8 +174,12 @@ fun RuleSchedule.toBackupDto(): ScheduleBackupDto = ScheduleBackupDto(
     intervalHours = intervalHours
 )
 
-fun RunHistory.toBackupDto(files: List<FileMoved> = emptyList()): RunHistoryBackupDto = RunHistoryBackupDto(
+fun RunHistory.toBackupDto(
+    files: List<FileMoved> = emptyList(),
+    ruleIndexInBackup: Int? = null
+): RunHistoryBackupDto = RunHistoryBackupDto(
     ruleName = ruleName,
+    ruleIndexInBackup = ruleIndexInBackup,
     triggeredBy = triggeredBy.name,
     startedAt = startedAt,
     completedAt = completedAt,
@@ -263,10 +272,16 @@ fun buildAppBackupJson(
     history: List<Pair<RunHistory, List<FileMoved>>> = emptyList(),
     settings: AppPreferences? = null
 ): String {
+    val ruleIdToIndexInBackup = rules.mapIndexed { index, rule -> rule.id to index }.toMap()
     val backup = AppBackup(
         exportedAtMillis = System.currentTimeMillis(),
         rules = rules.map { it.toBackupDto() },
-        history = history.map { (run, files) -> run.toBackupDto(files) },
+        history = history.map { (run, files) ->
+            run.toBackupDto(
+                files = files,
+                ruleIndexInBackup = run.ruleId?.let { ruleId -> ruleIdToIndexInBackup[ruleId] }
+            )
+        },
         settings = settings?.toBackupDto()
     )
     return jsonFormatter.encodeToString(backup)

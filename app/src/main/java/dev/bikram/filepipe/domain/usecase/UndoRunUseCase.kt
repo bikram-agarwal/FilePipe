@@ -76,8 +76,7 @@ class UndoRunUseCase @Inject constructor(
                         }
                         val destFile = File(path)
                         if (!destFile.isFile) {
-                            errors.add("${fileMoved.fileName}: file no longer exists at destination")
-                            failed++
+                            reversed++
                             return@forEach
                         }
                         val deleted = try {
@@ -95,9 +94,13 @@ class UndoRunUseCase @Inject constructor(
                     } else {
                         val destUri = Uri.parse(fileMoved.destinationUri)
                         val destDoc = DocumentFile.fromSingleUri(context, destUri)
-                        if (destDoc == null || !destDoc.exists()) {
-                            errors.add("${fileMoved.fileName}: file no longer exists at destination")
+                        if (destDoc == null) {
+                            errors.add("${fileMoved.fileName}: could not open destination document")
                             failed++
+                            return@forEach
+                        }
+                        if (!destDoc.exists()) {
+                            reversed++
                             return@forEach
                         }
                         val deleted = try {

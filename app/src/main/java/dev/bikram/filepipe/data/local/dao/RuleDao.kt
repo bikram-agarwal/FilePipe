@@ -19,6 +19,10 @@ interface RuleDao {
     @Query("SELECT * FROM rules WHERE id = :id")
     suspend fun getRuleById(id: Long): RuleEntity?
 
+    /** Order matches backup / [RuleRepository.replaceAllRules] insertion order (sortOrder index). */
+    @Query("SELECT * FROM rules ORDER BY sortOrder ASC, id ASC")
+    suspend fun getAllRulesOrderedBySortOrder(): List<RuleEntity>
+
     @Query("SELECT * FROM rules WHERE isEnabled = 1")
     suspend fun getEnabledRules(): List<RuleEntity>
 

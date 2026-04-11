@@ -91,21 +91,29 @@ class ImportRulesUseCase @Inject constructor(
 
         val rules = backup.rules.map { it.toDomain() }
         ruleRepository.replaceAllRules(rules)
-        val saved = ruleRepository.getAllRules().first()
-        val nameToRuleId = saved.groupBy { rule -> rule.name }.mapValues { entry -> entry.value.first().id }
+        val savedOrdered = ruleRepository.getAllRulesOrderedBySortOrder()
+        val nameToFirstRuleId = savedOrdered.groupBy { rule -> rule.name }
+            .mapValues { entry -> entry.value.first().id }
 
-        runHistoryRepository.replaceHistoryFromBackup(backup.history, nameToRuleId)
+        runHistoryRepository.replaceHistoryFromBackup(backup.history) { dto ->
+            val index = dto.ruleIndexInBackup
+            if (index != null && index in savedOrdered.indices) {
+                savedOrdered[index].id
+            } else {
+                nameToFirstRuleId[dto.ruleName]
+            }
+        }
 
         val settingsApplied = backup.settings != null
         backup.settings?.let { userPreferencesRepository.applySettingsFromBackup(it) }
 
-        saved.filter { rule -> rule.isEnabled && rule.schedule != null }.forEach { rule ->
+        savedOrdered.filter { rule -> rule.isEnabled && rule.schedule != null }.forEach { rule ->
             scheduleRulesUseCase.scheduleRule(rule)
         }
 
         return Result.success(
             RestoreBackupResult(
-                rulesImported = saved.size,
+                rulesImported = savedOrdered.size,
                 historyRunsImported = backup.history.size,
                 settingsRestored = settingsApplied
             )

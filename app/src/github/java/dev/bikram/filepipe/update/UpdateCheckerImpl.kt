@@ -35,7 +35,11 @@ class UpdateCheckerImpl @Inject constructor(
             val url = URL("https://api.github.com/repos/${BuildConfig.GITHUB_REPO}/releases/latest")
             val connection = url.openConnection() as HttpURLConnection
             connection.setRequestProperty("Accept", "application/vnd.github+json")
-            val responseText = connection.inputStream.use { it.readBytes().decodeToString() }
+            val responseText = try {
+                connection.inputStream.use { it.readBytes().decodeToString() }
+            } finally {
+                connection.disconnect()
+            }
             val release = json.decodeFromString<GithubRelease>(responseText)
 
             val remoteVersion = release.tag_name.removePrefix("v")

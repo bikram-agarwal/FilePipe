@@ -19,6 +19,9 @@ class RuleRepository @Inject constructor(
     suspend fun getRuleById(id: Long): Rule? =
         ruleDao.getRuleById(id)?.toDomain()
 
+    suspend fun getAllRulesOrderedBySortOrder(): List<Rule> =
+        ruleDao.getAllRulesOrderedBySortOrder().map { entity -> entity.toDomain() }
+
     suspend fun getEnabledRules(): List<Rule> =
         ruleDao.getEnabledRules().map { it.toDomain() }
 

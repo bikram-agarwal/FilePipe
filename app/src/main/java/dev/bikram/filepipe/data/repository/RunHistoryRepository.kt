@@ -217,12 +217,12 @@ class RunHistoryRepository @Inject constructor(
     }
 
     /**
-     * Replaces all history with backup rows. [ruleNameToId] maps rule name to the current DB rule id
-     * (first match if duplicate names). Clears existing history first.
+     * Replaces all history with backup rows. [resolveRuleId] returns the DB rule id for each row
+     * ([RunHistoryBackupDto.ruleIndexInBackup] preferred when present; else match by name).
      */
     suspend fun replaceHistoryFromBackup(
         backupRuns: List<RunHistoryBackupDto>,
-        ruleNameToId: Map<String, Long>
+        resolveRuleId: (RunHistoryBackupDto) -> Long?
     ) {
         clearAllHistory()
         for (dto in backupRuns) {
@@ -233,7 +233,7 @@ class RunHistoryRepository @Inject constructor(
             val filesFound = dto.files.size.coerceAtLeast(dto.totalFilesMoved + dto.totalFilesFailed)
             val entity = RunHistoryEntity(
                 id = 0L,
-                ruleId = ruleNameToId[dto.ruleName],
+                ruleId = resolveRuleId(dto),
                 ruleName = dto.ruleName,
                 triggeredBy = triggeredBy,
                 startedAt = dto.startedAt,
