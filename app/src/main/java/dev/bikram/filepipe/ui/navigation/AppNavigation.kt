@@ -75,7 +75,6 @@ import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
-import dev.bikram.filepipe.debug.AgentSessionLog
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
@@ -133,7 +132,6 @@ fun AppNavigation(
 ) {
     val playTap = rememberPlayTapSound()
     val navController = rememberNavController()
-    val appContext = LocalContext.current.applicationContext
     val pendingHistoryId by pendingShortcutRepository.pendingHistoryDetailId.collectAsStateWithLifecycle()
     val pendingOpenSettingsUpdates by pendingShortcutRepository.pendingOpenSettingsForUpdates.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -305,15 +303,6 @@ fun AppNavigation(
                     val fromSettings = backStack.arguments?.getBoolean(Screen.OnboardingTitle.ARG) ?: false
                     OnboardingTitleScreen(
                         onLetsBegan = {
-                            // #region agent log
-                            AgentSessionLog.append(
-                                context = appContext,
-                                location = "AppNavigation.kt:OnboardingTitle.onLetsBegan",
-                                message = "lets_begin_tapped",
-                                hypothesisId = "A",
-                                data = mapOf("fromSettings" to fromSettings)
-                            )
-                            // #endregion
                             navController.navigate(Screen.OnboardingPermissions.route)
                         }
                     )
@@ -322,15 +311,6 @@ fun AppNavigation(
                 composable(Screen.OnboardingPermissions.route) {
                     OnboardingPermissionsScreen(
                         onContinue = {
-                            // #region agent log
-                            AgentSessionLog.append(
-                                context = appContext,
-                                location = "AppNavigation.kt:OnboardingPermissions.onContinue",
-                                message = "navigate_wizard_keep_stack",
-                                hypothesisId = "B",
-                                data = emptyMap()
-                            )
-                            // #endregion
                             navController.navigate(Screen.OnboardingRuleWizard.route) {
                                 launchSingleTop = true
                             }
@@ -341,15 +321,6 @@ fun AppNavigation(
                 composable(Screen.OnboardingRuleWizard.route) {
                     OnboardingRuleWizardScreen(
                         onBackToPermissions = {
-                            // #region agent log
-                            AgentSessionLog.append(
-                                context = appContext,
-                                location = "AppNavigation.kt:OnboardingRuleWizard.onBack",
-                                message = "pop_back_to_permissions",
-                                hypothesisId = "B",
-                                data = emptyMap()
-                            )
-                            // #endregion
                             navController.popBackStack()
                         },
                         onUseTemplate = { templateIndex ->

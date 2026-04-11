@@ -45,7 +45,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 data class RuleDetailUiState(
@@ -389,10 +388,8 @@ class RuleDetailViewModel @Inject constructor(
         else userPreferencesRepository.addBookmark(path)
     }
 
-    fun applyTemplate(template: RuleTemplate) {
-        val prefs = runBlocking(Dispatchers.IO) {
-            userPreferencesRepository.preferencesFlow.first()
-        }
+    fun applyTemplate(template: RuleTemplate) = viewModelScope.launch {
+        val prefs = userPreferencesRepository.preferencesFlow.first()
         val useAutoFilesystemSources =
             isFilesystemAccessEffective(prefs.folderAccessMode) &&
                 Environment.isExternalStorageManager()

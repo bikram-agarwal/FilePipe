@@ -72,7 +72,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
-import dev.bikram.filepipe.debug.AgentSessionLog
 import kotlinx.coroutines.delay
 
 private val PermissionCardLeadingIconSlotWidth = 44.dp
@@ -95,19 +94,6 @@ fun OnboardingPermissionsScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
-    val appContext = context.applicationContext
-
-    LaunchedEffect(selected) {
-        // #region agent log
-        AgentSessionLog.append(
-            context = appContext,
-            location = "OnboardingPermissionsScreen.kt:LaunchedEffect(selected)",
-            message = "permissions_selected_mode",
-            hypothesisId = "B",
-            data = mapOf("folderAccessMode" to selected.name)
-        )
-        // #endregion
-    }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val needsAllFilesGrant =
