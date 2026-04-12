@@ -8,9 +8,11 @@ import androidx.compose.material3.ColorScheme
 import android.view.SoundEffectConstants
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -310,3 +312,16 @@ fun FilePipeTheme(
         )
     }
 }
+
+/**
+ * [TopAppBarDefaults.topAppBarColors] with a transparent bar body and explicit on-surface chrome colors.
+ * Needed over the root gradient: some expressive theme defaults leave titles/icons dark while the scrim is dark.
+ */
+@Composable
+fun gradientOverlayTopAppBarColors() = TopAppBarDefaults.topAppBarColors(
+    containerColor = Color.Transparent,
+    scrolledContainerColor = Color.Transparent,
+    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+    titleContentColor = MaterialTheme.colorScheme.onSurface,
+    actionIconContentColor = MaterialTheme.colorScheme.onSurface
+)

@@ -160,6 +160,7 @@ import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
+import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
 import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.ui.components.text.SimpleMarkdown
 
@@ -516,10 +517,7 @@ fun SettingsScreen(
             LargeTopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
                 scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent
-                )
+                colors = gradientOverlayTopAppBarColors()
             )
         },
         snackbarHost = {

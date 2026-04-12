@@ -113,7 +113,8 @@ fun OnboardingTitleScreen(
                         Text(
                             text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = scheme.onSurface
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(

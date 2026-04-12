@@ -46,7 +46,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,6 +77,7 @@ import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.screens.onboarding.FolderAccessLearnMoreFullModeSection
 import dev.bikram.filepipe.ui.screens.onboarding.FolderAccessLearnMoreSelectiveModeSection
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import kotlinx.coroutines.delay
@@ -834,10 +834,7 @@ fun FaqScreen(
                     )
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = Color.Transparent
-            )
+            colors = gradientOverlayTopAppBarColors()
         )
     }
 }

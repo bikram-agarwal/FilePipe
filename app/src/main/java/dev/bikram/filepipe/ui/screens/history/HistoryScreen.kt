@@ -84,6 +84,7 @@ import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.modifiers.progressiveBlur
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -178,10 +179,6 @@ fun HistoryScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
-            val appBarColors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = Color.Transparent
-            )
             val navigationIcon: @Composable () -> Unit = {
                 if (onNavigateBack != null) {
                     IconButton(onClick = {
@@ -196,7 +193,7 @@ fun HistoryScreen(
                 LargeTopAppBar(
                     title = { Text(stringResource(R.string.history_title)) },
                     scrollBehavior = scrollBehavior,
-                    colors = appBarColors,
+                    colors = gradientOverlayTopAppBarColors(),
                     navigationIcon = navigationIcon,
                     actions = {
                         Box {

@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -386,7 +387,8 @@ private fun FullAccessHighlightCard(
         targetValue = if (selected) scheme.primary else scheme.primary.copy(alpha = 0.55f),
         label = "fullAccessBorder"
     )
-    val containerAlpha = if (selected) 0.72f else 0.52f
+    val surfaceBlend = if (selected) 0.22f else 0.40f
+    val containerColor = lerp(scheme.primaryContainer, scheme.surface, surfaceBlend)
     Card(
         onClick = onSelect,
         modifier = Modifier
@@ -395,11 +397,15 @@ private fun FullAccessHighlightCard(
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(2.dp, borderColor),
         colors = CardDefaults.cardColors(
-            containerColor = scheme.primaryContainer.copy(alpha = containerAlpha)
+            containerColor = containerColor
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (selected) 10.dp else 6.dp,
-            pressedElevation = 12.dp
+            defaultElevation = 0.dp,
+            pressedElevation = 0.dp,
+            focusedElevation = 0.dp,
+            hoveredElevation = 0.dp,
+            draggedElevation = 0.dp,
+            disabledElevation = 0.dp
         )
     ) {
         Row(
