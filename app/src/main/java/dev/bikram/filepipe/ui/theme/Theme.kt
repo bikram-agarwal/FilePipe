@@ -1,5 +1,8 @@
 package dev.bikram.filepipe.ui.theme
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Color as AndroidColor
 import android.os.Build
 import android.os.SystemClock
@@ -23,6 +26,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.WindowCompat
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
@@ -284,6 +288,22 @@ fun FilePipeTheme(
     val view = LocalView.current
     SideEffect {
         view.isSoundEffectsEnabled = true
+    }
+    SideEffect {
+        var context: Context? = view.context
+        var hostingActivity: Activity? = null
+        while (context != null) {
+            if (context is Activity) {
+                hostingActivity = context
+                break
+            }
+            context = (context as? ContextWrapper)?.baseContext
+        }
+        val window = hostingActivity?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = !darkTheme
+            isAppearanceLightNavigationBars = !darkTheme
+        }
     }
     val realTapSound = remember(view) {
         val lastTapTimeMs = longArrayOf(0L)
