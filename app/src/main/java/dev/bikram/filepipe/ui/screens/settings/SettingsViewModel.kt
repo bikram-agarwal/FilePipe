@@ -44,7 +44,13 @@ import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.treeUriFromDocumentUri
 import dev.bikram.filepipe.domain.model.Rule
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import androidx.core.content.FileProvider
@@ -92,6 +98,18 @@ class SettingsViewModel @Inject constructor(
     private val ruleRepository: RuleRepository
 ) : ViewModel() {
 
+    private val isDevReleaseBuild = BuildConfig.BUILD_TYPE == "devRelease"
+
+    private enum class DevReleasePlayBannerMockStage {
+        OFF,
+        DOWNLOADING,
+        READY
+    }
+
+    private val devReleasePlayBannerMockStage =
+        MutableStateFlow(DevReleasePlayBannerMockStage.OFF)
+    private var devReleasePlayBannerMockSequenceJob: Job? = null
+
     val preferencesFlow = userPreferencesRepository.preferencesFlow
 
     private val _userMessage = MutableStateFlow<String?>(null)
@@ -131,7 +149,23 @@ class SettingsViewModel @Inject constructor(
         _updatePromoBannerDismissedThisSession.asStateFlow()
 
     val playInAppUpdateBannerUiState: StateFlow<PlayInAppUpdateBannerUiState> =
-        playInAppUpdateProgressController.bannerUiState
+        if (isDevReleaseBuild) {
+            combine(
+                playInAppUpdateProgressController.bannerUiState,
+                devReleasePlayBannerMockStage
+            ) { realState, mockStage ->
+                mergeDevReleasePlayBannerMock(realState, mockStage)
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = mergeDevReleasePlayBannerMock(
+                    playInAppUpdateProgressController.bannerUiState.value,
+                    devReleasePlayBannerMockStage.value
+                )
+            )
+        } else {
+            playInAppUpdateProgressController.bannerUiState
+        }
 
     private val _manualExportPickerRequested = MutableSharedFlow<String>(
         extraBufferCapacity = 1,
@@ -347,9 +381,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun flagOpenUpdateSheetFromRulesPromo() {
-        _openUpdateSheetFromRulesPromo.value = true
         if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
             _startPlayInAppUpdateAfterRulesPromoSheet.value = true
+        } else {
+            _openUpdateSheetFromRulesPromo.value = true
         }
     }
 
@@ -363,6 +398,42 @@ class SettingsViewModel @Inject constructor(
 
     fun dismissUpdatePromoBanner() {
         _updatePromoBannerDismissedThisSession.value = true
+        if (_updateInfo.value?.isDevReleaseMock == true) {
+            _updateInfo.value = null
+        }
+    }
+
+    /**
+     * Dev release: arms the global update promo (Rules / History / Settings). Swipe the card to dismiss.
+     */
+    fun devReleaseMockArmRulesUpdatePromoForRulesTab() {
+        if (!isDevReleaseBuild || !BuildConfig.SHOW_UPDATES) return
+        _updateInfo.value = UpdateInfo(
+            versionName = "9.9.9",
+            downloadUrl = "",
+            releaseNotes = "",
+            remoteApkAssetUpdatedAt = if (BuildConfig.FLAVOR == "github") {
+                DEV_RELEASE_MOCK_GITHUB_ASSET_UPDATED_AT
+            } else {
+                ""
+            },
+            isDevReleaseMock = true
+        )
+        _updatePromoBannerDismissedThisSession.value = false
+    }
+
+    /**
+     * Dev release: global Play-style banner as downloading, then ready to install (all flavors; GitHub uses no-op real).
+     */
+    fun devReleaseMockStartPlayUpdateBannerSequence() {
+        if (!isDevReleaseBuild) return
+        devReleasePlayBannerMockSequenceJob?.cancel()
+        devReleasePlayBannerMockSequenceJob = viewModelScope.launch {
+            devReleasePlayBannerMockStage.value = DevReleasePlayBannerMockStage.DOWNLOADING
+            delay(2_500L)
+            if (!isActive) return@launch
+            devReleasePlayBannerMockStage.value = DevReleasePlayBannerMockStage.READY
+        }
     }
 
     fun onPlayInAppUpdateUserCanceled() {
@@ -370,6 +441,13 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun completePlayFlexibleUpdateIfReady(activity: Activity?) {
+        if (isDevReleaseBuild &&
+            devReleasePlayBannerMockStage.value == DevReleasePlayBannerMockStage.READY
+        ) {
+            devReleasePlayBannerMockSequenceJob?.cancel()
+            devReleasePlayBannerMockStage.value = DevReleasePlayBannerMockStage.OFF
+            return
+        }
         if (activity == null) return
         playInAppUpdateProgressController.completeFlexibleUpdateIfReady(activity)
     }
@@ -544,7 +622,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun dismissUpdateSheet() {
-        val bannerState = playInAppUpdateProgressController.bannerUiState.value
+        val bannerState = resolvePlayBannerUiStateForSessionLogic()
         val blocksPendingClear = bannerState is PlayInAppUpdateBannerUiState.Downloading ||
             bannerState is PlayInAppUpdateBannerUiState.ReadyToInstall
         if (!blocksPendingClear) {
@@ -690,8 +768,40 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    private fun mergeDevReleasePlayBannerMock(
+        realState: PlayInAppUpdateBannerUiState,
+        mockStage: DevReleasePlayBannerMockStage
+    ): PlayInAppUpdateBannerUiState = when (mockStage) {
+        DevReleasePlayBannerMockStage.OFF -> realState
+        DevReleasePlayBannerMockStage.DOWNLOADING -> PlayInAppUpdateBannerUiState.Downloading(
+            bytesDownloaded = MOCK_PLAY_UPDATE_BYTES_DOWNLOADED,
+            totalBytesToDownload = MOCK_PLAY_UPDATE_BYTES_TOTAL,
+            indeterminateProgress = false
+        )
+        DevReleasePlayBannerMockStage.READY -> PlayInAppUpdateBannerUiState.ReadyToInstall
+    }
+
+    private fun resolvePlayBannerUiStateForSessionLogic(): PlayInAppUpdateBannerUiState {
+        if (!isDevReleaseBuild) {
+            return playInAppUpdateProgressController.bannerUiState.value
+        }
+        return mergeDevReleasePlayBannerMock(
+            playInAppUpdateProgressController.bannerUiState.value,
+            devReleasePlayBannerMockStage.value
+        )
+    }
+
+    override fun onCleared() {
+        devReleasePlayBannerMockSequenceJob?.cancel()
+        super.onCleared()
+    }
+
     companion object {
         private const val SCHEDULED_EXPORT_WORK_NAME = "scheduled_rules_export"
+        private const val MOCK_PLAY_UPDATE_BYTES_DOWNLOADED: Long = 3_000_000L
+        private const val MOCK_PLAY_UPDATE_BYTES_TOTAL: Long = 10_000_000L
+        /** Placeholder so GitHub update sheet shows Skip version for dev mocks. */
+        private const val DEV_RELEASE_MOCK_GITHUB_ASSET_UPDATED_AT = "2000-01-01T00:00:00Z"
     }
 }
 

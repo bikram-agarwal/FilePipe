@@ -17,17 +17,23 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
@@ -322,7 +328,7 @@ fun ScheduleDialog(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ScheduleTimePickerDialog(
     initialHour: Int,
@@ -372,17 +378,35 @@ private fun ScheduleTimePickerDialog(
                             .padding(top = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
-                            onClick = { showDial = !showDial }
-                        ) {
-                            Icon(
-                                imageVector = if (showDial) Icons.Filled.Keyboard else Icons.Filled.Schedule,
-                                contentDescription = if (showDial) {
-                                    stringResource(R.string.schedule_time_input_mode_cd)
-                                } else {
-                                    stringResource(R.string.schedule_time_dial_mode_cd)
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                TooltipAnchorPosition.Above
+                            ),
+                            tooltip = {
+                                PlainTooltip {
+                                    Text(
+                                        text = if (showDial) {
+                                            stringResource(R.string.schedule_time_input_mode_cd)
+                                        } else {
+                                            stringResource(R.string.schedule_time_dial_mode_cd)
+                                        }
+                                    )
                                 }
-                            )
+                            },
+                            state = rememberTooltipState()
+                        ) {
+                            IconButton(
+                                onClick = { showDial = !showDial }
+                            ) {
+                                Icon(
+                                    imageVector = if (showDial) Icons.Filled.Keyboard else Icons.Filled.Schedule,
+                                    contentDescription = if (showDial) {
+                                        stringResource(R.string.schedule_time_input_mode_cd)
+                                    } else {
+                                        stringResource(R.string.schedule_time_dial_mode_cd)
+                                    }
+                                )
+                            }
                         }
                         Spacer(Modifier.weight(1f))
                         TextButton(onClick = onDismiss) {

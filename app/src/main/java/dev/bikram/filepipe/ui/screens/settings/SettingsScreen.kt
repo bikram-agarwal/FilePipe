@@ -67,6 +67,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Notifications
@@ -102,13 +103,8 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
-import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TooltipAnchorPosition
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -124,7 +120,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -163,6 +165,7 @@ import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 import dev.bikram.filepipe.ui.components.AboutAuthorPhoto
 import dev.bikram.filepipe.ui.components.AppIconImage
+import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
@@ -177,6 +180,7 @@ import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
 import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.ui.components.text.SimpleMarkdown
 
@@ -209,6 +213,30 @@ private fun rememberSectionHighlightPulseAlpha(active: Boolean): Float {
     return if (active) pulse else 1f
 }
 
+private fun Modifier.pulsingSectionHighlightOutline(
+    active: Boolean,
+    outlineColor: Color,
+    expandDp: Dp = 10.dp,
+    cornerRadiusDp: Dp = 18.dp,
+    strokeWidthDp: Dp = 3.dp
+): Modifier {
+    if (!active) return this
+    return this
+        .graphicsLayer { clip = false }
+        .drawBehind {
+            val expandPx = expandDp.toPx()
+            val strokeWidthPx = strokeWidthDp.toPx()
+            val cornerPx = cornerRadiusDp.toPx()
+            drawRoundRect(
+                color = outlineColor,
+                topLeft = Offset(-expandPx, -expandPx),
+                size = Size(size.width + 2f * expandPx, size.height + 2f * expandPx),
+                cornerRadius = CornerRadius(cornerPx, cornerPx),
+                style = Stroke(width = strokeWidthPx)
+            )
+        }
+}
+
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
@@ -226,6 +254,7 @@ fun SettingsScreen(
     val preferences by viewModel.preferencesFlow.collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
+    val playInAppUpdateBannerUiState by viewModel.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
     val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
@@ -416,6 +445,18 @@ fun SettingsScreen(
         }
     }
 
+    LaunchedEffect(playInAppUpdateBannerUiState, showUpdateSheet) {
+        if (!showUpdateSheet || !BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
+        when (playInAppUpdateBannerUiState) {
+            is PlayInAppUpdateBannerUiState.Downloading,
+            PlayInAppUpdateBannerUiState.ReadyToInstall -> {
+                showUpdateSheet = false
+                viewModel.dismissUpdateSheet()
+            }
+            else -> Unit
+        }
+    }
+
     val openUpdateSheetFromRulesPromo by viewModel.openUpdateSheetFromRulesPromo.collectAsStateWithLifecycle()
     val startPlayAfterRulesPromoSheet by viewModel.startPlayInAppUpdateAfterRulesPromoSheet.collectAsStateWithLifecycle()
 
@@ -436,10 +477,8 @@ fun SettingsScreen(
         viewModel.consumeOpenUpdateSheetFromRulesPromo()
     }
 
-    LaunchedEffect(showUpdateSheet, startPlayAfterRulesPromoSheet) {
-        if (!showUpdateSheet || !startPlayAfterRulesPromoSheet || !BuildConfig.USE_PLAY_IN_APP_UPDATES) {
-            return@LaunchedEffect
-        }
+    LaunchedEffect(startPlayAfterRulesPromoSheet) {
+        if (!startPlayAfterRulesPromoSheet || !BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
         delay(400)
         val hostActivity = context as? ComponentActivity
         viewModel.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
@@ -466,6 +505,7 @@ fun SettingsScreen(
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
                 usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
+                playTap = playTap,
                 onDownloadClick = { info ->
                     playTap()
                     if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.downloadUrl.isBlank()) {
@@ -727,28 +767,17 @@ fun SettingsScreen(
             
             // ── Folder access ─────────────────────────────────────────────────
             item {
-                val folderAccessHighlightShape = RoundedCornerShape(16.dp)
                 val folderHighlightPulse = rememberSectionHighlightPulseAlpha(folderAccessSectionHighlight)
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .then(
-                            if (folderAccessSectionHighlight) {
-                                Modifier
-                                    .border(
-                                        width = 3.dp,
-                                        color = MaterialTheme.colorScheme.primary.copy(
-                                            alpha = folderHighlightPulse
-                                        ),
-                                        shape = folderAccessHighlightShape
-                                    )
-                                    .padding(10.dp)
-                            } else {
-                                Modifier
-                            }
+                        .pulsingSectionHighlightOutline(
+                            active = folderAccessSectionHighlight,
+                            outlineColor = MaterialTheme.colorScheme.primary.copy(
+                                alpha = folderHighlightPulse
+                            )
                         )
                 ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
                 SettingsSectionHeader(
                     icon = Icons.Default.FolderOpen,
                     title = stringResource(R.string.settings_folder_access_section)
@@ -879,34 +908,22 @@ fun SettingsScreen(
                     }
                 }
                 }
-                }
             }
 
             // ── Touch & Sound ────────────────────────────────────────────────
             item {
-                val notificationsHighlightShape = RoundedCornerShape(16.dp)
                 val notificationsHighlightPulse =
                     rememberSectionHighlightPulseAlpha(notificationsSectionHighlight)
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .then(
-                            if (notificationsSectionHighlight) {
-                                Modifier
-                                    .border(
-                                        width = 3.dp,
-                                        color = MaterialTheme.colorScheme.primary.copy(
-                                            alpha = notificationsHighlightPulse
-                                        ),
-                                        shape = notificationsHighlightShape
-                                    )
-                                    .padding(10.dp)
-                            } else {
-                                Modifier
-                            }
+                        .pulsingSectionHighlightOutline(
+                            active = notificationsSectionHighlight,
+                            outlineColor = MaterialTheme.colorScheme.primary.copy(
+                                alpha = notificationsHighlightPulse
+                            )
                         )
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
                         SettingsSectionHeader(
                             icon = Icons.Default.Vibration,
                             title = stringResource(R.string.settings_touch_sound_section)
@@ -989,7 +1006,6 @@ fun SettingsScreen(
                                 )
                             }
                         }
-                    }
                 }
             }
 
@@ -1342,6 +1358,43 @@ fun SettingsScreen(
                                     },
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (BuildConfig.BUILD_TYPE == "devRelease") {
+                item {
+                    Column(modifier = Modifier.padding(top = 24.dp)) {
+                        SettingsSectionHeader(
+                            icon = Icons.Filled.BugReport,
+                            title = stringResource(R.string.settings_dev_release_mocks_section)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    playTap()
+                                    viewModel.devReleaseMockArmRulesUpdatePromoForRulesTab()
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.settings_dev_release_mock_rules_banner))
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    playTap()
+                                    viewModel.devReleaseMockStartPlayUpdateBannerSequence()
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.settings_dev_release_mock_play_banner))
                             }
                         }
                     }
@@ -1770,6 +1823,7 @@ private fun UpdateCheckBottomSheetContent(
     changelogState: ChangelogUiState,
     showGithubExtraUi: Boolean,
     usePlayInAppUpdates: Boolean,
+    playTap: () -> Unit,
     onDownloadClick: (UpdateInfo) -> Unit,
     onSkipVersionClick: () -> Unit
 ) {
@@ -1821,11 +1875,11 @@ private fun UpdateCheckBottomSheetContent(
                             Spacer(Modifier.height(12.dp))
                         }
                         if (showGithubExtraUi) {
-                            val falsePositiveTooltipState = rememberTooltipState()
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Spacer(Modifier.width(48.dp))
                                 Text(
                                     text = stringResource(
                                         R.string.settings_update_available,
@@ -1836,39 +1890,11 @@ private fun UpdateCheckBottomSheetContent(
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.weight(1f)
                                 )
-                                TooltipBox(
-                                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                                        TooltipAnchorPosition.Above
-                                    ),
-                                    tooltip = {
-                                        PlainTooltip {
-                                            Text(
-                                                text = stringResource(
-                                                    R.string.settings_update_sheet_false_positive_tooltip
-                                                ),
-                                                style = MaterialTheme.typography.bodySmall
-                                            )
-                                        }
-                                    },
-                                    state = falsePositiveTooltipState
-                                ) {
-                                    IconButton(onClick = {
-                                        pagerCoroutineScope.launch {
-                                            if (falsePositiveTooltipState.isVisible) {
-                                                falsePositiveTooltipState.dismiss()
-                                            } else {
-                                                falsePositiveTooltipState.show()
-                                            }
-                                        }
-                                    }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Info,
-                                            contentDescription = stringResource(
-                                                R.string.settings_update_sheet_false_positive_tooltip
-                                            )
-                                        )
-                                    }
-                                }
+                                ToggleLabelHelpDropdown(
+                                    tipText = stringResource(R.string.settings_update_sheet_false_positive_tooltip),
+                                    contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
+                                    playTap = playTap
+                                )
                             }
                         } else {
                             Text(

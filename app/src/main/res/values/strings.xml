@@ -40,11 +40,10 @@
     <string name="rule_detail_folder_access_hint_filesystem">Internal storage root and Download folder need All Files Access. Go to Settings, and select \"All Files Access\"; or pick a subfolder instead.</string>
     <string name="rule_detail_folder_access_hint_backup_restore">After a backup restore, folder permissions are not restored. Turn All Files Access back on in Android settings if you used that mode, or tap each folder and allow access again.</string>
     <string name="rule_detail_validation_errors_summary">Check the sections below, fix any required fields, then try saving again.</string>
-    <string name="rule_detail_folder_access_summary_unavailable">One or more folders are missing or no longer available. Tap the highlighted paths below to fix them.</string>
+    <string name="rule_detail_folder_access_summary_unavailable">One or more folders are missing or no longer available. \nTap the highlighted paths below to fix them.</string>
     <string name="rule_detail_folder_access_summary_permission">One or more folders need access again. Tap the highlighted paths below and re-grant access.</string>
-    <string name="rule_detail_folder_access_summary_filesystem">One or more folders need access again or require All files access. Tap the highlighted paths below or change access mode in Settings.</string>
+    <string name="rule_detail_folder_access_summary_filesystem">One or more folders need access again or require All files access. \nTap the highlighted paths below or change access mode in Settings.</string>
     <string name="rule_detail_open_faq">Open FAQ</string>
-    <string name="rule_section_saf_help">You are using \"Selective Access\" mode. Android does not allow access to internal storage root, the Download root, or an SD card volume root. To use those locations, switch to \"All files access\" in Settings.</string>
     <string name="rule_open_all_files_settings">Open All files access settings</string>
     <string name="filesystem_folder_picker_title">Choose folder</string>
     <string name="filesystem_folder_picker_internal_storage">Internal Storage</string>
@@ -377,14 +376,17 @@
     <string name="settings_play_in_app_update_failed">Could not start the update. Try Check for updates again.</string>
     <string name="settings_play_in_app_update_canceled">Update was canceled. You can try again from Updates in Settings.</string>
     <string name="rules_update_promo_title">Update available</string>
-    <string name="rules_update_promo_message">A newer version is ready from Google Play.</string>
-    <string name="rules_update_promo_action">Open Settings</string>
+    <string name="rules_update_promo_message">A newer version is available</string>
+    <string name="rules_update_promo_action">Check Update</string>
+    <string name="settings_dev_release_mocks_section">Dev release mocks</string>
+    <string name="settings_dev_release_mock_rules_banner">Arm update promo banner</string>
+    <string name="settings_dev_release_mock_play_banner">Play update banner (download then install)</string>
     <string name="play_update_banner_downloading_title">Play update</string>
     <string name="play_update_banner_downloading">Downloading update…</string>
     <string name="play_update_banner_downloading_bytes">Downloading update %1$s / %2$s</string>
     <string name="play_update_banner_install_title">Update ready to install</string>
-    <string name="play_update_banner_install_subtitle">Restart to use the new version.</string>
-    <string name="play_update_banner_install_action">Install and restart</string>
+    <string name="play_update_banner_install_subtitle">Restart to use the new version</string>
+    <string name="play_update_banner_install_action">Install &amp; restart</string>
     <string name="settings_update_play_in_progress_body">An update from Google Play is already in progress. Continue to open Play and finish downloading or installing.</string>
     <string name="settings_update_resume_play">Continue update</string>
 

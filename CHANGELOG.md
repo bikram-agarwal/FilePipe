@@ -1,3 +1,16 @@
+## v3.1.1 UI consistency
+
+### 🔧 Improved Features
+
+- In Play Store flavor, tapping `check update` in banner won't open double bottom sheets.
+- Update and install banner layout made consistent.
+- Updated rule error banner layout to be similar to update banner layout.
+- Added missed tooltips in edit rule page.
+- Settings highlight container now doesn't shrink the section card.
+- [Dev build] Added buttons in Settings screen for mocking in-app update banners for testing.
+
+---
+
 ## v3.1.0 In-App Updates, Review, Share
 
 ### ✨ New Features
@@ -7,7 +20,7 @@
 - **Rate/Review the app**: You can now rate/review FilePipe directly from Settings.
 - **Share FilePipe**: Share a link to FilePipe with friends from the Settings screen.
 
-### 📈 Improved Features
+### 🔧 Improved Features
 
 - **Help always one tap away**: A new  ❔ button in the Settings header takes you straight to the FAQ and help section.
 - Adjusted how the app works with **edge-to-edge** on newer Android versions.

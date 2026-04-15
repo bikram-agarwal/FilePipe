@@ -73,6 +73,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -772,8 +773,8 @@ private fun PlayStoreGlobalUpdateBanner(
                 shape = expressiveShape,
                 border = BorderStroke(1.dp, scheme.outlineVariant),
                 colors = CardDefaults.outlinedCardColors(
-                    containerColor = scheme.primaryContainer,
-                    contentColor = scheme.onPrimaryContainer
+                    containerColor = scheme.surfaceContainerHigh,
+                    contentColor = scheme.onSurface
                 )
             ) {
                 Row(
@@ -793,13 +794,17 @@ private fun PlayStoreGlobalUpdateBanner(
                         Text(
                             text = stringResource(R.string.play_update_banner_install_title),
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
                             text = stringResource(R.string.play_update_banner_install_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = scheme.onPrimaryContainer.copy(alpha = 0.88f)
+                            color = scheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     Button(
@@ -809,7 +814,11 @@ private fun PlayStoreGlobalUpdateBanner(
                             contentColor = scheme.onPrimary
                         )
                     ) {
-                        Text(stringResource(R.string.play_update_banner_install_action))
+                        Text(
+                            text = stringResource(R.string.play_update_banner_install_action),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }

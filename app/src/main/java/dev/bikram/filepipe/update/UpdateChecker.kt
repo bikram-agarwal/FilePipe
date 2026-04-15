@@ -19,7 +19,11 @@ data class UpdateInfo(
      * Play only: [com.google.android.play.core.install.model.UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS].
      * Used for copy and UI so in-progress is not shown as plain "up to date".
      */
-    val isPlayStoreUpdateInProgress: Boolean = false
+    val isPlayStoreUpdateInProgress: Boolean = false,
+    /**
+     * Dev release only: [SettingsViewModel] arms a fake update for the global promo without Play or GitHub.
+     */
+    val isDevReleaseMock: Boolean = false
 )
 
 /** Used for update notifications dedupe and GitHub release acknowledgment. */

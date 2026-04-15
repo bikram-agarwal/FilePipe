@@ -14,7 +14,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -54,6 +55,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
@@ -67,20 +69,28 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -94,6 +104,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -115,6 +126,7 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
+import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.FileExtensionChips
 import dev.bikram.filepipe.ui.components.FilesystemFolderPickerSheetContent
 import dev.bikram.filepipe.ui.components.FolderPickerButton
@@ -151,7 +163,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.ButtonGroup
@@ -194,58 +206,69 @@ private data class PendingFilesystemFolderPick(
 )
 private val PillShape = RoundedCornerShape(50)
 
-/** ObtainX-style large faded icon at bottom-right of error cards (~alpha 28/255). */
-private val RuleErrorCardWatermarkAlpha = 28f / 255f
+private val RuleErrorBannerShape = RoundedCornerShape(28.dp)
 
 @Composable
 private fun RuleErrorAlertCard(
     title: String,
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(8.dp),
-    titleTrailing: (@Composable RowScope.() -> Unit)? = null,
+    titleTrailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val onErrorContainer = MaterialTheme.colorScheme.onErrorContainer
-    Surface(
+    val scheme = MaterialTheme.colorScheme
+    val useGradientBackground = LocalUseGradientBackground.current
+    val containerBase =
+        if (useGradientBackground) scheme.surface else scheme.surfaceContainerHigh
+    val errorBlendFraction = if (useGradientBackground) 0.38f else 0.26f
+    val containerFill = lerp(containerBase, scheme.error, errorBlendFraction)
+    val contentOnFill = scheme.onSurface
+    val borderColor = scheme.outlineVariant
+    OutlinedCard(
         modifier = modifier.fillMaxWidth(),
-        shape = SectionButtonShape,
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = onErrorContainer
+        shape = RuleErrorBannerShape,
+        border = BorderStroke(1.dp, borderColor),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = containerFill,
+            contentColor = contentOnFill
+        )
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Column(
+        CompositionLocalProvider(LocalContentColor provides contentOnFill) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(PaddingValues(top = 8.dp, start = 12.dp, end = 12.dp, bottom = 12.dp)),
-                verticalArrangement = verticalArrangement
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Warning,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                Icon(
+                    imageVector = Icons.Filled.Error,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = scheme.error
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = LocalContentColor.current,
+                            modifier = Modifier.weight(1f)
+                        )
+                        titleTrailing?.invoke()
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Column(
+                        verticalArrangement = verticalArrangement,
+                        content = content
                     )
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.weight(1f)
-                    )
-                    titleTrailing?.invoke(this)
                 }
-                content()
             }
-            Icon(
-                imageVector = Icons.Filled.Warning,
-                contentDescription = null,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 4.dp, bottom = 4.dp)
-                    .size(52.dp),
-                tint = onErrorContainer.copy(alpha = RuleErrorCardWatermarkAlpha)
-            )
         }
     }
 }
@@ -571,26 +594,38 @@ fun RuleDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilledTonalIconButton(
-                    onClick = { withTapSound { showRuleIconSheet = true } },
-                    modifier = Modifier
-                        .padding(top = 4.dp)
-                        .size(56.dp),
-                    shape = SectionButtonShape,
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                        TooltipAnchorPosition.Above
+                    ),
+                    tooltip = {
+                        PlainTooltip {
+                            Text(stringResource(R.string.rule_icon_picker_cd))
+                        }
+                    },
+                    state = rememberTooltipState()
                 ) {
-                    RuleIconOrEmoji(
-                        iconEmoji = state.iconEmoji,
-                        icon = state.icon,
-                        vectorSize = 34.dp,
-                        emojiFontSize = 32.sp,
-                        tint = MaterialTheme.colorScheme.primary,
-                        contentDescription = stringResource(R.string.rule_icon_picker_cd),
+                    FilledTonalIconButton(
+                        onClick = { withTapSound { showRuleIconSheet = true } },
                         modifier = Modifier
-                    )
+                            .padding(top = 4.dp)
+                            .size(56.dp),
+                        shape = SectionButtonShape,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        RuleIconOrEmoji(
+                            iconEmoji = state.iconEmoji,
+                            icon = state.icon,
+                            vectorSize = 34.dp,
+                            emojiFontSize = 32.sp,
+                            tint = MaterialTheme.colorScheme.primary,
+                            contentDescription = stringResource(R.string.rule_icon_picker_cd),
+                            modifier = Modifier
+                        )
+                    }
                 }
                 OutlinedTextField(
                     value = state.name,
@@ -621,45 +656,75 @@ fun RuleDetailScreen(
                 icon = Icons.Filled.Search
             ) {
                 state.sourceFolderPaths.forEach { path ->
-                    val isSourceBookmarked = path in bookmarkedFolders
-                    val sourceNeedsAccess = path in state.inaccessibleSourceIssues
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = buildString {
-                                if (sourceNeedsAccess) {
-                                    append(folderAccessIssueEmojiPrefix(path, state.folderAccessMode))
-                                }
-                                append(displayPath(path, internalStorageDisplayName))
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (sourceNeedsAccess) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable {
-                                    withTapSound {
-                                        launchFolderPicker(FolderPickIntent.ReplaceSource(path), path)
+                    key(path) {
+                        val isSourceBookmarked = path in bookmarkedFolders
+                        val sourceNeedsAccess = path in state.inaccessibleSourceIssues
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = buildString {
+                                    if (sourceNeedsAccess) {
+                                        append(folderAccessIssueEmojiPrefix(path, state.folderAccessMode))
                                     }
-                                }
-                        )
-                        IconButton(onClick = { withTapSound { viewModel.toggleBookmark(path) } }) {
-                            Icon(
-                                imageVector = if (isSourceBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                                contentDescription = stringResource(R.string.bookmark_toggle_cd),
-                                modifier = Modifier.size(22.dp),
-                                tint = if (isSourceBookmarked) MaterialTheme.colorScheme.primary
-                                       else MaterialTheme.colorScheme.onSurfaceVariant
+                                    append(displayPath(path, internalStorageDisplayName))
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (sourceNeedsAccess) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        withTapSound {
+                                            launchFolderPicker(FolderPickIntent.ReplaceSource(path), path)
+                                        }
+                                    }
                             )
-                        }
-                        IconButton(onClick = { withTapSound { viewModel.removeSourceFolder(path) } }) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.schedule_remove_short), modifier = Modifier.size(18.dp))
+                            TooltipBox(
+                                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                    TooltipAnchorPosition.Above
+                                ),
+                                tooltip = {
+                                    PlainTooltip {
+                                        Text(stringResource(R.string.bookmark_toggle_cd))
+                                    }
+                                },
+                                state = rememberTooltipState()
+                            ) {
+                                IconButton(onClick = { withTapSound { viewModel.toggleBookmark(path) } }) {
+                                    Icon(
+                                        imageVector = if (isSourceBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                        contentDescription = stringResource(R.string.bookmark_toggle_cd),
+                                        modifier = Modifier.size(22.dp),
+                                        tint = if (isSourceBookmarked) MaterialTheme.colorScheme.primary
+                                               else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            TooltipBox(
+                                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                    TooltipAnchorPosition.Above
+                                ),
+                                tooltip = {
+                                    PlainTooltip {
+                                        Text(stringResource(R.string.schedule_remove_short))
+                                    }
+                                },
+                                state = rememberTooltipState()
+                            ) {
+                                IconButton(onClick = { withTapSound { viewModel.removeSourceFolder(path) } }) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.schedule_remove_short),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -736,13 +801,24 @@ fun RuleDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = stringResource(R.string.rule_scan_subdirs_label),
-                            style = MaterialTheme.typography.bodyMedium,
+                        Row(
                             modifier = Modifier.weight(1f),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.rule_scan_subdirs_label),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            ToggleLabelHelpDropdown(
+                                tipText = stringResource(R.string.rule_scan_subdirs_support),
+                                contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
+                                playTap = playTap
+                            )
+                        }
                         Switch(
                             checked = state.scanSubdirectories,
                             onCheckedChange = { enabled ->
@@ -757,13 +833,24 @@ fun RuleDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = stringResource(R.string.rule_suppress_missing_source_card_label),
-                            style = MaterialTheme.typography.bodyMedium,
+                        Row(
                             modifier = Modifier.weight(1f),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.rule_suppress_missing_source_card_label),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            ToggleLabelHelpDropdown(
+                                tipText = stringResource(R.string.rule_suppress_missing_source_card_support),
+                                contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
+                                playTap = playTap
+                            )
+                        }
                         Switch(
                             checked = state.suppressMissingSourceFolderCardWarning,
                             onCheckedChange = { enabled ->
@@ -815,14 +902,26 @@ fun RuleDetailScreen(
                                     }
                                 }
                         )
-                        IconButton(onClick = { withTapSound { viewModel.toggleBookmark(state.destinationFolderPath) } }) {
-                            Icon(
-                                imageVector = if (isDestBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                                contentDescription = stringResource(R.string.bookmark_toggle_cd),
-                                modifier = Modifier.size(22.dp),
-                                tint = if (isDestBookmarked) MaterialTheme.colorScheme.primary
-                                       else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                TooltipAnchorPosition.Above
+                            ),
+                            tooltip = {
+                                PlainTooltip {
+                                    Text(stringResource(R.string.bookmark_toggle_cd))
+                                }
+                            },
+                            state = rememberTooltipState()
+                        ) {
+                            IconButton(onClick = { withTapSound { viewModel.toggleBookmark(state.destinationFolderPath) } }) {
+                                Icon(
+                                    imageVector = if (isDestBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                    contentDescription = stringResource(R.string.bookmark_toggle_cd),
+                                    modifier = Modifier.size(22.dp),
+                                    tint = if (isDestBookmarked) MaterialTheme.colorScheme.primary
+                                           else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -1003,8 +1102,23 @@ fun RuleDetailScreen(
                             )
                             Text(text = "  $scheduleText")
                         }
-                        IconButton(onClick = { withTapSound { viewModel.setSchedule(null) } }) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_schedule))
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                TooltipAnchorPosition.Above
+                            ),
+                            tooltip = {
+                                PlainTooltip {
+                                    Text(stringResource(R.string.remove_schedule))
+                                }
+                            },
+                            state = rememberTooltipState()
+                        ) {
+                            IconButton(onClick = { withTapSound { viewModel.setSchedule(null) } }) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.remove_schedule)
+                                )
+                            }
                         }
                     }
                 } else {
@@ -1153,16 +1267,46 @@ fun RuleDetailScreen(
             modifier = Modifier.align(Alignment.TopCenter),
             title = { Text(if (viewModel.isNewRule) stringResource(R.string.new_rule) else stringResource(R.string.edit_rule)) },
             navigationIcon = {
-                IconButton(onClick = { withTapSound(::tryNavigateBack) }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                        TooltipAnchorPosition.Above
+                    ),
+                    tooltip = {
+                        PlainTooltip {
+                            Text(stringResource(R.string.nav_back))
+                        }
+                    },
+                    state = rememberTooltipState()
+                ) {
+                    IconButton(onClick = { withTapSound(::tryNavigateBack) }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.nav_back)
+                        )
+                    }
                 }
             },
             actions = {
-                IconButton(
-                    onClick = { withTapSound { viewModel.loadPreview() } },
-                    enabled = state.sourceFolderPaths.isNotEmpty() && state.fileExtensions.isNotEmpty()
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                        TooltipAnchorPosition.Above
+                    ),
+                    tooltip = {
+                        PlainTooltip {
+                            Text(stringResource(R.string.preview_rule))
+                        }
+                    },
+                    state = rememberTooltipState()
                 ) {
-                    Icon(Icons.Default.Visibility, contentDescription = stringResource(R.string.preview_rule))
+                    IconButton(
+                        onClick = { withTapSound { viewModel.loadPreview() } },
+                        enabled = state.sourceFolderPaths.isNotEmpty() && state.fileExtensions.isNotEmpty()
+                    ) {
+                        Icon(
+                            Icons.Default.Visibility,
+                            contentDescription = stringResource(R.string.preview_rule)
+                        )
+                    }
                 }
             },
             colors = gradientOverlayTopAppBarColors()
