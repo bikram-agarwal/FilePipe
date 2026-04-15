@@ -17,4 +17,14 @@ abstract class GithubPlayUpdateModule {
     @Binds
     @Singleton
     abstract fun bindPlayInAppUpdateStarter(impl: GithubPlayUpdateNoOp): PlayInAppUpdateStarter
+
+    @Binds
+    @Singleton
+    abstract fun bindPlayInAppUpdateProgressController(
+        impl: GithubPlayUpdateNoOp
+    ): PlayInAppUpdateProgressController
+
+    @Binds
+    @Singleton
+    abstract fun bindAppReviewLauncher(impl: GithubPlayUpdateNoOp): AppReviewLauncher
 }

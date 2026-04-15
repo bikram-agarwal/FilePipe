@@ -26,8 +26,10 @@ import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import dev.bikram.filepipe.ui.InAppRatingAutoPromptHost
 import dev.bikram.filepipe.ui.navigation.AppNavigation
 import dev.bikram.filepipe.ui.theme.FilePipeTheme
+import dev.bikram.filepipe.update.AppReviewLauncher
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -42,6 +44,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var rulesAutoExportTrigger: RulesAutoExportTrigger
+
+    @Inject
+    lateinit var appReviewLauncher: AppReviewLauncher
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,6 +89,12 @@ class MainActivity : ComponentActivity() {
                         Box(Modifier.fillMaxSize())
                     }
                 } else {
+                    InAppRatingAutoPromptHost(
+                        preferences = preferences,
+                        activity = this@MainActivity,
+                        userPreferencesRepository = userPreferencesRepository,
+                        appReviewLauncher = appReviewLauncher
+                    )
                     AppNavigation(
                         hasSeenIntro = preferences.hasSeenIntro,
                         introSeenAtLaunch = introSeenAtLaunch!!,

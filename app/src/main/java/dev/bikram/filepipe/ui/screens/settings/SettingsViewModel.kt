@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.ui.screens.settings
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -27,6 +28,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import dev.bikram.filepipe.update.FILEPIPE_UPDATE_APK_CACHE_NAME
+import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
+import dev.bikram.filepipe.update.PlayInAppUpdateProgressController
+import dev.bikram.filepipe.update.AppReviewLauncher
 import dev.bikram.filepipe.update.PlayInAppUpdateStarter
 import dev.bikram.filepipe.update.PlayUpdateSessionHandle
 import dev.bikram.filepipe.update.UpdateAvailableNotifier
@@ -81,6 +85,8 @@ class SettingsViewModel @Inject constructor(
     private val updateChecker: UpdateChecker,
     private val playUpdateSessionHandle: PlayUpdateSessionHandle,
     private val playInAppUpdateStarter: PlayInAppUpdateStarter,
+    private val playInAppUpdateProgressController: PlayInAppUpdateProgressController,
+    private val appReviewLauncher: AppReviewLauncher,
     private val updateAvailableNotifier: UpdateAvailableNotifier,
     private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
     private val ruleRepository: RuleRepository
@@ -112,6 +118,20 @@ class SettingsViewModel @Inject constructor(
 
     private val _openUpdateSheetFromNotification = MutableStateFlow(false)
     val openUpdateSheetFromNotification: StateFlow<Boolean> = _openUpdateSheetFromNotification.asStateFlow()
+
+    private val _openUpdateSheetFromRulesPromo = MutableStateFlow(false)
+    val openUpdateSheetFromRulesPromo: StateFlow<Boolean> = _openUpdateSheetFromRulesPromo.asStateFlow()
+
+    private val _startPlayInAppUpdateAfterRulesPromoSheet = MutableStateFlow(false)
+    val startPlayInAppUpdateAfterRulesPromoSheet: StateFlow<Boolean> =
+        _startPlayInAppUpdateAfterRulesPromoSheet.asStateFlow()
+
+    private val _updatePromoBannerDismissedThisSession = MutableStateFlow(false)
+    val updatePromoBannerDismissedThisSession: StateFlow<Boolean> =
+        _updatePromoBannerDismissedThisSession.asStateFlow()
+
+    val playInAppUpdateBannerUiState: StateFlow<PlayInAppUpdateBannerUiState> =
+        playInAppUpdateProgressController.bannerUiState
 
     private val _manualExportPickerRequested = MutableSharedFlow<String>(
         extraBufferCapacity = 1,
@@ -326,6 +346,47 @@ class SettingsViewModel @Inject constructor(
         _openUpdateSheetFromNotification.value = false
     }
 
+    fun flagOpenUpdateSheetFromRulesPromo() {
+        _openUpdateSheetFromRulesPromo.value = true
+        if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
+            _startPlayInAppUpdateAfterRulesPromoSheet.value = true
+        }
+    }
+
+    fun consumeOpenUpdateSheetFromRulesPromo() {
+        _openUpdateSheetFromRulesPromo.value = false
+    }
+
+    fun consumeStartPlayInAppUpdateAfterRulesPromoSheet() {
+        _startPlayInAppUpdateAfterRulesPromoSheet.value = false
+    }
+
+    fun dismissUpdatePromoBanner() {
+        _updatePromoBannerDismissedThisSession.value = true
+    }
+
+    fun onPlayInAppUpdateUserCanceled() {
+        _userMessage.value = context.getString(R.string.settings_play_in_app_update_canceled)
+    }
+
+    fun completePlayFlexibleUpdateIfReady(activity: Activity?) {
+        if (activity == null) return
+        playInAppUpdateProgressController.completeFlexibleUpdateIfReady(activity)
+    }
+
+    fun launchPlayInAppReviewFromSettings(activity: ComponentActivity?, onFlowFinished: () -> Unit) {
+        val hostActivity = activity ?: return
+        appReviewLauncher.tryLaunchInAppReview(hostActivity, onFlowFinished)
+    }
+
+    fun markPlayAutoReviewPromptHandledForCurrentInstall(lastUpdateTimeMillis: Long) = viewModelScope.launch {
+        userPreferencesRepository.setPlayAutoReviewPromptedForLastUpdateTime(lastUpdateTimeMillis)
+    }
+
+    fun setInAppReviewAutoNeverAskAgain(neverAskAgain: Boolean) = viewModelScope.launch {
+        userPreferencesRepository.setInAppReviewAutoNeverAskAgain(neverAskAgain)
+    }
+
     fun skipAcknowledgedGithubRelease(updateInfo: UpdateInfo) = viewModelScope.launch {
         if (BuildConfig.FLAVOR != "github") return@launch
         if (updateInfo.remoteApkAssetUpdatedAt.isBlank()) return@launch
@@ -409,13 +470,16 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun checkForUpdate(silent: Boolean = false) = viewModelScope.launch {
-        playUpdateSessionHandle.clearPendingPlayUpdate()
         _isCheckingUpdate.value = true
         _downloadProgress.value = null
         val info = updateChecker.checkForUpdate()
         _isCheckingUpdate.value = false
         if (info != null) {
             _updateInfo.value = info
+            _updatePromoBannerDismissedThisSession.value = false
+            if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.isPlayStoreUpdateInProgress) {
+                playInAppUpdateProgressController.ensureInstallStateListenerRegistered()
+            }
             if (BuildConfig.SHOW_UPDATES) {
                 val prefsSnapshot = userPreferencesRepository.getPreferencesSnapshot()
                 updateAvailableNotifier.notifyIfNewUpdateAvailable(info, prefsSnapshot)
@@ -435,7 +499,6 @@ class SettingsViewModel @Inject constructor(
      * No snackbar; the sheet shows up-to-date vs available.
      */
     fun beginManualUpdateCheckFromSheet() {
-        playUpdateSessionHandle.clearPendingPlayUpdate()
         _isCheckingUpdate.value = true
         _downloadProgress.value = null
         _manualUpdateNoResult.value = false
@@ -444,6 +507,10 @@ class SettingsViewModel @Inject constructor(
             _isCheckingUpdate.value = false
             if (info != null) {
                 _updateInfo.value = info
+                _updatePromoBannerDismissedThisSession.value = false
+                if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.isPlayStoreUpdateInProgress) {
+                    playInAppUpdateProgressController.ensureInstallStateListenerRegistered()
+                }
                 if (BuildConfig.SHOW_UPDATES) {
                     val prefsSnapshot = userPreferencesRepository.getPreferencesSnapshot()
                     updateAvailableNotifier.notifyIfNewUpdateAvailable(info, prefsSnapshot)
@@ -477,7 +544,12 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun dismissUpdateSheet() {
-        playUpdateSessionHandle.clearPendingPlayUpdate()
+        val bannerState = playInAppUpdateProgressController.bannerUiState.value
+        val blocksPendingClear = bannerState is PlayInAppUpdateBannerUiState.Downloading ||
+            bannerState is PlayInAppUpdateBannerUiState.ReadyToInstall
+        if (!blocksPendingClear) {
+            playUpdateSessionHandle.clearPendingPlayUpdate()
+        }
         _updateSheetChangelog.value = ChangelogUiState.Hidden
         _manualUpdateNoResult.value = false
     }

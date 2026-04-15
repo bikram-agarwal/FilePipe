@@ -14,7 +14,12 @@ data class UpdateInfo(
      * GitHub: ISO 8601 `updated_at` of the chosen `.apk` asset (for hotfix + ack fingerprint).
      * Play: empty.
      */
-    val remoteApkAssetUpdatedAt: String = ""
+    val remoteApkAssetUpdatedAt: String = "",
+    /**
+     * Play only: [com.google.android.play.core.install.model.UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS].
+     * Used for copy and UI so in-progress is not shown as plain "up to date".
+     */
+    val isPlayStoreUpdateInProgress: Boolean = false
 )
 
 /** Used for update notifications dedupe and GitHub release acknowledgment. */

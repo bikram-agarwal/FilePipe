@@ -37,7 +37,17 @@ data class AppPreferences(
     /** Neutral light/dark greys for list cards instead of accent-tinted elevated surfaces. */
     val useFixedCardColors: Boolean = false,
     /** SAF vs All files. Legacy [FolderAccessMode.DEFERRED] is migrated to [FolderAccessMode.SAF_ONLY]. */
-    val folderAccessMode: FolderAccessMode = FolderAccessMode.SAF_ONLY
+    val folderAccessMode: FolderAccessMode = FolderAccessMode.SAF_ONLY,
+    /**
+     * Play flavor: user turned off automatic in-app rating in Settings. When true, the app does not
+     * auto-request Google Play's in-app review flow after updates.
+     */
+    val inAppReviewAutoNeverAskAgain: Boolean = false,
+    /**
+     * Play flavor: [android.content.pm.PackageInfo.lastUpdateTime] for which we already requested the
+     * automatic in-app review flow (or it completed) for this install/update cycle.
+     */
+    val playAutoReviewPromptedForLastUpdateTime: Long = 0L
 ) {
     companion object {
         val DEFAULT = AppPreferences()

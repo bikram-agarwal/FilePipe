@@ -19,4 +19,14 @@ abstract class PlayStorePlayUpdateModule {
     abstract fun bindPlayInAppUpdateStarter(
         impl: PlayStorePlayInAppUpdateStarter
     ): PlayInAppUpdateStarter
+
+    @Binds
+    @Singleton
+    abstract fun bindPlayInAppUpdateProgressController(
+        impl: PlayStorePlayInAppUpdateCoordinator
+    ): PlayInAppUpdateProgressController
+
+    @Binds
+    @Singleton
+    abstract fun bindAppReviewLauncher(impl: PlayStoreAppReviewLauncher): AppReviewLauncher
 }

@@ -1,15 +1,21 @@
-## v3.0.2: Visual fixes
+## v3.1.0 In-App Updates, Review, Share
 
-### 🔧 Improved Features
+### ✨ New Features
 
-- Adjusted how the app works with **edge-to-edge** on newer Android versions: the theme no longer sets status and navigation bar colors the old way (which Android 15 flags as deprecated). System status and navigation icon contrast (light vs dark icons) now follows your **light, dark, or black** theme choice.
-- Updated the **AndroidX Activity** library so edge-to-edge behavior stays correct when the device rotates or the configuration changes.
+- **Update nudge**: When a new version is available, an update banner appears at top of screen so you never miss an update.
+- **Seamless updates (Play Store)**: FilePipe can now download and install updates from Google Play without leaving the app. A banner shows download progress and lets you restart to apply the update when it's ready.
+- **Rate/Review the app**: You can now rate/review FilePipe directly from Settings.
+- **Share FilePipe**: Share a link to FilePipe with friends from the Settings screen.
 
-### 🐛 Bug Fixes
+## 📈 Improved Features
 
-- On the onboarding welcome screen, the app name uses the proper on-surface color so it stays readable with your theme.
-- On onboarding, the “full access” highlight card uses a clearer surface blend and no drop shadow so it looks flatter and more consistent with the rest of the screen.
-- Top bars on Rules, History, Settings, FAQ, rule detail, and history detail now use one shared style so titles, back buttons, and action icons stay readable on the gradient background instead of picking up colors that were hard to see on dark scrims.
+- **Help always one tap away**: A new  ❔ button in the Settings header takes you straight to the FAQ and help section.
+- Adjusted how the app works with **edge-to-edge** on newer Android versions.
+- Tweaked colors on onboarding title screen and permissions screen. 
+
+## 🐛 Bug Fixes
+
+- Fixed a bug where a newly duplicated rule wouldn't appear on the list.
 
 ---
 

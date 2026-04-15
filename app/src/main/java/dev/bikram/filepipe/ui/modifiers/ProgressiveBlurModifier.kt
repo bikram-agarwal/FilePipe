@@ -76,9 +76,11 @@ fun Modifier.progressiveBlur(
     topHeight: Float = 0f,
     bottomHeight: Float = 0f,
     showGradientOverlay: Boolean = true,
-    overlayAlpha: Float = 0.28f
+    overlayAlpha: Float = 0.28f,
+    overlayAlphaBottom: Float = overlayAlpha
 ): Modifier = composed {
-    val overlayColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = overlayAlpha)
+    val overlayColorTop = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = overlayAlpha)
+    val overlayColorBottom = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = overlayAlphaBottom)
 
     val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && blurRadius > 0f) {
         Modifier.graphicsLayer {
@@ -101,7 +103,7 @@ fun Modifier.progressiveBlur(
             if (topHeight > 0f) {
                 drawRect(
                     brush = Brush.verticalGradient(
-                        colors = listOf(overlayColor, Color.Transparent),
+                        colors = listOf(overlayColorTop, Color.Transparent),
                         endY = topHeight
                     )
                 )
@@ -109,7 +111,7 @@ fun Modifier.progressiveBlur(
             if (bottomHeight > 0f) {
                 drawRect(
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, overlayColor),
+                        colors = listOf(Color.Transparent, overlayColorBottom),
                         startY = size.height - bottomHeight
                     )
                 )
@@ -143,7 +145,8 @@ fun ProgressiveBlurStyle.applyToScrollableList(): Modifier = Modifier.progressiv
     topHeight = topHeightPx,
     bottomHeight = bottomHeightPx,
     showGradientOverlay = true,
-    overlayAlpha = overlayAlpha
+    overlayAlpha = overlayAlpha,
+    overlayAlphaBottom = overlayAlphaBottom
 )
 
 /** Blur for a full-screen layer (y=0 at window top), e.g. rule edit scroll under transparent chrome. */
@@ -152,5 +155,6 @@ fun ProgressiveBlurStyle.applyToFullBleedLayer(): Modifier = Modifier.progressiv
     topHeight = topHeightPx,
     bottomHeight = bottomHeightPx,
     showGradientOverlay = true,
-    overlayAlpha = overlayAlpha
+    overlayAlpha = overlayAlpha,
+    overlayAlphaBottom = overlayAlphaBottom
 )

@@ -1,12 +1,17 @@
 package dev.bikram.filepipe.ui.screens.settings
 
 import android.Manifest
+import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,12 +25,17 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -49,6 +59,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Shop
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -74,6 +85,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.LargeTopAppBar
@@ -90,8 +102,8 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
@@ -119,6 +131,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -156,7 +169,10 @@ import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
+import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
+import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
@@ -193,12 +209,17 @@ private fun rememberSectionHighlightPulseAlpha(active: Boolean): Float {
     return if (active) pulse else 1f
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3ExpressiveApi::class,
+    ExperimentalFoundationApi::class
+)
 @Composable
 fun SettingsScreen(
     contentPadding: PaddingValues,
     onOpenIntro: () -> Unit = {},
     onOpenFaqStorageSection: () -> Unit = {},
+    onOpenHelp: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val playTap = rememberPlayTapSound()
@@ -383,7 +404,11 @@ fun SettingsScreen(
 
     val playInAppUpdateLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
-    ) { }
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_CANCELED) {
+            viewModel.onPlayInAppUpdateUserCanceled()
+        }
+    }
 
     LaunchedEffect(showUpdateSheet) {
         if (showUpdateSheet) {
@@ -391,12 +416,34 @@ fun SettingsScreen(
         }
     }
 
+    val openUpdateSheetFromRulesPromo by viewModel.openUpdateSheetFromRulesPromo.collectAsStateWithLifecycle()
+    val startPlayAfterRulesPromoSheet by viewModel.startPlayInAppUpdateAfterRulesPromoSheet.collectAsStateWithLifecycle()
+
     LaunchedEffect(openUpdateSheetFromNotification) {
         if (!openUpdateSheetFromNotification || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
         showUpdateSheet = true
         viewModel.loadChangelogForUpdateSheet()
         viewModel.beginManualUpdateCheckFromSheet()
         viewModel.consumeOpenUpdateSheetFromNotification()
+    }
+
+    LaunchedEffect(openUpdateSheetFromRulesPromo) {
+        if (!openUpdateSheetFromRulesPromo || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
+        showUpdateSheet = true
+        if (BuildConfig.FLAVOR == "github" && BuildConfig.CHANGELOG_GITHUB_REPO.isNotBlank()) {
+            viewModel.loadChangelogForUpdateSheet()
+        }
+        viewModel.consumeOpenUpdateSheetFromRulesPromo()
+    }
+
+    LaunchedEffect(showUpdateSheet, startPlayAfterRulesPromoSheet) {
+        if (!showUpdateSheet || !startPlayAfterRulesPromoSheet || !BuildConfig.USE_PLAY_IN_APP_UPDATES) {
+            return@LaunchedEffect
+        }
+        delay(400)
+        val hostActivity = context as? ComponentActivity
+        viewModel.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
+        viewModel.consumeStartPlayInAppUpdateAfterRulesPromoSheet()
     }
 
     if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
@@ -418,6 +465,7 @@ fun SettingsScreen(
                 downloadProgress = downloadProgress,
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
+                usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
                 onDownloadClick = { info ->
                     playTap()
                     if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.downloadUrl.isBlank()) {
@@ -514,11 +562,37 @@ fun SettingsScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
-            LargeTopAppBar(
+            Column(Modifier.fillMaxWidth()) {
+                LocalPrimaryTabTopBanner.current()
+                LargeTopAppBar(
+                modifier = Modifier.then(
+                    if (LocalPrimaryTabTopBannerActive.current) {
+                        Modifier.consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
+                    } else {
+                        Modifier
+                    }
+                ),
                 title = { Text(stringResource(R.string.settings_title)) },
                 scrollBehavior = scrollBehavior,
-                colors = gradientOverlayTopAppBarColors()
+                colors = gradientOverlayTopAppBarColors(),
+                actions = {
+                    val helpOpenLabel = stringResource(R.string.settings_fab_open_help)
+                    FilledTonalIconButton(
+                        onClick = {
+                            playTap()
+                            onOpenHelp()
+                        },
+                        modifier = Modifier.semantics { contentDescription = helpOpenLabel }
+                    ) {
+                        Text(
+                            text = "?",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
             )
+            }
         },
         snackbarHost = {
             SnackbarHost(
@@ -1279,6 +1353,20 @@ fun SettingsScreen(
                 val aboutContext = LocalContext.current
                 val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
                     .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
+                val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
+                val copyAboutLinkToClipboard = remember(aboutContext) {
+                    { url: String ->
+                        val clipboard =
+                            aboutContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("link", url))
+                        Toast.makeText(
+                            aboutContext,
+                            aboutContext.getString(R.string.toast_about_link_copied),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
                 Column(modifier = Modifier.padding(top = 24.dp)) {
                     SettingsSectionHeader(
                         icon = Icons.Default.Info,
@@ -1347,28 +1435,234 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurface,
                                     textAlign = TextAlign.Center
                                 )
-                                if (githubRepoForSourceLink.isNotEmpty()) {
-                                    Spacer(Modifier.height(16.dp))
-                                    OutlinedButton(
-                                        onClick = {
-                                            playTap()
-                                            val url = "https://github.com/$githubRepoForSourceLink"
-                                            runCatching {
-                                                aboutContext.startActivity(
-                                                    Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                Spacer(Modifier.height(24.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val hostActivity = context as? ComponentActivity
+                                    val aboutPillShape = RoundedCornerShape(50)
+                                    if (BuildConfig.FLAVOR == "github") {
+                                        Surface(
+                                            shape = aboutPillShape,
+                                            color = Color.Transparent,
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                            modifier = Modifier
+                                                .clip(aboutPillShape)
+                                                .tapSoundCombinedClickable(
+                                                    onClick = {
+                                                        runCatching {
+                                                            aboutContext.startActivity(
+                                                                Intent(
+                                                                    Intent.ACTION_VIEW,
+                                                                    Uri.parse(playStoreListingUrl)
+                                                                )
+                                                            )
+                                                        }
+                                                    },
+                                                    onLongClick = {
+                                                        copyAboutLinkToClipboard(playStoreListingUrl)
+                                                    },
+                                                    role = Role.Button
+                                                )
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Shop,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(20.dp),
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(
+                                                    text = stringResource(R.string.settings_rate_on_play_store),
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    color = MaterialTheme.colorScheme.primary
                                                 )
                                             }
-                                        },
-                                        shape = RoundedCornerShape(50)
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.ic_github_mark),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(stringResource(R.string.settings_view_on_github))
+                                        }
+                                        if (githubRepoForSourceLink.isNotEmpty()) {
+                                            Spacer(Modifier.width(12.dp))
+                                            Surface(
+                                                shape = aboutPillShape,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier
+                                                    .clip(aboutPillShape)
+                                                    .tapSoundCombinedClickable(
+                                                        onClick = {
+                                                            val repoUrl = "https://github.com/$githubRepoForSourceLink"
+                                                            runCatching {
+                                                                aboutContext.startActivity(
+                                                                    Intent(Intent.ACTION_VIEW, Uri.parse(repoUrl))
+                                                                )
+                                                            }
+                                                        },
+                                                        onLongClick = {
+                                                            copyAboutLinkToClipboard(
+                                                                "https://github.com/$githubRepoForSourceLink"
+                                                            )
+                                                        },
+                                                        role = Role.Button
+                                                    )
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.Center
+                                                ) {
+                                                    Icon(
+                                                        painter = painterResource(R.drawable.ic_github_mark),
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(20.dp),
+                                                        tint = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Text(
+                                                        text = stringResource(R.string.settings_star_on_github),
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        color = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        if (playStoreAboutUsesListingOnly) {
+                                            Surface(
+                                                shape = aboutPillShape,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier
+                                                    .clip(aboutPillShape)
+                                                    .tapSoundCombinedClickable(
+                                                        onClick = {
+                                                            runCatching {
+                                                                aboutContext.startActivity(
+                                                                    Intent(
+                                                                        Intent.ACTION_VIEW,
+                                                                        Uri.parse(playStoreListingUrl)
+                                                                    )
+                                                                )
+                                                            }
+                                                        },
+                                                        onLongClick = {
+                                                            copyAboutLinkToClipboard(playStoreListingUrl)
+                                                        },
+                                                        role = Role.Button
+                                                    )
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Shop,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(20.dp),
+                                                        tint = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Text(
+                                                        text = stringResource(R.string.settings_rate_on_play_store),
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        color = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            Surface(
+                                                shape = aboutPillShape,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier
+                                                    .clip(aboutPillShape)
+                                                    .tapSoundCombinedClickable(
+                                                        onClick = {
+                                                            if (hostActivity != null) {
+                                                                viewModel.launchPlayInAppReviewFromSettings(
+                                                                    hostActivity
+                                                                ) {
+                                                                    playStoreAboutUsesListingOnly = true
+                                                                }
+                                                            }
+                                                        },
+                                                        onLongClick = {
+                                                            copyAboutLinkToClipboard(playStoreListingUrl)
+                                                        },
+                                                        role = Role.Button
+                                                    )
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Shop,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(20.dp),
+                                                        tint = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Text(
+                                                        text = stringResource(R.string.settings_rate_on_play_store),
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        color = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        if (githubRepoForSourceLink.isNotEmpty()) {
+                                            Spacer(Modifier.width(12.dp))
+                                            Surface(
+                                                shape = aboutPillShape,
+                                                color = Color.Transparent,
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                                modifier = Modifier
+                                                    .clip(aboutPillShape)
+                                                    .tapSoundCombinedClickable(
+                                                        onClick = {
+                                                            val repoUrl = "https://github.com/$githubRepoForSourceLink"
+                                                            runCatching {
+                                                                aboutContext.startActivity(
+                                                                    Intent(Intent.ACTION_VIEW, Uri.parse(repoUrl))
+                                                                )
+                                                            }
+                                                        },
+                                                        onLongClick = {
+                                                            copyAboutLinkToClipboard(
+                                                                "https://github.com/$githubRepoForSourceLink"
+                                                            )
+                                                        },
+                                                        role = Role.Button
+                                                    )
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.Center
+                                                ) {
+                                                    Icon(
+                                                        painter = painterResource(R.drawable.ic_github_mark),
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(20.dp),
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Text(
+                                                        text = stringResource(R.string.settings_star_on_github),
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1377,6 +1671,37 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * Opens the system share sheet with the same link and message as the Settings About section used for sharing.
+ */
+fun launchAppShareChooser(context: Context) {
+    val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
+        .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
+    val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
+    val shareUrl = when {
+        BuildConfig.FLAVOR == "playstore" -> playStoreListingUrl
+        githubRepoForSourceLink.isNotEmpty() ->
+            "https://github.com/$githubRepoForSourceLink/releases/latest"
+        else -> ""
+    }
+    if (shareUrl.isEmpty()) return
+    val message = context.getString(
+        R.string.about_share_text,
+        context.getString(R.string.app_name),
+        shareUrl
+    )
+    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, message)
+        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.app_name))
+    }
+    runCatching {
+        context.startActivity(
+            Intent.createChooser(sendIntent, context.getString(R.string.settings_share_app))
+        )
     }
 }
 
@@ -1444,6 +1769,7 @@ private fun UpdateCheckBottomSheetContent(
     downloadProgress: Float?,
     changelogState: ChangelogUiState,
     showGithubExtraUi: Boolean,
+    usePlayInAppUpdates: Boolean,
     onDownloadClick: (UpdateInfo) -> Unit,
     onSkipVersionClick: () -> Unit
 ) {
@@ -1485,7 +1811,17 @@ private fun UpdateCheckBottomSheetContent(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(Modifier.height(8.dp))
+                        if (usePlayInAppUpdates && availableUpdate.isPlayStoreUpdateInProgress) {
+                            Text(
+                                text = stringResource(R.string.settings_update_play_in_progress_body),
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(12.dp))
+                        }
                         if (showGithubExtraUi) {
+                            val falsePositiveTooltipState = rememberTooltipState()
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
@@ -1514,9 +1850,17 @@ private fun UpdateCheckBottomSheetContent(
                                             )
                                         }
                                     },
-                                    state = rememberTooltipState()
+                                    state = falsePositiveTooltipState
                                 ) {
-                                    IconButton(onClick = { }) {
+                                    IconButton(onClick = {
+                                        pagerCoroutineScope.launch {
+                                            if (falsePositiveTooltipState.isVisible) {
+                                                falsePositiveTooltipState.dismiss()
+                                            } else {
+                                                falsePositiveTooltipState.show()
+                                            }
+                                        }
+                                    }) {
                                         Icon(
                                             imageVector = Icons.Default.Info,
                                             contentDescription = stringResource(
@@ -1547,10 +1891,14 @@ private fun UpdateCheckBottomSheetContent(
                             shape = RoundedCornerShape(24.dp)
                         ) {
                             Text(
-                                text = stringResource(
-                                    R.string.settings_download_install,
-                                    availableUpdate.versionName
-                                ),
+                                text = if (usePlayInAppUpdates && availableUpdate.isPlayStoreUpdateInProgress) {
+                                    stringResource(R.string.settings_update_resume_play)
+                                } else {
+                                    stringResource(
+                                        R.string.settings_download_install,
+                                        availableUpdate.versionName
+                                    )
+                                },
                                 maxLines = 1
                             )
                         }

@@ -15,7 +15,8 @@ import javax.inject.Singleton
 @Singleton
 class PlayStorePlayInAppUpdateStarter @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val playInAppUpdateSession: PlayInAppUpdateSession
+    private val playInAppUpdateSession: PlayInAppUpdateSession,
+    private val playInAppUpdateProgressController: PlayInAppUpdateProgressController
 ) : PlayInAppUpdateStarter {
 
     override fun startUpdateIfPending(
@@ -32,6 +33,9 @@ class PlayStorePlayInAppUpdateStarter @Inject constructor(
         val options = AppUpdateOptions.newBuilder(updateType).build()
         return try {
             manager.startUpdateFlowForResult(appUpdateInfo, launcher, options)
+            if (updateType == AppUpdateType.FLEXIBLE) {
+                playInAppUpdateProgressController.onFlexibleUpdateFlowStarted()
+            }
             true
         } catch (_: IntentSender.SendIntentException) {
             false

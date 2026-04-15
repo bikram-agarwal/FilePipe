@@ -1,6 +1,8 @@
 package dev.bikram.filepipe.ui.navigation
 
+import android.app.Activity
 import android.os.Build
+import android.text.format.Formatter
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -8,9 +10,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,31 +24,42 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.NewReleases
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,9 +71,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -73,6 +91,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.bikram.filepipe.ui.components.SwipeDismissableUpdatePromoBanner
+import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
@@ -90,6 +110,7 @@ import dev.bikram.filepipe.ui.screens.rules.RulesScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsBringIntoViewSection
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
+import dev.bikram.filepipe.ui.screens.settings.launchAppShareChooser
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseFixedCardColors
@@ -157,9 +178,12 @@ fun AppNavigation(
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val floatingBarHeight = 64.dp
     val scrimHeight = navBarInset + floatingBarHeight + 24.dp
-    val topBlurSmallChrome = statusBarInset + 64.dp
-    // Blur only under collapsed app-bar band so expanded LargeTopAppBar does not tint/blur list content below.
-    val topBlurHeightDp = topBlurSmallChrome
+    /** Extra top blur under History filter chips (must match [isHistoryFilterRoute] detection). */
+    val historyFilterChipsBand = 96.dp
+    val isHistoryFilterRoute = currentDestination?.hierarchy?.any { destination ->
+        destination.route == Screen.History.route ||
+            (destination.route?.startsWith("history_for_rule") == true)
+    } == true
     val fullScreenBottomBlurShort = navBarInset + 48.dp
     val fullScreenBottomBlurRuleEdit = navBarInset + 88.dp
     val bottomBlurHeightDp = when {
@@ -171,30 +195,6 @@ fun AppNavigation(
     val contentPaddingBottom = if (showBottomBar) scrimHeight else navBarInset
     val density = LocalDensity.current
     val bottomBlurHeightPx = with(density) { bottomBlurHeightDp.toPx() }
-    val topBlurHeightPx = with(density) { topBlurHeightDp.toPx() }
-    val progressiveBlurStyle: ProgressiveBlurStyle? =
-        if (!preferences.progressiveBlurEnabled) {
-            null
-        } else {
-            val blurRadius =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    if (isRuleDetailRoute || isFaqRoute) 56f else 44f
-                } else {
-                    0f
-                }
-            val overlayAlpha = when {
-                isRuleDetailRoute -> 0.38f
-                isFaqRoute -> 0.38f
-                isHistoryDetailRoute -> 0.30f
-                else -> 0.34f
-            }
-            ProgressiveBlurStyle(
-                topHeightPx = topBlurHeightPx,
-                bottomHeightPx = bottomBlurHeightPx,
-                blurRadius = blurRadius,
-                overlayAlpha = overlayAlpha
-            )
-        }
 
     // Activity-scoped VMs for nav bar FAB actions
     val historyVm: HistoryViewModel = hiltViewModel()
@@ -239,6 +239,72 @@ fun AppNavigation(
         pendingShortcutRepository.clearPendingHistoryDetail()
     }
 
+    val updateInfo by settingsVm.updateInfo.collectAsStateWithLifecycle()
+    val updatePromoDismissed by settingsVm.updatePromoBannerDismissedThisSession.collectAsStateWithLifecycle()
+    val playBannerState by settingsVm.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
+    val navRoute = navBackStackEntry?.destination?.route
+    val primaryTabRoute = navRoute != null &&
+        (navRoute == Screen.Rules.route ||
+            navRoute == Screen.History.route ||
+            navRoute == Screen.Settings.route)
+    val showGlobalUpdatePromoBanner = BuildConfig.SHOW_UPDATES &&
+        updateInfo != null &&
+        !updatePromoDismissed &&
+        playBannerState is PlayInAppUpdateBannerUiState.Hidden &&
+        primaryTabRoute
+
+    val showPlayUpdateBanner = playBannerState != PlayInAppUpdateBannerUiState.Hidden
+    val primaryTabTopBannerActive =
+        (showPlayUpdateBanner && primaryTabRoute) || showGlobalUpdatePromoBanner
+    val primaryTabTopBannerBlurInsetDp = if (primaryTabTopBannerActive) 100.dp else 0.dp
+    val topBlurSmallChrome = statusBarInset + 64.dp + primaryTabTopBannerBlurInsetDp
+    val topBlurHeightDp = if (isHistoryFilterRoute) {
+        topBlurSmallChrome + historyFilterChipsBand
+    } else {
+        topBlurSmallChrome
+    }
+    val topBlurHeightPx = with(density) { topBlurHeightDp.toPx() }
+    val progressiveBlurStyle: ProgressiveBlurStyle? =
+        if (!preferences.progressiveBlurEnabled) {
+            null
+        } else {
+            val blurRadius =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    when {
+                        isRuleDetailRoute || isFaqRoute -> 56f
+                        isHistoryFilterRoute -> 54f
+                        else -> 44f
+                    }
+                } else {
+                    0f
+                }
+            val overlayAlpha = when {
+                isRuleDetailRoute -> 0.38f
+                isFaqRoute -> 0.38f
+                isHistoryDetailRoute -> 0.30f
+                isHistoryFilterRoute -> 0.52f
+                navRoute == Screen.Rules.route -> 0.46f
+                navRoute == Screen.Settings.route -> 0.40f
+                else -> 0.34f
+            }
+            val primaryTabBottomBlurBoost = showBottomBar &&
+                (navRoute == Screen.Rules.route ||
+                    navRoute == Screen.History.route ||
+                    navRoute == Screen.Settings.route)
+            val overlayAlphaBottom = if (primaryTabBottomBlurBoost) {
+                (overlayAlpha + 0.14f).coerceAtMost(0.58f)
+            } else {
+                overlayAlpha
+            }
+            ProgressiveBlurStyle(
+                topHeightPx = topBlurHeightPx,
+                bottomHeightPx = bottomBlurHeightPx,
+                blurRadius = blurRadius,
+                overlayAlpha = overlayAlpha,
+                overlayAlphaBottom = overlayAlphaBottom
+            )
+        }
+
     val currentTab = bottomNavItems.find { item ->
         currentDestination?.hierarchy?.any { it.route == item.screen.route } == true
     }?.screen
@@ -270,6 +336,49 @@ fun AppNavigation(
         LocalProgressiveBlurEnabled provides preferences.progressiveBlurEnabled,
         LocalProgressiveBlurStyle provides progressiveBlurStyle
     ) {
+        val context = LocalContext.current
+        CompositionLocalProvider(LocalPrimaryTabTopBannerActive provides primaryTabTopBannerActive) {
+        CompositionLocalProvider(
+            LocalPrimaryTabTopBanner provides {
+                if (primaryTabTopBannerActive) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top))
+                            .consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
+                    ) {
+                        if (showPlayUpdateBanner && primaryTabRoute) {
+                            PlayStoreGlobalUpdateBanner(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 2.dp),
+                                state = playBannerState,
+                                onInstallClick = {
+                                    val activity = context as? Activity
+                                    settingsVm.completePlayFlexibleUpdateIfReady(activity)
+                                }
+                            )
+                        }
+                        if (showGlobalUpdatePromoBanner) {
+                            SwipeDismissableUpdatePromoBanner(
+                                onDismiss = { settingsVm.dismissUpdatePromoBanner() },
+                                onOpenSettingsClick = {
+                                    playTap()
+                                    settingsVm.flagOpenUpdateSheetFromRulesPromo()
+                                    navController.navigate(Screen.Settings.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        ) {
         Box(Modifier.fillMaxSize()) {
             if (preferences.useGradientBackground) {
                 val scheme = MaterialTheme.colorScheme
@@ -286,20 +395,26 @@ fun AppNavigation(
                             )
                         )
                 )
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                )
             }
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                containerColor = if (preferences.useGradientBackground) Color.Transparent else MaterialTheme.colorScheme.background,
-                bottomBar = {}
-            ) { _ ->
+            Column(Modifier.fillMaxSize()) {
                 NavHost(
-                navController = navController,
-                startDestination = lockedNavStartDestination,
-                enterTransition = { slideInHorizontally { it } + fadeIn() },
-                exitTransition = { slideOutHorizontally { -it / 3 } + fadeOut() },
-                popEnterTransition = { slideInHorizontally { -it } + fadeIn() },
-                popExitTransition = { slideOutHorizontally { it } + fadeOut() }
-            ) {
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .background(Color.Transparent),
+                        navController = navController,
+                        startDestination = lockedNavStartDestination,
+                        enterTransition = { slideInHorizontally { it } + fadeIn() },
+                        exitTransition = { slideOutHorizontally { -it / 3 } + fadeOut() },
+                        popEnterTransition = { slideInHorizontally { -it } + fadeIn() },
+                        popExitTransition = { slideOutHorizontally { it } + fadeOut() }
+                    ) {
                 composable(
                     route = Screen.OnboardingTitle.route
                 ) {
@@ -419,6 +534,9 @@ fun AppNavigation(
                         onOpenFaqStorageSection = {
                             navController.navigate(Screen.Faq.createRoute(Screen.Faq.FOCUS_STORAGE_ACCESS))
                         },
+                        onOpenHelp = {
+                            navController.navigate(Screen.Faq.createRoute())
+                        },
                         viewModel = settingsVm
                     )
                 }
@@ -486,7 +604,7 @@ fun AppNavigation(
                     )
                 }
             }
-        }
+            }
 
         if (showBottomBar) {
             FloatingNavBar(
@@ -503,6 +621,7 @@ fun AppNavigation(
                     }
                 },
                 fabContent = {
+                    val hostContext = LocalContext.current
                     val containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
                     val contentColor = MaterialTheme.colorScheme.primary
                     val fabModifier = Modifier.size(64.dp)
@@ -534,15 +653,15 @@ fun AppNavigation(
                         Screen.Settings -> FloatingActionButton(
                             onClick = {
                                 playTap()
-                                navController.navigate(Screen.Faq.createRoute())
+                                launchAppShareChooser(hostContext)
                             },
                             modifier = fabModifier,
                             containerColor = containerColor,
                             contentColor = contentColor
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.Help,
-                                contentDescription = stringResource(R.string.settings_fab_open_help)
+                                Icons.Default.Share,
+                                contentDescription = stringResource(R.string.settings_share_app)
                             )
                         }
 
@@ -553,6 +672,148 @@ fun AppNavigation(
             )
         }
     }
+    }
+    }
+    }
+}
+
+@Composable
+private fun PlayStoreGlobalUpdateBanner(
+    modifier: Modifier = Modifier,
+    state: PlayInAppUpdateBannerUiState,
+    onInstallClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val scheme = MaterialTheme.colorScheme
+    val expressiveShape = RoundedCornerShape(28.dp)
+    when (state) {
+        is PlayInAppUpdateBannerUiState.Hidden -> Unit
+        is PlayInAppUpdateBannerUiState.Downloading -> {
+            OutlinedCard(
+                modifier = modifier.fillMaxWidth(),
+                shape = expressiveShape,
+                border = BorderStroke(1.dp, scheme.outlineVariant),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = scheme.surfaceContainerHigh,
+                    contentColor = scheme.onSurface
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SystemUpdate,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = scheme.primary
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.play_update_banner_downloading_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        val progressLabel = if (state.indeterminateProgress) {
+                            stringResource(R.string.play_update_banner_downloading)
+                        } else {
+                            val downloaded = Formatter.formatFileSize(context, state.bytesDownloaded)
+                            val total = Formatter.formatFileSize(context, state.totalBytesToDownload)
+                            stringResource(R.string.play_update_banner_downloading_bytes, downloaded, total)
+                        }
+                        Text(
+                            text = progressLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = scheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        if (state.indeterminateProgress) {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(expressiveShape),
+                                color = scheme.primary,
+                                trackColor = scheme.surfaceContainerHighest
+                            )
+                        } else if (state.totalBytesToDownload > 0L) {
+                            val fraction = (state.bytesDownloaded.toFloat() / state.totalBytesToDownload.toFloat())
+                                .coerceIn(0f, 1f)
+                            LinearProgressIndicator(
+                                progress = { fraction },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(expressiveShape),
+                                color = scheme.primary,
+                                trackColor = scheme.surfaceContainerHighest
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(expressiveShape),
+                                color = scheme.primary,
+                                trackColor = scheme.surfaceContainerHighest
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        PlayInAppUpdateBannerUiState.ReadyToInstall -> {
+            OutlinedCard(
+                modifier = modifier.fillMaxWidth(),
+                shape = expressiveShape,
+                border = BorderStroke(1.dp, scheme.outlineVariant),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = scheme.primaryContainer,
+                    contentColor = scheme.onPrimaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NewReleases,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = scheme.primary
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.play_update_banner_install_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.play_update_banner_install_subtitle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = scheme.onPrimaryContainer.copy(alpha = 0.88f)
+                        )
+                    }
+                    Button(
+                        onClick = onInstallClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = scheme.primary,
+                            contentColor = scheme.onPrimary
+                        )
+                    ) {
+                        Text(stringResource(R.string.play_update_banner_install_action))
+                    }
+                }
+            }
+        }
     }
 }
 

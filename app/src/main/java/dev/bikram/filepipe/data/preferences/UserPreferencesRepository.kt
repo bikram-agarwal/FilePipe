@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -73,6 +74,9 @@ private object PrefKeys {
     val CUSTOM_SEED_HEX_LIST = stringPreferencesKey("custom_seed_hex_list")
     val ACTIVE_CUSTOM_SEED_HEX = stringPreferencesKey("active_custom_seed_hex")
     val FOLDER_ACCESS_MODE = stringPreferencesKey("folder_access_mode")
+    val IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN = booleanPreferencesKey("in_app_review_auto_never_ask_again")
+    val PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME =
+        longPreferencesKey("play_auto_review_prompted_for_last_update_time")
 }
 
 @Singleton
@@ -155,7 +159,10 @@ class UserPreferencesRepository @Inject constructor(
                 prefs[PrefKeys.FOLDER_ACCESS_MODE]?.let { raw ->
                     runCatching { FolderAccessMode.valueOf(raw) }.getOrNull()
                 }
-            )
+            ),
+            inAppReviewAutoNeverAskAgain = prefs[PrefKeys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN] ?: false,
+            playAutoReviewPromptedForLastUpdateTime =
+                prefs[PrefKeys.PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME] ?: 0L
         )
     }
 
@@ -302,6 +309,16 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setFolderAccessMode(mode: FolderAccessMode) {
         dataStore.edit { it[PrefKeys.FOLDER_ACCESS_MODE] = mode.name }
+    }
+
+    suspend fun setInAppReviewAutoNeverAskAgain(neverAskAgain: Boolean) {
+        dataStore.edit { it[PrefKeys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN] = neverAskAgain }
+    }
+
+    suspend fun setPlayAutoReviewPromptedForLastUpdateTime(lastUpdateTimeMillis: Long) {
+        dataStore.edit {
+            it[PrefKeys.PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME] = lastUpdateTimeMillis
+        }
     }
 
     /**

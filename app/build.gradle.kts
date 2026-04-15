@@ -40,16 +40,23 @@ val hasReleaseSigning =
         releaseKeyPassword != null
 
 extensions.configure<ApplicationExtension>("android") {
+    val filePipeApplicationId = "dev.bikram.filepipe"
     namespace = "dev.bikram.filepipe"
     compileSdk = 36
     defaultConfig {
-        applicationId = "dev.bikram.filepipe"
+        applicationId = filePipeApplicationId
         minSdk = 30
         targetSdk = 36
-        versionCode = 302
-        versionName = "3.0.2"
+        versionCode = 310
+        versionName = "3.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "PLAY_STORE_LISTING_URL",
+            "\"https://play.google.com/store/apps/details?id=$filePipeApplicationId\""
+        )
 
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64", "armeabi-v7a")
@@ -207,4 +214,6 @@ dependencies {
     // Inspect merged output: ./gradlew :app:processPlaystoreReleaseMainManifest
     add("playstoreImplementation", "com.google.android.play:app-update:2.1.0")
     add("playstoreImplementation", "com.google.android.play:app-update-ktx:2.1.0")
+    add("playstoreImplementation", "com.google.android.play:review:2.0.2")
+    add("playstoreImplementation", "com.google.android.play:review-ktx:2.0.2")
 }

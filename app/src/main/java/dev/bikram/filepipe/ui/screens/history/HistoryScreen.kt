@@ -9,11 +9,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -81,9 +86,11 @@ import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
 import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
-import dev.bikram.filepipe.ui.modifiers.progressiveBlur
+import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
+import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -190,7 +197,15 @@ fun HistoryScreen(
                 }
             }
             Column(Modifier.fillMaxWidth()) {
+                LocalPrimaryTabTopBanner.current()
                 LargeTopAppBar(
+                    modifier = Modifier.then(
+                        if (LocalPrimaryTabTopBannerActive.current) {
+                            Modifier.consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
+                        } else {
+                            Modifier
+                        }
+                    ),
                     title = { Text(stringResource(R.string.history_title)) },
                     scrollBehavior = scrollBehavior,
                     colors = gradientOverlayTopAppBarColors(),
@@ -322,18 +337,8 @@ fun HistoryScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
-        val blurStyle = LocalProgressiveBlurStyle.current
-        val scrollBlurModifier = if (blurStyle != null) {
-            Modifier.progressiveBlur(
-                blurRadius = blurStyle.blurRadius,
-                topHeight = blurStyle.topHeightPx,
-                bottomHeight = blurStyle.bottomHeightPx,
-                showGradientOverlay = true,
-                overlayAlpha = blurStyle.overlayAlpha,
-            )
-        } else {
-            Modifier
-        }
+        val scrollBlurModifier =
+            LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
 
         if (isEmpty) {
             AnimatedVisibility(

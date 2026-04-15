@@ -15,7 +15,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -87,6 +92,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -112,6 +118,8 @@ import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
+import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
 import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
@@ -174,6 +182,12 @@ fun RulesScreen(
             return@LaunchedEffect
         }
         if (reorderableRules.isEmpty()) {
+            reorderableRules = rules
+            return@LaunchedEffect
+        }
+        val reorderRuleIds = reorderableRules.map { it.id }.toSet()
+        val hasRuleNotInReorderList = rules.any { rule -> rule.id !in reorderRuleIds }
+        if (hasRuleNotInReorderList) {
             reorderableRules = rules
             return@LaunchedEffect
         }
@@ -245,64 +259,74 @@ fun RulesScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Rules") },
-                scrollBehavior = scrollBehavior,
-                colors = gradientOverlayTopAppBarColors(),
-                actions = {
-                    if (hasSelection && !isRunning) {
-                        IconButton(onClick = {
-                            playTap()
-                            viewModel.selectAll()
-                        }) {
-                            Icon(Icons.Default.SelectAll, contentDescription = stringResource(R.string.run_select_all))
+            Column(Modifier.fillMaxWidth()) {
+                LocalPrimaryTabTopBanner.current()
+                LargeTopAppBar(
+                    modifier = Modifier.then(
+                        if (LocalPrimaryTabTopBannerActive.current) {
+                            Modifier.consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
+                        } else {
+                            Modifier
                         }
-                        IconButton(onClick = {
-                            playTap()
-                            viewModel.clearSelection()
-                        }) {
-                            Icon(Icons.Default.Deselect, contentDescription = stringResource(R.string.run_deselect_all))
-                        }
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            Box {
-                                FilledTonalIconButton(onClick = {
-                                    playTap()
-                                    sortMenuExpanded = true
-                                }) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.Sort,
-                                        contentDescription = stringResource(R.string.history_sort_menu)
+                    ),
+                    title = { Text("Rules") },
+                    scrollBehavior = scrollBehavior,
+                    colors = gradientOverlayTopAppBarColors(),
+                    actions = {
+                        if (hasSelection && !isRunning) {
+                            IconButton(onClick = {
+                                playTap()
+                                viewModel.selectAll()
+                            }) {
+                                Icon(Icons.Default.SelectAll, contentDescription = stringResource(R.string.run_select_all))
+                            }
+                            IconButton(onClick = {
+                                playTap()
+                                viewModel.clearSelection()
+                            }) {
+                                Icon(Icons.Default.Deselect, contentDescription = stringResource(R.string.run_deselect_all))
+                            }
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                Box {
+                                    FilledTonalIconButton(onClick = {
+                                        playTap()
+                                        sortMenuExpanded = true
+                                    }) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.Sort,
+                                            contentDescription = stringResource(R.string.history_sort_menu)
+                                        )
+                                    }
+                                    RulesSortDropdown(
+                                        expanded = sortMenuExpanded,
+                                        onDismiss = { sortMenuExpanded = false },
+                                        sortKey = sortKey,
+                                        sortDirection = sortDirection,
+                                        onSelect = { key, direction ->
+                                            playTap()
+                                            viewModel.setSort(key, direction)
+                                            sortMenuExpanded = false
+                                        }
                                     )
                                 }
-                                RulesSortDropdown(
-                                    expanded = sortMenuExpanded,
-                                    onDismiss = { sortMenuExpanded = false },
-                                    sortKey = sortKey,
-                                    sortDirection = sortDirection,
-                                    onSelect = { key, direction ->
-                                        playTap()
-                                        viewModel.setSort(key, direction)
-                                        sortMenuExpanded = false
-                                    }
-                                )
-                            }
-                            FilledTonalIconButton(onClick = {
-                                playTap()
-                                viewModel.toggleGlobalViewMode()
-                            }) {
-                                Icon(
-                                    imageVector = if (isCompactMode) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
-                                    contentDescription = if (isCompactMode) "Expand all" else "Collapse all"
-                                )
+                                FilledTonalIconButton(onClick = {
+                                    playTap()
+                                    viewModel.toggleGlobalViewMode()
+                                }) {
+                                    Icon(
+                                        imageVector = if (isCompactMode) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
+                                        contentDescription = if (isCompactMode) "Expand all" else "Collapse all"
+                                    )
+                                }
                             }
                         }
                     }
-                }
-            )
+                )
+            }
         },
         snackbarHost = {
             SnackbarHost(

@@ -22,25 +22,48 @@ class UpdateCheckerImpl @Inject constructor(
             return null
         }
 
-        if (appUpdateInfo.updateAvailability() != UpdateAvailability.UPDATE_AVAILABLE) {
-            playInAppUpdateSession.clearPendingPlayUpdate()
-            return null
+        when (appUpdateInfo.updateAvailability()) {
+            UpdateAvailability.UPDATE_AVAILABLE -> {
+                val flexibleAllowed = appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
+                val immediateAllowed = appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
+                if (!flexibleAllowed && !immediateAllowed) {
+                    playInAppUpdateSession.clearPendingPlayUpdate()
+                    return null
+                }
+                playInAppUpdateSession.setPendingAppUpdateInfo(appUpdateInfo)
+                val versionLabel = semanticVersionNameFromPlayUpdateInfo(appUpdateInfo)
+                return UpdateInfo(
+                    versionName = versionLabel,
+                    downloadUrl = "",
+                    releaseNotes = "",
+                    isPlayStoreUpdateInProgress = false
+                )
+            }
+            UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> {
+                val flexibleAllowed = appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
+                val immediateAllowed = appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
+                if (!flexibleAllowed && !immediateAllowed) {
+                    playInAppUpdateSession.clearPendingPlayUpdate()
+                    return null
+                }
+                playInAppUpdateSession.setPendingAppUpdateInfo(appUpdateInfo)
+                val versionLabel = semanticVersionNameFromPlayUpdateInfo(appUpdateInfo)
+                return UpdateInfo(
+                    versionName = versionLabel,
+                    downloadUrl = "",
+                    releaseNotes = "",
+                    isPlayStoreUpdateInProgress = true
+                )
+            }
+            UpdateAvailability.UPDATE_NOT_AVAILABLE,
+            UpdateAvailability.UNKNOWN -> {
+                playInAppUpdateSession.clearPendingPlayUpdate()
+                return null
+            }
+            else -> {
+                playInAppUpdateSession.clearPendingPlayUpdate()
+                return null
+            }
         }
-
-        val flexibleAllowed = appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
-        val immediateAllowed = appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-        if (!flexibleAllowed && !immediateAllowed) {
-            playInAppUpdateSession.clearPendingPlayUpdate()
-            return null
-        }
-
-        playInAppUpdateSession.setPendingAppUpdateInfo(appUpdateInfo)
-
-        val versionLabel = "Play build ${appUpdateInfo.availableVersionCode()}"
-        return UpdateInfo(
-            versionName = versionLabel,
-            downloadUrl = "",
-            releaseNotes = ""
-        )
     }
 }
