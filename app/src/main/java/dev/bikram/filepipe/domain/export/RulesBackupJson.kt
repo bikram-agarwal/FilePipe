@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package dev.bikram.filepipe.domain.export
 
 import dev.bikram.filepipe.data.preferences.AppColorSource
@@ -15,6 +17,7 @@ import dev.bikram.filepipe.domain.model.ScheduleType
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNames
 
 /**
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
@@ -130,7 +133,8 @@ data class SettingsBackupDto(
     val notifyOnNewUpdates: Boolean = false,
     val saveUpdateApkToDownloads: Boolean = false,
     val useGradientBackground: Boolean = true,
-    val useFixedCardColors: Boolean = false,
+    @JsonNames("useFixedCardColors")
+    val useEnhancedShading: Boolean = false,
     val customSeedHex: String? = null,
     val customSeedHexes: List<String>? = null,
     val activeCustomSeedHex: String? = null,
@@ -226,7 +230,7 @@ fun AppPreferences.toBackupDto(): SettingsBackupDto = SettingsBackupDto(
     notifyOnNewUpdates = notifyOnNewUpdates,
     saveUpdateApkToDownloads = saveUpdateApkToDownloads,
     useGradientBackground = useGradientBackground,
-    useFixedCardColors = useFixedCardColors,
+    useEnhancedShading = useEnhancedShading,
     customSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },
     customSeedHexes = savedCustomSeedHexes.takeIf { it.isNotEmpty() },
     activeCustomSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },

@@ -741,12 +741,12 @@ fun SettingsScreen(
                     }
                     GroupedListItem(position = GroupPosition.MIDDLE) {
                         SettingsToggleItem(
-                            title = stringResource(R.string.settings_fixed_card_colors),
-                            subtitle = stringResource(R.string.settings_fixed_card_colors_desc),
-                            checked = preferences.useFixedCardColors,
+                            title = stringResource(R.string.settings_enhanced_shading),
+                            subtitle = stringResource(R.string.settings_enhanced_shading_desc),
+                            checked = preferences.useEnhancedShading,
                             onCheckedChange = { enabled ->
                                 playTap()
-                                viewModel.setUseFixedCardColors(enabled)
+                                viewModel.setUseEnhancedShading(enabled)
                             }
                         )
                     }

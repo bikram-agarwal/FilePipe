@@ -219,6 +219,8 @@ fun FilePipeTheme(
     themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     hapticFeedbackEnabled: Boolean = true,
     useGradientBackground: Boolean = true,
+    /** When true, omit primary surface boost (Remember-style enhanced shading). */
+    useEnhancedShading: Boolean = false,
     activeCustomSeedHex: String = "",
     content: @Composable () -> Unit
 ) {
@@ -263,16 +265,22 @@ fun FilePipeTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
+    val applyPrimarySurfaceBoost =
+        !useEnhancedShading && themeMode != AppThemeMode.BLACK
     val colorScheme = baseColorScheme
         .let { base ->
             if (useDynamic || staticSeedColor != null) base
             else base.increaseBackgroundCardContrast()
         }
         .let { scheme ->
-            if (useGradientBackground) {
-                scheme.boostSurfaceContainersTowardPrimaryForGradient(darkTheme = darkTheme)
+            if (applyPrimarySurfaceBoost) {
+                if (useGradientBackground) {
+                    scheme.boostSurfaceContainersTowardPrimaryForGradient(darkTheme = darkTheme)
+                } else {
+                    scheme.boostSurfaceContainersTowardPrimaryForSolidBackground(darkTheme = darkTheme)
+                }
             } else {
-                scheme.boostSurfaceContainersTowardPrimaryForSolidBackground(darkTheme = darkTheme)
+                scheme
             }
         }
         .let { scheme ->

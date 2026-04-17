@@ -114,7 +114,6 @@ import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
 import dev.bikram.filepipe.ui.screens.settings.launchAppShareChooser
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
-import dev.bikram.filepipe.ui.theme.LocalUseFixedCardColors
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.ProgressiveBlurStyle
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
@@ -333,7 +332,6 @@ fun AppNavigation(
 
     CompositionLocalProvider(
         LocalUseGradientBackground provides preferences.useGradientBackground,
-        LocalUseFixedCardColors provides preferences.useFixedCardColors,
         LocalProgressiveBlurEnabled provides preferences.progressiveBlurEnabled,
         LocalProgressiveBlurStyle provides progressiveBlurStyle
     ) {

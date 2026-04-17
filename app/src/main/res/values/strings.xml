@@ -269,8 +269,8 @@
     <string name="settings_appearance_section">Appearance</string>
     <string name="settings_gradient_background">Gradient background</string>
     <string name="settings_gradient_background_desc">Tinted background using your theme color</string>
-    <string name="settings_fixed_card_colors">Fixed card colors</string>
-    <string name="settings_fixed_card_colors_desc">Neutral grey cards instead of accent-tinted</string>
+    <string name="settings_enhanced_shading">Enhanced Shading</string>
+    <string name="settings_enhanced_shading_desc">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="settings_backup_section">Backup &amp; Restore</string>
     <string name="settings_choose_export_folder">Choose export folder</string>
     <string name="settings_export_folder_hint">Folder for exporting backups (rules, history, settings).</string>
