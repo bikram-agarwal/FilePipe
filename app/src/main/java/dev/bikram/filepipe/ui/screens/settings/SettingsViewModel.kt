@@ -356,8 +356,8 @@ class SettingsViewModel @Inject constructor(
         userPreferencesRepository.setUseGradientBackground(enabled)
     }
 
-    fun setUseFixedCardColors(enabled: Boolean) = viewModelScope.launch {
-        userPreferencesRepository.setUseFixedCardColors(enabled)
+    fun setUseEnhancedShading(enabled: Boolean) = viewModelScope.launch {
+        userPreferencesRepository.setUseEnhancedShading(enabled)
     }
 
     fun setUpdateCheckSchedule(schedule: UpdateCheckSchedule) = viewModelScope.launch {

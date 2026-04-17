@@ -68,7 +68,9 @@ private object PrefKeys {
     val SAVE_UPDATE_APK_TO_DOWNLOADS = booleanPreferencesKey("save_update_apk_to_downloads")
     val UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED = booleanPreferencesKey("update_apk_downloads_copy_succeeded")
     val USE_GRADIENT_BACKGROUND = booleanPreferencesKey("use_gradient_background")
-    val FIXED_CARD_COLORS = booleanPreferencesKey("fixed_card_colors")
+    val ENHANCED_SHADING = booleanPreferencesKey("enhanced_shading")
+    /** Legacy DataStore key; read once then removed in [UserPreferencesRepository.migrateLegacyEnhancedShadingPreferenceIfNeeded]. */
+    val ENHANCED_SHADING_LEGACY = booleanPreferencesKey("fixed_card_colors")
     /** Legacy; migrated into [CUSTOM_SEED_HEX_LIST] + [ACTIVE_CUSTOM_SEED_HEX]. */
     val CUSTOM_SEED_HEX = stringPreferencesKey("custom_seed_hex")
     val CUSTOM_SEED_HEX_LIST = stringPreferencesKey("custom_seed_hex_list")
@@ -154,7 +156,9 @@ class UserPreferencesRepository @Inject constructor(
             saveUpdateApkToDownloads = prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] ?: false,
             updateApkDownloadsCopySucceeded = prefs[PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED] ?: false,
             useGradientBackground = prefs[PrefKeys.USE_GRADIENT_BACKGROUND] ?: true,
-            useFixedCardColors = prefs[PrefKeys.FIXED_CARD_COLORS] ?: false,
+            useEnhancedShading = prefs[PrefKeys.ENHANCED_SHADING]
+                ?: prefs[PrefKeys.ENHANCED_SHADING_LEGACY]
+                ?: false,
             folderAccessMode = normalizeFolderAccessModeStored(
                 prefs[PrefKeys.FOLDER_ACCESS_MODE]?.let { raw ->
                     runCatching { FolderAccessMode.valueOf(raw) }.getOrNull()
@@ -303,8 +307,25 @@ class UserPreferencesRepository @Inject constructor(
         dataStore.edit { it[PrefKeys.USE_GRADIENT_BACKGROUND] = enabled }
     }
 
-    suspend fun setUseFixedCardColors(enabled: Boolean) {
-        dataStore.edit { it[PrefKeys.FIXED_CARD_COLORS] = enabled }
+    suspend fun setUseEnhancedShading(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[PrefKeys.ENHANCED_SHADING] = enabled
+            prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
+        }
+    }
+
+    /**
+     * Copies `fixed_card_colors` into [PrefKeys.ENHANCED_SHADING] if needed, then deletes the legacy key.
+     * Safe to call on every launch.
+     */
+    suspend fun migrateLegacyEnhancedShadingPreferenceIfNeeded() {
+        dataStore.edit { prefs ->
+            if (!prefs.contains(PrefKeys.ENHANCED_SHADING_LEGACY)) return@edit
+            if (!prefs.contains(PrefKeys.ENHANCED_SHADING)) {
+                prefs[PrefKeys.ENHANCED_SHADING] = prefs[PrefKeys.ENHANCED_SHADING_LEGACY] ?: false
+            }
+            prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
+        }
     }
 
     suspend fun setFolderAccessMode(mode: FolderAccessMode) {
@@ -487,7 +508,8 @@ class UserPreferencesRepository @Inject constructor(
             prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] = dto.saveUpdateApkToDownloads
             prefs.remove(PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED)
             prefs[PrefKeys.USE_GRADIENT_BACKGROUND] = dto.useGradientBackground
-            prefs[PrefKeys.FIXED_CARD_COLORS] = dto.useFixedCardColors
+            prefs[PrefKeys.ENHANCED_SHADING] = dto.useEnhancedShading
+            prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
 
             dto.folderAccessMode?.let { raw ->
                 runCatching { FolderAccessMode.valueOf(raw) }.getOrNull()?.let { mode ->

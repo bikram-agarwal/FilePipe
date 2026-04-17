@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
             var introSeenAtLaunch by remember { mutableStateOf<Boolean?>(null) }
             LaunchedEffect(Unit) {
+                userPreferencesRepository.migrateLegacyEnhancedShadingPreferenceIfNeeded()
                 introSeenAtLaunch = userPreferencesRepository.getPreferencesSnapshot().hasSeenIntro
             }
 
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
                 themePaletteStyle = preferences.themePaletteStyle,
                 hapticFeedbackEnabled = preferences.hapticFeedbackEnabled,
                 useGradientBackground = preferences.useGradientBackground,
+                useEnhancedShading = preferences.useEnhancedShading,
                 activeCustomSeedHex = preferences.activeCustomSeedHex
             ) {
                 if (introSeenAtLaunch == null) {
