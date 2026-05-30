@@ -638,8 +638,15 @@ fun HistoryScreen(
                                     modifier = Modifier.padding(vertical = 4.dp),
                                 )
                             }
-                            is HistoryItem.RuleHeader -> Unit
-                            is HistoryItem.StatusHeader -> Unit
+
+                            is HistoryItem.RuleHeader -> {
+                                Unit
+                            }
+
+                            is HistoryItem.StatusHeader -> {
+                                Unit
+                            }
+
                             is HistoryItem.Entry -> {
                                 SwipeToDismissHistoryCard(
                                     history = item.history,
@@ -648,7 +655,10 @@ fun HistoryScreen(
                                     modifier = Modifier.animateItem(),
                                 )
                             }
-                            null -> Unit
+
+                            null -> {
+                                Unit
+                            }
                         }
                     }
                 }
@@ -689,6 +699,7 @@ fun HistoryScreen(
                                     modifier = Modifier.padding(vertical = 4.dp).animateItem(),
                                 )
                             }
+
                             is HistoryItem.RuleHeader -> {
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).animateItem(),
@@ -707,6 +718,7 @@ fun HistoryScreen(
                                     )
                                 }
                             }
+
                             is HistoryItem.StatusHeader -> {
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).animateItem(),
@@ -725,6 +737,7 @@ fun HistoryScreen(
                                     )
                                 }
                             }
+
                             is HistoryItem.Entry -> {
                                 SwipeToDismissHistoryCard(
                                     history = item.history,

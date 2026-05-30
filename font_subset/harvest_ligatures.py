@@ -3,12 +3,10 @@ Walk app/src/main/java and extract every Material Symbols ligature name we use.
 
 Sources of truth (any one match is enough to keep the glyph):
 - `*MaterialRoundedSymbol(name = "xxx", ...)` literal calls.
-- `iconName = "xxx"` / `leadingIconName = "xxx"` wrapper parameters.
-- `materialSymbolName = "xxx"` / `leadingMaterialSymbolName = "xxx"` wrapper parameters.
-- `symbolName = "xxx"` field assignments.
-- String literals returned from `*.materialSymbolName()`-style helper functions.
-- String literals returned from file-extension `when` branches such as
-  `"mp3", "wav" -> "audio_file"` and `else -> "draft"`.
+- Any Kotlin identifier containing `icon` or `symbol`, e.g. `iconName = "xxx"`,
+  `leadingIcon = "xxx"`, `materialSymbolName = "xxx"`, or `symbolName = "xxx"`.
+- String literals returned from `*.materialSymbolName()`-style helper functions,
+  including expression-body and block-body `when` branches.
 
 We err on the side of including extras: ligatures are cheap (~50-200 bytes
 each), but a missing one ships as an invisible icon in production.
@@ -27,6 +25,36 @@ OUTPUT_LIST = Path(__file__).with_name("ligatures.txt")
 OUTPUT_REPORT = Path(__file__).with_name("ligatures_report.json")
 
 LIGATURE = r'"([a-z][a-z0-9_]+)"'
+ICON_SYMBOL_IDENTIFIER = r'(?=[A-Za-z_][A-Za-z0-9_]*)(?=[A-Za-z0-9_]*(?:[Ii]con|[Ss]ymbol))[A-Za-z_][A-Za-z0-9_]*'
+ICON_SYMBOL_ASSIGNMENT = rf'\b{ICON_SYMBOL_IDENTIFIER}\s*=\s*{LIGATURE}'
+ICON_SYMBOL_DEFAULT_PARAM = rf'\b{ICON_SYMBOL_IDENTIFIER}\s*:\s*String\??\s*=\s*{LIGATURE}'
+ICON_SYMBOL_IF_ELSE_IDENTIFIER = rf'(?:name|{ICON_SYMBOL_IDENTIFIER})'
+KOTLIN_OPEN_BRACE = r'\{'
+KOTLIN_CLOSE_BRACE = r'\}'
+ICON_SYMBOL_WHEN_BRANCH = re.compile(r'->\s*"([a-z][a-z0-9_]+)"')
+ICON_SYMBOL_WHEN_BLOCKS: list[tuple[str, re.Pattern[str]]] = [
+    (
+        "icon_symbol_when_assignment",
+        re.compile(
+            rf'\b{ICON_SYMBOL_IDENTIFIER}\s*=\s*when\b[^{KOTLIN_OPEN_BRACE}]*{KOTLIN_OPEN_BRACE}(?P<body>.*?)^\s*{KOTLIN_CLOSE_BRACE}',
+            re.DOTALL | re.MULTILINE,
+        ),
+    ),
+    (
+        "icon_symbol_when_function",
+        re.compile(
+            rf'\bfun\s+[A-Za-z0-9_.]*{ICON_SYMBOL_IDENTIFIER}\s*\([^)]*\)\s*:\s*String\s*=\s*when\b[^{KOTLIN_OPEN_BRACE}]*{KOTLIN_OPEN_BRACE}(?P<body>.*?)^\s*{KOTLIN_CLOSE_BRACE}',
+            re.DOTALL | re.MULTILINE,
+        ),
+    ),
+    (
+        "icon_symbol_return_when_function",
+        re.compile(
+            rf'\bfun\s+[A-Za-z0-9_.]*{ICON_SYMBOL_IDENTIFIER}\s*\([^)]*\)\s*:\s*String\s*{KOTLIN_OPEN_BRACE}.*?\breturn\s+when\b[^{KOTLIN_OPEN_BRACE}]*{KOTLIN_OPEN_BRACE}(?P<body>.*?)^\s*{KOTLIN_CLOSE_BRACE}',
+            re.DOTALL | re.MULTILINE,
+        ),
+    ),
+]
 
 PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("MaterialRoundedSymbol", re.compile(rf'\b[A-Za-z0-9_]*MaterialRoundedSymbol\s*\(\s*(?:name\s*=\s*)?{LIGATURE}', re.MULTILINE)),
@@ -35,36 +63,14 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         rf'\b[A-Za-z0-9_]*MaterialRoundedSymbol\s*\(\s*.*?\bname\s*=\s*{LIGATURE}',
         re.DOTALL,
     )),
-    ("materialSymbolName_assign", re.compile(rf'materialSymbolName\s*=\s*{LIGATURE}')),
-    ("materialSymbolName_param", re.compile(rf'materialSymbolName\s*:\s*String\??\s*=\s*{LIGATURE}')),
-    ("iconName_assign", re.compile(rf'\biconName\s*=\s*{LIGATURE}')),
-    ("iconName_param", re.compile(rf'\biconName\s*:\s*String\??\s*=\s*{LIGATURE}')),
-    ("leadingIconName_assign", re.compile(rf'\bleadingIconName\s*=\s*{LIGATURE}')),
-    ("leadingIconName_param", re.compile(rf'\bleadingIconName\s*:\s*String\??\s*=\s*{LIGATURE}')),
-    ("leadingMaterialSymbolName", re.compile(rf'leadingMaterialSymbolName\s*=\s*{LIGATURE}')),
-    ("symbolName_field", re.compile(rf'symbolName\s*=\s*{LIGATURE}')),
+    ("icon_symbol_assignment", re.compile(ICON_SYMBOL_ASSIGNMENT)),
+    ("icon_symbol_default_param", re.compile(ICON_SYMBOL_DEFAULT_PARAM)),
     # `name = if (cond) "icon_a" else "icon_b"` or wrapper variants like
     # `iconName = if (...) "restore_from_trash" else "delete_forever"`.
     # The simpler `name = "x"` patterns stop at the first `)` inside the condition.
     ("symbol_name_if_else", re.compile(
-        r'\b(?:name|iconName|leadingIconName|materialSymbolName|leadingMaterialSymbolName|symbolName)\s*=\s*if\s*\([^)]*\)\s*(?:\{\s*)?"([a-z][a-z0-9_]+)"\s*(?:\}\s*)?else\s*(?:\{\s*)?"([a-z][a-z0-9_]+)"',
+        rf'\b{ICON_SYMBOL_IF_ELSE_IDENTIFIER}\s*=\s*if\s*\([^)]*\)\s*(?:{KOTLIN_OPEN_BRACE}\s*)?"([a-z][a-z0-9_]+)"\s*(?:{KOTLIN_CLOSE_BRACE}\s*)?else\s*(?:{KOTLIN_OPEN_BRACE}\s*)?"([a-z][a-z0-9_]+)"',
         re.DOTALL,
-    )),
-    # `EnumType.FOO -> "icon"` in `fun EnumType.materialSymbolName()`-style maps.
-    ("enum_icon_arrow", re.compile(
-        r'\b[A-Z][A-Za-z0-9_]*\.\w+\s*->\s*"([a-z][a-z0-9_]+)"',
-        re.MULTILINE,
-    )),
-    # Kotlin when branches that map string literals to icon ligatures, e.g.
-    # `"mp3", "wav" -> "audio_file"` in file type helpers.
-    ("string_when_icon_arrow", re.compile(
-        r'(?:"[^"]+"\s*,\s*)*"[^"]+"\s*->\s*"([a-z][a-z0-9_]+)"',
-        re.MULTILINE,
-    )),
-    # Fallback branches in icon-name helper functions, e.g. `else -> "draft"`.
-    ("else_icon_arrow", re.compile(
-        r'\belse\s*->\s*"([a-z][a-z0-9_]+)"',
-        re.MULTILINE,
     )),
     # Enum constructor entries like `ARCHIVE("archive")`.
     ("enum_entry_first_string_arg", re.compile(
@@ -80,11 +86,10 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 
 ENABLED_FILES_HINT = {
     "MaterialRoundedSymbol",
-    "iconName",
-    "leadingIconName",
-    "materialSymbolName",
-    "leadingMaterialSymbolName",
-    "symbolName",
+    "icon",
+    "Icon",
+    "symbol",
+    "Symbol",
 }
 
 EXCLUDE_DIRS = {"build", "generated", ".gradle"}
@@ -94,26 +99,46 @@ def file_is_relevant(text: str) -> bool:
     return any(token in text for token in ENABLED_FILES_HINT)
 
 
+def strip_kotlin_comments(text: str) -> str:
+    text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+    return re.sub(r'//.*', '', text)
+
+
+def collect_ligatures_from_match(
+    by_pattern: dict[str, set[str]],
+    pattern_name: str,
+    groups: tuple[str | None, ...],
+) -> None:
+    for ligature in groups:
+        if ligature is None:
+            continue
+        # Filter obvious non-ligatures.
+        if ligature in {"name", "symbolName", "materialSymbolName"}:
+            continue
+        if ligature.startswith("ic_") or ligature.startswith("symbol:"):
+            continue
+        by_pattern[pattern_name].add(ligature)
+
+
 def harvest() -> dict[str, set[str]]:
-    by_pattern: dict[str, set[str]] = {name: set() for name, _ in PATTERNS}
+    by_pattern: dict[str, set[str]] = {
+        name: set()
+        for name, _ in PATTERNS + ICON_SYMBOL_WHEN_BLOCKS
+    }
     for path in JAVA_ROOT.rglob("*.kt"):
         if any(part in EXCLUDE_DIRS for part in path.parts):
             continue
-        text = path.read_text(encoding="utf-8")
-        if not file_is_relevant(text):
+        raw_text = path.read_text(encoding="utf-8")
+        if not file_is_relevant(raw_text):
             continue
+        text = strip_kotlin_comments(raw_text)
         for name, pattern in PATTERNS:
             for match in pattern.finditer(text):
-                groups = match.groups()
-                for ligature in groups:
-                    if ligature is None:
-                        continue
-                    # Filter obvious non-ligatures.
-                    if ligature in {"name", "symbolName", "materialSymbolName"}:
-                        continue
-                    if ligature.startswith("ic_") or ligature.startswith("symbol:"):
-                        continue
-                    by_pattern[name].add(ligature)
+                collect_ligatures_from_match(by_pattern, name, match.groups())
+        for name, pattern in ICON_SYMBOL_WHEN_BLOCKS:
+            for match in pattern.finditer(text):
+                for branch_match in ICON_SYMBOL_WHEN_BRANCH.finditer(match.group("body")):
+                    collect_ligatures_from_match(by_pattern, name, branch_match.groups())
     return by_pattern
 
 

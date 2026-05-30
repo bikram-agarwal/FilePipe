@@ -87,18 +87,21 @@ fun HistoryCard(
             val successPart =
                 if (history.totalFilesMoved > 0) {
                     when (history.operationMode) {
-                        OperationMode.COPY ->
+                        OperationMode.COPY -> {
                             pluralStringResource(
                                 R.plurals.history_files_copied,
                                 history.totalFilesMoved,
                                 history.totalFilesMoved,
                             )
-                        OperationMode.MOVE ->
+                        }
+
+                        OperationMode.MOVE -> {
                             pluralStringResource(
                                 R.plurals.history_files_moved,
                                 history.totalFilesMoved,
                                 history.totalFilesMoved,
                             )
+                        }
                     }
                 } else {
                     ""
@@ -128,11 +131,15 @@ fun HistoryCard(
                     history.status == RunStatus.CANCELLED &&
                         history.totalFilesMoved == 0 &&
                         history.totalFilesFailed == 0 &&
-                        history.cancelledUnprocessedCount == 0 ->
+                        history.cancelledUnprocessedCount == 0 -> {
                         stringResource(R.string.status_cancelled)
-                    history.totalFilesMoved == 0 && history.totalFilesFailed == 0 && cancelledPart.isEmpty() ->
+                    }
+
+                    history.totalFilesMoved == 0 && history.totalFilesFailed == 0 && cancelledPart.isEmpty() -> {
                         stringResource(R.string.history_no_files_affected)
-                    else ->
+                    }
+
+                    else -> {
                         buildString {
                             if (successPart.isNotEmpty()) append(successPart)
                             if (failedPart.isNotEmpty()) {
@@ -144,6 +151,7 @@ fun HistoryCard(
                                 append(cancelledPart)
                             }
                         }
+                    }
                 }
             Text(
                 text = "$triggerLabel · $timeLabel · $fileSummary",
@@ -162,8 +170,11 @@ fun StatusChip(
 ) {
     val (label, targetColor) =
         when {
-            noChanges -> stringResource(R.string.status_no_changes) to MaterialTheme.colorScheme.surfaceVariant
-            else ->
+            noChanges -> {
+                stringResource(R.string.status_no_changes) to MaterialTheme.colorScheme.surfaceVariant
+            }
+
+            else -> {
                 when (status) {
                     RunStatus.SUCCESS -> stringResource(R.string.status_success) to MaterialTheme.colorScheme.primaryContainer
                     RunStatus.PARTIAL_FAILURE -> stringResource(R.string.status_partial) to MaterialTheme.colorScheme.tertiaryContainer
@@ -172,6 +183,7 @@ fun StatusChip(
                     RunStatus.CANCELLED -> stringResource(R.string.status_cancelled) to MaterialTheme.colorScheme.surfaceVariant
                     RunStatus.UNDONE -> stringResource(R.string.status_undone) to MaterialTheme.colorScheme.surfaceVariant
                 }
+            }
         }
     val containerColor by animateColorAsState(
         targetValue = targetColor,

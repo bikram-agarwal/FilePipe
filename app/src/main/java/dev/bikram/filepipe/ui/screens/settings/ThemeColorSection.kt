@@ -279,7 +279,7 @@ fun ThemeAccentRow(
 @Composable
 private fun ThemeAccentCircleContent(source: AppColorSource) {
     when (source) {
-        AppColorSource.MATERIAL_YOU ->
+        AppColorSource.MATERIAL_YOU -> {
             Box(
                 modifier =
                     Modifier
@@ -304,6 +304,8 @@ private fun ThemeAccentCircleContent(source: AppColorSource) {
                     size = 22.dp,
                 )
             }
+        }
+
         else -> {
             val triplet = source.curatedTriplet()
             if (triplet != null) {

@@ -335,8 +335,14 @@ fun SettingsScreen(
         if (wasCollapsed) delay(SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS)
         val targetIndex =
             when (key) {
-                "folder_access" -> SETTINGS_LIST_INDEX_FOLDER_ACCESS
-                "notifications" -> SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS
+                "folder_access" -> {
+                    SETTINGS_LIST_INDEX_FOLDER_ACCESS
+                }
+
+                "notifications" -> {
+                    SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS
+                }
+
                 else -> {
                     onHighlightHandled()
                     return@LaunchedEffect
@@ -351,6 +357,7 @@ fun SettingsScreen(
                 folderAccessHighlight = true
                 folderAccessHighlightExpiresAtMillis = highlightExpiresAtMillis
             }
+
             "notifications" -> {
                 notificationsHighlight = true
                 notificationsHighlightExpiresAtMillis = highlightExpiresAtMillis
@@ -491,6 +498,7 @@ fun SettingsScreen(
                 val path = safTreeUriToPath(uri) ?: uri.toString()
                 when (target) {
                     BackupFolderTarget.Cloud -> viewModel.setCloudExportFolderUri(uri.toString())
+
                     BackupFolderTarget.Local,
                     null,
                     -> viewModel.setExportFolderUri(path)
@@ -559,7 +567,10 @@ fun SettingsScreen(
                 showUpdateSheet = false
                 viewModel.dismissUpdateSheet()
             }
-            else -> Unit
+
+            else -> {
+                Unit
+            }
         }
     }
 
@@ -658,14 +669,17 @@ fun SettingsScreen(
                         viewModel.setFolderAccessModeNow(confirmedTarget)
                         val message =
                             when {
-                                affectedRuleCount <= 0 ->
+                                affectedRuleCount <= 0 -> {
                                     resources.getString(R.string.settings_folder_access_switched_selective_zero_rules)
-                                else ->
+                                }
+
+                                else -> {
                                     resources.getQuantityString(
                                         R.plurals.settings_folder_access_switched_selective_snackbar,
                                         affectedRuleCount,
                                         affectedRuleCount,
                                     )
+                                }
                             }
                         snackbarHostState.showSnackbar(
                             message = message,
@@ -870,14 +884,21 @@ fun SettingsScreen(
                             preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED
                         val allFilesStatusLine =
                             when {
-                                selectiveLike && allFilesAccessGranted ->
+                                selectiveLike && allFilesAccessGranted -> {
                                     stringResource(R.string.settings_folder_access_all_files_status_granted_unused)
-                                selectiveLike && !allFilesAccessGranted ->
+                                }
+
+                                selectiveLike && !allFilesAccessGranted -> {
                                     stringResource(R.string.settings_folder_access_all_files_status_not_granted_idle)
-                                allFilesModeSelected && allFilesAccessGranted ->
+                                }
+
+                                allFilesModeSelected && allFilesAccessGranted -> {
                                     stringResource(R.string.settings_folder_access_all_files_status_granted_used)
-                                else ->
+                                }
+
+                                else -> {
                                     stringResource(R.string.settings_folder_access_all_files_status_not_granted_required)
+                                }
                             }
                         Row(
                             modifier =
@@ -1008,13 +1029,17 @@ fun SettingsScreen(
                                                         pendingEnableUpdateNotificationsAfterPermission = false
                                                         requestPostNotificationPermissionOrOpenAppSettings()
                                                     }
+
                                                     wantEnabled &&
                                                         !NotificationManagerCompat
                                                             .from(context)
-                                                            .areNotificationsEnabled() ->
+                                                            .areNotificationsEnabled() -> {
                                                         viewModel.openAppNotificationSettings()
-                                                    !wantEnabled ->
+                                                    }
+
+                                                    !wantEnabled -> {
                                                         viewModel.openAppNotificationSettings()
+                                                    }
                                                 }
                                             },
                                         )
@@ -1340,6 +1365,7 @@ fun SettingsScreen(
                                                     pendingEnableUpdateNotificationsAfterPermission = false
                                                     viewModel.setNotifyOnNewUpdates(false)
                                                 }
+
                                                 preferences.updateCheckSchedule == UpdateCheckSchedule.NEVER -> {
                                                     coroutineScope.launch {
                                                         snackbarHostState.showSnackbar(
@@ -1349,6 +1375,7 @@ fun SettingsScreen(
                                                         )
                                                     }
                                                 }
+
                                                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                                                     ContextCompat.checkSelfPermission(
                                                         context,
@@ -1357,6 +1384,7 @@ fun SettingsScreen(
                                                     pendingEnableUpdateNotificationsAfterPermission = true
                                                     requestPostNotificationPermissionOrOpenAppSettings()
                                                 }
+
                                                 !NotificationManagerCompat.from(context).areNotificationsEnabled() -> {
                                                     coroutineScope.launch {
                                                         snackbarHostState.showSnackbar(
@@ -1367,7 +1395,10 @@ fun SettingsScreen(
                                                     }
                                                     viewModel.openAppNotificationSettings()
                                                 }
-                                                else -> viewModel.setNotifyOnNewUpdates(true)
+
+                                                else -> {
+                                                    viewModel.setNotifyOnNewUpdates(true)
+                                                }
                                             }
                                         },
                                     )
@@ -2036,10 +2067,17 @@ fun launchAppShareChooser(context: Context) {
     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
     val shareUrl =
         when {
-            BuildConfig.FLAVOR == "playstore" -> playStoreListingUrl
-            githubRepoForSourceLink.isNotEmpty() ->
+            BuildConfig.FLAVOR == "playstore" -> {
+                playStoreListingUrl
+            }
+
+            githubRepoForSourceLink.isNotEmpty() -> {
                 "https://github.com/$githubRepoForSourceLink/releases/latest"
-            else -> ""
+            }
+
+            else -> {
+                ""
+            }
         }
     if (shareUrl.isEmpty()) return
     val message =
@@ -2199,6 +2237,7 @@ private fun UpdateCheckBottomSheetContent(
                 downloadProgress != null -> {
                     UpdateSheetDownloadProgressBar(downloadProgress = downloadProgress)
                 }
+
                 updateInfo != null -> {
                     val availableUpdate = updateInfo
                     Column(
@@ -2286,6 +2325,7 @@ private fun UpdateCheckBottomSheetContent(
                         }
                     }
                 }
+
                 manualUpdateNoResult -> {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2310,6 +2350,7 @@ private fun UpdateCheckBottomSheetContent(
         }
         when (changelogState) {
             ChangelogUiState.Hidden -> {}
+
             ChangelogUiState.Loading -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -2338,6 +2379,7 @@ private fun UpdateCheckBottomSheetContent(
                     }
                 }
             }
+
             is ChangelogUiState.Ready -> {
                 val readyMarkdown = changelogState.text
                 val changelogPages = remember(readyMarkdown) { splitChangelogIntoPages(readyMarkdown) }
@@ -2488,6 +2530,7 @@ private fun UpdateCheckBottomSheetContent(
                     }
                 }
             }
+
             is ChangelogUiState.Failed -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -2555,13 +2598,20 @@ private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
     val shape = pillShape
     val label =
         when {
-            downloadProgress == -1f -> stringResource(R.string.settings_installing)
-            downloadProgress == -2f -> stringResource(R.string.settings_downloading)
-            else ->
+            downloadProgress == -1f -> {
+                stringResource(R.string.settings_installing)
+            }
+
+            downloadProgress == -2f -> {
+                stringResource(R.string.settings_downloading)
+            }
+
+            else -> {
                 stringResource(
                     R.string.settings_downloading_percent,
                     downloadProgress.toInt().coerceIn(0, 100),
                 )
+            }
         }
     Box(
         modifier =
@@ -2585,6 +2635,7 @@ private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
                         .background(scheme.primary.copy(alpha = 0.85f)),
                 )
             }
+
             downloadProgress == -1f || downloadProgress == -2f -> {
                 Box(
                     Modifier
@@ -2956,8 +3007,14 @@ private fun SettingsToggleItem(
             checked = checked,
             onCheckedChange = { enabled ->
                 when {
-                    switchEnabled -> onCheckedChange(enabled)
-                    onDisabledInteraction != null && enabled -> onDisabledInteraction.invoke()
+                    switchEnabled -> {
+                        onCheckedChange(enabled)
+                    }
+
+                    onDisabledInteraction != null && enabled -> {
+                        onDisabledInteraction.invoke()
+                    }
+
                     else -> { }
                 }
             },
@@ -3035,16 +3092,25 @@ private fun providerDisplayName(
     val providerAuthority = authority?.takeIf { it.isNotBlank() } ?: return null
     val normalizedAuthority = providerAuthority.lowercase()
     return when {
-        normalizedAuthority.contains("google.android.apps.docs") ->
+        normalizedAuthority.contains("google.android.apps.docs") -> {
             context.getString(R.string.cloud_provider_google_drive)
-        normalizedAuthority.contains("skydrive") || normalizedAuthority.contains("onedrive") ->
+        }
+
+        normalizedAuthority.contains("skydrive") || normalizedAuthority.contains("onedrive") -> {
             context.getString(R.string.cloud_provider_onedrive)
-        normalizedAuthority.contains("dropbox") ->
+        }
+
+        normalizedAuthority.contains("dropbox") -> {
             context.getString(R.string.cloud_provider_dropbox)
-        normalizedAuthority.contains("box.android") ->
+        }
+
+        normalizedAuthority.contains("box.android") -> {
             context.getString(R.string.cloud_provider_box)
-        else ->
+        }
+
+        else -> {
             providerAuthority
+        }
     }
 }
 

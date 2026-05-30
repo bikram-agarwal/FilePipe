@@ -33,11 +33,17 @@ class UpdateCheckWorkScheduler
             }
             val schedule = userPreferencesRepository.getPreferencesSnapshot().updateCheckSchedule
             when (schedule) {
-                UpdateCheckSchedule.DAILY_AT_21 -> enqueueOneTime(delayMillis = millisUntilNextDailyNinePm())
-                UpdateCheckSchedule.WEEKLY_MONDAY_AT_21 ->
+                UpdateCheckSchedule.DAILY_AT_21 -> {
+                    enqueueOneTime(delayMillis = millisUntilNextDailyNinePm())
+                }
+
+                UpdateCheckSchedule.WEEKLY_MONDAY_AT_21 -> {
                     enqueueOneTime(delayMillis = millisUntilNextMondayNinePm())
-                UpdateCheckSchedule.AT_APP_START, UpdateCheckSchedule.NEVER ->
+                }
+
+                UpdateCheckSchedule.AT_APP_START, UpdateCheckSchedule.NEVER -> {
                     workManager.cancelUniqueWork(UpdateCheckWorker.UNIQUE_WORK_NAME)
+                }
             }
         }
 

@@ -124,32 +124,39 @@ class RunAllScheduledRulesWorker
             ensureSummaryChannel()
             val body =
                 when {
-                    failed > 0 && operationMode == OperationMode.COPY ->
+                    failed > 0 && operationMode == OperationMode.COPY -> {
                         appContext.resources.getQuantityString(
                             R.plurals.notification_summary_body_partial_copied,
                             moved,
                             moved,
                             failed,
                         )
-                    failed > 0 ->
+                    }
+
+                    failed > 0 -> {
                         appContext.resources.getQuantityString(
                             R.plurals.notification_summary_body_partial,
                             moved,
                             moved,
                             failed,
                         )
-                    operationMode == OperationMode.COPY ->
+                    }
+
+                    operationMode == OperationMode.COPY -> {
                         appContext.resources.getQuantityString(
                             R.plurals.history_files_copied,
                             moved,
                             moved,
                         )
-                    else ->
+                    }
+
+                    else -> {
                         appContext.resources.getQuantityString(
                             R.plurals.history_files_moved,
                             moved,
                             moved,
                         )
+                    }
                 }
             val builder =
                 NotificationCompat
@@ -265,10 +272,12 @@ class RunAllScheduledRulesWorker
                     }
                     builder.setContentText(appContext.notificationContentTextForTerminalProgress(progress))
                 }
+
                 progress.totalFiles <= 0 -> {
                     builder.setProgress(0, 0, true)
                     builder.setContentText(appContext.getString(R.string.notification_preparing))
                 }
+
                 else -> {
                     val rule = rules.first()
                     val max = progress.totalFiles
@@ -279,10 +288,13 @@ class RunAllScheduledRulesWorker
                     )
                     val subText =
                         when (rule.operationMode) {
-                            OperationMode.COPY ->
+                            OperationMode.COPY -> {
                                 appContext.getString(R.string.notification_copying_n_of_m, done, max)
-                            OperationMode.MOVE ->
+                            }
+
+                            OperationMode.MOVE -> {
                                 appContext.getString(R.string.notification_moving_n_of_m, done, max)
+                            }
                         }
                     builder.setSubText(subText)
                 }

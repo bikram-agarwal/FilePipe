@@ -285,14 +285,24 @@ object DiagnosticLog {
         value: String,
     ): String =
         when {
-            value.isBlank() -> context.getString(R.string.diagnostics_value_not_configured)
-            value.startsWith("content://") -> context.getString(R.string.diagnostics_value_configured_content_uri)
-            value.startsWith("/") -> context.getString(R.string.diagnostics_value_configured_filesystem_path)
-            else ->
+            value.isBlank() -> {
+                context.getString(R.string.diagnostics_value_not_configured)
+            }
+
+            value.startsWith("content://") -> {
+                context.getString(R.string.diagnostics_value_configured_content_uri)
+            }
+
+            value.startsWith("/") -> {
+                context.getString(R.string.diagnostics_value_configured_filesystem_path)
+            }
+
+            else -> {
                 context.getString(
                     R.string.diagnostics_value_configured_reference_format,
                     value.substringBefore(':', missingDelimiterValue = unknownValue(context)),
                 )
+            }
         }
 
     private fun unknownValue(context: Context): String = context.getString(R.string.diagnostics_value_unknown)

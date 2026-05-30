@@ -198,12 +198,14 @@ private fun FaqTopicListItem(
                                 showModeTitleInBody = false,
                             )
                         }
+
                         FaqItemBodyKind.STORAGE_SELECTIVE_MODE -> {
                             FolderAccessLearnMoreSelectiveModeSection(
                                 modifier = Modifier.padding(top = 4.dp),
                                 showModeTitleInBody = false,
                             )
                         }
+
                         FaqItemBodyKind.BULLETS -> {
                             itemContent.bullets.forEach { bulletText ->
                                 val trimmed = bulletText.trim()
@@ -250,6 +252,7 @@ private fun FaqTopicListItem(
                                             )
                                         }
                                     }
+
                                     FaqInlineAction.OPEN_APP_NOTIFICATION_SETTINGS -> {
                                         FilePipeFilledTonalButton(
                                             onClick = onOpenAppNotificationSettings,

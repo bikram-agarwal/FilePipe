@@ -176,8 +176,19 @@ detekt {
     config.setFrom(rootProject.files("config/detekt/detekt.yml"))
 }
 
+configurations.named("detekt") {
+    resolutionStrategy {
+        force(
+            "io.github.detekt.sarif4k:sarif4k:${libs.versions.sarif4k.get()}",
+            "io.github.detekt.sarif4k:sarif4k-jvm:${libs.versions.sarif4k.get()}",
+            "io.github.oshai:kotlin-logging:${libs.versions.kotlinLogging.get()}",
+        )
+    }
+}
+
 ktlint {
     android.set(true)
+    version.set(libs.versions.ktlint.get())
 }
 
 dependencies {

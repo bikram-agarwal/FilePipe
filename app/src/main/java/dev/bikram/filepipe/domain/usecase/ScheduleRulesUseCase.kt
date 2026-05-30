@@ -39,13 +39,17 @@ class ScheduleRulesUseCase
 
             val delayMs =
                 when (schedule.type) {
-                    ScheduleType.EVERY_N_HOURS -> 0L
-                    else ->
+                    ScheduleType.EVERY_N_HOURS -> {
+                        0L
+                    }
+
+                    else -> {
                         calculateDelayUntilNextRun(
                             schedule.hour,
                             schedule.minute,
                             if (schedule.type == ScheduleType.WEEKLY) schedule.dayOfWeek else null,
                         )
+                    }
                 }
 
             val request =
@@ -54,8 +58,14 @@ class ScheduleRulesUseCase
                         val hours = schedule.intervalHours?.toLong()?.coerceIn(1L, 24L) ?: 1L
                         PeriodicWorkRequestBuilder<FileOrganizerWorker>(hours, TimeUnit.HOURS)
                     }
-                    ScheduleType.DAILY -> PeriodicWorkRequestBuilder<FileOrganizerWorker>(1L, TimeUnit.DAYS)
-                    ScheduleType.WEEKLY -> PeriodicWorkRequestBuilder<FileOrganizerWorker>(7L, TimeUnit.DAYS)
+
+                    ScheduleType.DAILY -> {
+                        PeriodicWorkRequestBuilder<FileOrganizerWorker>(1L, TimeUnit.DAYS)
+                    }
+
+                    ScheduleType.WEEKLY -> {
+                        PeriodicWorkRequestBuilder<FileOrganizerWorker>(7L, TimeUnit.DAYS)
+                    }
                 }.setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
                     .setInputData(inputData)
                     .addTag(tag)
@@ -100,13 +110,17 @@ class ScheduleRulesUseCase
                     val schedule = group.schedule
                     val delayMs =
                         when (schedule.type) {
-                            ScheduleType.EVERY_N_HOURS -> 0L
-                            else ->
+                            ScheduleType.EVERY_N_HOURS -> {
+                                0L
+                            }
+
+                            else -> {
                                 calculateDelayUntilNextRun(
                                     schedule.hour,
                                     schedule.minute,
                                     if (schedule.type == ScheduleType.WEEKLY) schedule.dayOfWeek else null,
                                 )
+                            }
                         }
                     val ruleIds = group.ruleIds.toLongArray()
                     val inputData = workDataOf(RunAllScheduledRulesWorker.KEY_RULE_IDS to ruleIds)
@@ -118,8 +132,14 @@ class ScheduleRulesUseCase
                                 val hours = schedule.intervalHours?.toLong()?.coerceIn(1L, 24L) ?: 1L
                                 PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(hours, TimeUnit.HOURS)
                             }
-                            ScheduleType.DAILY -> PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(1L, TimeUnit.DAYS)
-                            ScheduleType.WEEKLY -> PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(7L, TimeUnit.DAYS)
+
+                            ScheduleType.DAILY -> {
+                                PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(1L, TimeUnit.DAYS)
+                            }
+
+                            ScheduleType.WEEKLY -> {
+                                PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(7L, TimeUnit.DAYS)
+                            }
                         }.setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
                             .setInputData(inputData)
                             .addTag(batchTag)

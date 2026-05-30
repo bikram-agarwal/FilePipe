@@ -240,19 +240,25 @@ fun AppNavigation(
             UpdateChromeState.Hidden
         } else {
             when (val currentPlayState = playBannerState) {
-                is PlayInAppUpdateBannerUiState.Downloading ->
+                is PlayInAppUpdateBannerUiState.Downloading -> {
                     UpdateChromeState.Downloading(
                         bytesDownloaded = currentPlayState.bytesDownloaded,
                         totalBytesToDownload = currentPlayState.totalBytesToDownload,
                         indeterminateProgress = currentPlayState.indeterminateProgress,
                     )
-                PlayInAppUpdateBannerUiState.ReadyToInstall -> UpdateChromeState.ReadyToInstall
-                PlayInAppUpdateBannerUiState.Hidden ->
+                }
+
+                PlayInAppUpdateBannerUiState.ReadyToInstall -> {
+                    UpdateChromeState.ReadyToInstall
+                }
+
+                PlayInAppUpdateBannerUiState.Hidden -> {
                     if (updateAvailable) {
                         UpdateChromeState.Available
                     } else {
                         UpdateChromeState.Hidden
                     }
+                }
             }
         }
     val updateBarState =
@@ -260,19 +266,25 @@ fun AppNavigation(
             UpdateChromeState.Hidden
         } else {
             when (val currentPlayState = playBannerState) {
-                is PlayInAppUpdateBannerUiState.Downloading ->
+                is PlayInAppUpdateBannerUiState.Downloading -> {
                     UpdateChromeState.Downloading(
                         bytesDownloaded = currentPlayState.bytesDownloaded,
                         totalBytesToDownload = currentPlayState.totalBytesToDownload,
                         indeterminateProgress = currentPlayState.indeterminateProgress,
                     )
-                PlayInAppUpdateBannerUiState.ReadyToInstall -> UpdateChromeState.ReadyToInstall
-                PlayInAppUpdateBannerUiState.Hidden ->
+                }
+
+                PlayInAppUpdateBannerUiState.ReadyToInstall -> {
+                    UpdateChromeState.ReadyToInstall
+                }
+
+                PlayInAppUpdateBannerUiState.Hidden -> {
                     if (updateAvailable && updateKey != dismissedUpdateBarKey) {
                         UpdateChromeState.Available
                     } else {
                         UpdateChromeState.Hidden
                     }
+                }
             }
         }
     val floatingUpdateBarExtraHeight = if (updateBarState != UpdateChromeState.Hidden) 72.dp else 0.dp
@@ -1063,12 +1075,17 @@ private fun UpdateFloatingBar(
     val iconShape = remember { RoundedPolygonShape(MaterialShapes.Cookie9Sided) }
     val (title, body) =
         when (state) {
-            UpdateChromeState.Hidden -> return
-            UpdateChromeState.Available ->
+            UpdateChromeState.Hidden -> {
+                return
+            }
+
+            UpdateChromeState.Available -> {
                 Pair(
                     stringResource(R.string.update_bar_available_title),
                     null,
                 )
+            }
+
             is UpdateChromeState.Downloading -> {
                 val progressLabel =
                     if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
@@ -1083,11 +1100,13 @@ private fun UpdateFloatingBar(
                     progressLabel,
                 )
             }
-            UpdateChromeState.ReadyToInstall ->
+
+            UpdateChromeState.ReadyToInstall -> {
                 Pair(
                     stringResource(R.string.play_update_bar_install_title),
                     stringResource(R.string.play_update_bar_install_subtitle),
                 )
+            }
         }
 
     Surface(
@@ -1171,8 +1190,12 @@ private fun UpdateFloatingBar(
                             )
                         }
                     }
-                    is UpdateChromeState.Downloading -> Unit
-                    UpdateChromeState.ReadyToInstall ->
+
+                    is UpdateChromeState.Downloading -> {
+                        Unit
+                    }
+
+                    UpdateChromeState.ReadyToInstall -> {
                         FilePipeButton(
                             onClick = onInstallClick,
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
@@ -1187,7 +1210,11 @@ private fun UpdateFloatingBar(
                                 maxLines = 1,
                             )
                         }
-                    UpdateChromeState.Hidden -> Unit
+                    }
+
+                    UpdateChromeState.Hidden -> {
+                        Unit
+                    }
                 }
             }
 
@@ -1403,7 +1430,7 @@ private fun MainNavFabSlot(
     onShareApp: () -> Unit,
 ) {
     when (currentTab) {
-        Screen.Rules ->
+        Screen.Rules -> {
             SimpleNavFab(
                 icon = { tint ->
                     FilePipeMaterialRoundedSymbol(
@@ -1416,33 +1443,33 @@ private fun MainNavFabSlot(
                 enabled = true,
                 onClick = onAddRule,
             )
+        }
 
-        Screen.History ->
-            {
-                val inTrash = historySection == HistorySection.TRASH
-                val description =
-                    stringResource(
-                        if (inTrash) {
-                            R.string.history_trash_empty_action
-                        } else {
-                            R.string.history_clear
-                        },
-                    )
-                SimpleNavFab(
-                    icon = { tint ->
-                        FilePipeMaterialRoundedSymbol(
-                            name = "delete_forever",
-                            contentDescription = null,
-                            tint = tint,
-                        )
+        Screen.History -> {
+            val inTrash = historySection == HistorySection.TRASH
+            val description =
+                stringResource(
+                    if (inTrash) {
+                        R.string.history_trash_empty_action
+                    } else {
+                        R.string.history_clear
                     },
-                    description = description,
-                    enabled = if (inTrash) hasAnyTrashedRules else hasAnyHistory,
-                    onClick = if (inTrash) onEmptyTrash else onClearHistory,
                 )
-            }
+            SimpleNavFab(
+                icon = { tint ->
+                    FilePipeMaterialRoundedSymbol(
+                        name = "delete_forever",
+                        contentDescription = null,
+                        tint = tint,
+                    )
+                },
+                description = description,
+                enabled = if (inTrash) hasAnyTrashedRules else hasAnyHistory,
+                onClick = if (inTrash) onEmptyTrash else onClearHistory,
+            )
+        }
 
-        Screen.Settings ->
+        Screen.Settings -> {
             SimpleNavFab(
                 icon = { tint ->
                     FilePipeMaterialRoundedSymbol(
@@ -1455,8 +1482,11 @@ private fun MainNavFabSlot(
                 enabled = true,
                 onClick = onShareApp,
             )
+        }
 
-        else -> Unit
+        else -> {
+            Unit
+        }
     }
 }
 

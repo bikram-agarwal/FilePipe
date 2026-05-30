@@ -347,7 +347,7 @@
     <string name="settings_enhanced_shading">Enhanced shading</string>
     <string name="settings_enhanced_shading_desc">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="settings_surface_shading">Surface shading</string>
-    <string name="settings_surface_shading_desc">Adjust the amount of color tint mixed into backgrounds</string>
+    <string name="settings_surface_shading_desc">Adjust how strongly theme colors tint surfaces</string>
     <string name="settings_black_theme_effect_disabled">Can\'t change this in Black theme</string>
     <string name="settings_backup_section">Backup &amp; restore</string>
     <string name="settings_choose_local_backup_folder">Choose local backup folder</string>

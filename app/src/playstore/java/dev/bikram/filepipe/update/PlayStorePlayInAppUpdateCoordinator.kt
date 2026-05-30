@@ -38,9 +38,11 @@ class PlayStorePlayInAppUpdateCoordinator
                                 indeterminateProgress = totalBytes <= 0L,
                             )
                     }
+
                     InstallStatus.DOWNLOADED -> {
                         bannerState.value = PlayInAppUpdateBannerUiState.ReadyToInstall
                     }
+
                     InstallStatus.INSTALLING,
                     InstallStatus.PENDING,
                     -> {
@@ -51,19 +53,27 @@ class PlayStorePlayInAppUpdateCoordinator
                                 indeterminateProgress = true,
                             )
                     }
+
                     InstallStatus.INSTALLED -> {
                         unregisterInstallStateListener()
                         playInAppUpdateSession.clearPendingPlayUpdate()
                         bannerState.value = PlayInAppUpdateBannerUiState.Hidden
                     }
+
                     InstallStatus.FAILED,
                     InstallStatus.CANCELED,
                     -> {
                         unregisterInstallStateListener()
                         bannerState.value = PlayInAppUpdateBannerUiState.Hidden
                     }
-                    InstallStatus.UNKNOWN -> Unit
-                    else -> Unit
+
+                    InstallStatus.UNKNOWN -> {
+                        Unit
+                    }
+
+                    else -> {
+                        Unit
+                    }
                 }
             }
 

@@ -67,19 +67,37 @@ fun SimpleMarkdown(
                     HeaderLine(block.text, style, block.isCentered)
                 }
 
-                is MarkdownBlock.Text -> MarkdownText(block.text, block.isCentered)
-                is MarkdownBlock.BulletPoint -> BulletPointLine(block.text, block.isCentered)
-                is MarkdownBlock.OrderedList ->
+                is MarkdownBlock.Text -> {
+                    MarkdownText(block.text, block.isCentered)
+                }
+
+                is MarkdownBlock.BulletPoint -> {
+                    BulletPointLine(block.text, block.isCentered)
+                }
+
+                is MarkdownBlock.OrderedList -> {
                     OrderedListLine(
                         block.index,
                         block.text,
                         block.isCentered,
                     )
+                }
 
-                is MarkdownBlock.ImageGroup -> ImageBlock(block.images, block.isCentered)
-                is MarkdownBlock.CodeBlock -> CodeBlock(block.code)
-                is MarkdownBlock.HorizontalRule -> HorizontalRule()
-                is MarkdownBlock.Spacer -> Spacer(modifier = Modifier.height(8.dp))
+                is MarkdownBlock.ImageGroup -> {
+                    ImageBlock(block.images, block.isCentered)
+                }
+
+                is MarkdownBlock.CodeBlock -> {
+                    CodeBlock(block.code)
+                }
+
+                is MarkdownBlock.HorizontalRule -> {
+                    HorizontalRule()
+                }
+
+                is MarkdownBlock.Spacer -> {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
         }
     }
@@ -518,7 +536,9 @@ private fun parseMarkdownInline(text: String): AnnotatedString =
                     }
                 }
 
-                else -> append(matchValue)
+                else -> {
+                    append(matchValue)
+                }
             }
 
             cursor = match.range.last + 1

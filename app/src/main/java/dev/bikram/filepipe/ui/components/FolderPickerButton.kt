@@ -52,11 +52,21 @@ fun displayPath(
             val docId = DocumentsContract.getTreeDocumentId(path.toUri())
             val relative = docId.substringAfter(":", "")
             when {
-                relative.isBlank() && docId.startsWith("primary", ignoreCase = true) ->
+                relative.isBlank() && docId.startsWith("primary", ignoreCase = true) -> {
                     internalStorageRootDisplayName
-                relative.isBlank() -> docId
-                docId.startsWith("primary", ignoreCase = true) -> relative
-                else -> "SD Card/$relative"
+                }
+
+                relative.isBlank() -> {
+                    docId
+                }
+
+                docId.startsWith("primary", ignoreCase = true) -> {
+                    relative
+                }
+
+                else -> {
+                    "SD Card/$relative"
+                }
             }
         } catch (_: Exception) {
             path

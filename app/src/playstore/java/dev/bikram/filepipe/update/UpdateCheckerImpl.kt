@@ -41,6 +41,7 @@ class UpdateCheckerImpl
                         isPlayStoreUpdateInProgress = false,
                     )
                 }
+
                 UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> {
                     val flexibleAllowed = appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
                     val immediateAllowed = appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
@@ -57,12 +58,14 @@ class UpdateCheckerImpl
                         isPlayStoreUpdateInProgress = true,
                     )
                 }
+
                 UpdateAvailability.UPDATE_NOT_AVAILABLE,
                 UpdateAvailability.UNKNOWN,
                 -> {
                     playInAppUpdateSession.clearPendingPlayUpdate()
                     return null
                 }
+
                 else -> {
                     playInAppUpdateSession.clearPendingPlayUpdate()
                     return null

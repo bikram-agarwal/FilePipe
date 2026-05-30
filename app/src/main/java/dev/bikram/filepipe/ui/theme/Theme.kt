@@ -271,8 +271,14 @@ fun FilePipeTheme(
 
     val baseColorScheme =
         when {
-            useDynamic && darkTheme -> dynamicDarkColorScheme(context)
-            useDynamic && !darkTheme -> dynamicLightColorScheme(context)
+            useDynamic && darkTheme -> {
+                dynamicDarkColorScheme(context)
+            }
+
+            useDynamic && !darkTheme -> {
+                dynamicLightColorScheme(context)
+            }
+
             staticTriplet != null -> {
                 val tripletOverrides =
                     staticTriplet.takeIf { themePaletteStyle == ThemePaletteStyle.TONAL_SPOT }
@@ -286,15 +292,23 @@ fun FilePipeTheme(
                     isAmoled = black,
                 )
             }
-            staticSeedColor != null ->
+
+            staticSeedColor != null -> {
                 rememberDynamicColorScheme(
                     seedColor = staticSeedColor,
                     isDark = darkTheme,
                     style = themePaletteStyle.toLib(),
                     isAmoled = black,
                 )
-            darkTheme -> DarkColors
-            else -> LightColors
+            }
+
+            darkTheme -> {
+                DarkColors
+            }
+
+            else -> {
+                LightColors
+            }
         }
     val oledAdjusted = if (black) baseColorScheme.toOled() else baseColorScheme
     val colorScheme =

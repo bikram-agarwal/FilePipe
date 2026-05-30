@@ -527,6 +527,7 @@ class RuleDetailViewModel
                         _uiState.update { it.copy(errors = result.errors) }
                         return@launch
                     }
+
                     is ValidateRuleUseCase.Result.Valid -> {}
                 }
 

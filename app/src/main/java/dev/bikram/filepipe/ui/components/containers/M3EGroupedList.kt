@@ -19,18 +19,27 @@ fun groupedItemShape(position: GroupPosition): CornerBasedShape {
     val outerShape = MaterialTheme.shapes.large
     val innerShape = MaterialTheme.shapes.extraSmall
     return when (position) {
-        GroupPosition.FIRST ->
+        GroupPosition.FIRST -> {
             outerShape.copy(
                 bottomStart = innerShape.bottomStart,
                 bottomEnd = innerShape.bottomEnd,
             )
-        GroupPosition.MIDDLE -> innerShape
-        GroupPosition.LAST ->
+        }
+
+        GroupPosition.MIDDLE -> {
+            innerShape
+        }
+
+        GroupPosition.LAST -> {
             outerShape.copy(
                 topStart = innerShape.topStart,
                 topEnd = innerShape.topEnd,
             )
-        GroupPosition.ONLY -> outerShape
+        }
+
+        GroupPosition.ONLY -> {
+            outerShape
+        }
     }
 }
 

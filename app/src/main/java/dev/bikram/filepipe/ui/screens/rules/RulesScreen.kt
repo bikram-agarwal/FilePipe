@@ -399,7 +399,9 @@ fun RulesScreen(
                         }
                     }
                 }
+
                 isRunning -> { }
+
                 else -> {
                     val selectionBarSpatialSpec =
                         reducedMotionAwareSpec(
@@ -776,19 +778,23 @@ fun RulesScreen(
                                                 overflow = TextOverflow.Ellipsis,
                                             )
                                             when {
-                                                result.wouldSkip ->
+                                                result.wouldSkip -> {
                                                     Text(
                                                         text = stringResource(R.string.preview_would_skip),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     )
-                                                result.wouldOverwrite ->
+                                                }
+
+                                                result.wouldOverwrite -> {
                                                     Text(
                                                         text = stringResource(R.string.preview_would_overwrite),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     )
-                                                result.renamedTo != null ->
+                                                }
+
+                                                result.renamedTo != null -> {
                                                     Text(
                                                         text =
                                                             stringResource(
@@ -800,6 +806,7 @@ fun RulesScreen(
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
                                                     )
+                                                }
                                             }
                                         }
                                         val sizeKb = result.sizeBytes / 1024

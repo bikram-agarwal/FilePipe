@@ -273,7 +273,7 @@ class FileOperationRepository
                 }
 
                 when {
-                    destIsFilesystem && sourceIsFile ->
+                    destIsFilesystem && sourceIsFile -> {
                         moveFileFilesystemToFilesystem(
                             sourceEntry,
                             effectiveDestFolder,
@@ -281,7 +281,9 @@ class FileOperationRepository
                             operationMode,
                             destFoldersCreatedCollector,
                         )
-                    destIsFilesystem && !sourceIsFile ->
+                    }
+
+                    destIsFilesystem && !sourceIsFile -> {
                         moveFileDocumentToFilesystem(
                             sourceEntry,
                             effectiveDestFolder,
@@ -289,7 +291,9 @@ class FileOperationRepository
                             operationMode,
                             destFoldersCreatedCollector,
                         )
-                    !destIsFilesystem && sourceIsFile ->
+                    }
+
+                    !destIsFilesystem && sourceIsFile -> {
                         moveFileFilesystemToDocument(
                             sourceEntry,
                             effectiveDestFolder,
@@ -297,7 +301,9 @@ class FileOperationRepository
                             operationMode,
                             destFoldersCreatedCollector,
                         )
-                    else ->
+                    }
+
+                    else -> {
                         moveFileDocumentToDocument(
                             sourceEntry,
                             effectiveDestFolder,
@@ -305,6 +311,7 @@ class FileOperationRepository
                             operationMode,
                             destFoldersCreatedCollector,
                         )
+                    }
                 }
             }
 
@@ -385,16 +392,22 @@ class FileOperationRepository
             val existing = File(destParent, destName)
             if (existing.exists()) {
                 when (conflictPolicy) {
-                    ConflictPolicy.SKIP -> return FileMoved(
-                        fileName = sourceEntry.name,
-                        sourceUri = sourceEntry.uri.toString(),
-                        destinationUri = existing.toUri().toString(),
-                        fileSizeBytes = sourceEntry.size,
-                        relativeParentSegments = sourceEntry.relativeParentSegments,
-                        success = true,
-                        skipped = true,
-                    )
-                    ConflictPolicy.OVERWRITE -> Unit
+                    ConflictPolicy.SKIP -> {
+                        return FileMoved(
+                            fileName = sourceEntry.name,
+                            sourceUri = sourceEntry.uri.toString(),
+                            destinationUri = existing.toUri().toString(),
+                            fileSizeBytes = sourceEntry.size,
+                            relativeParentSegments = sourceEntry.relativeParentSegments,
+                            success = true,
+                            skipped = true,
+                        )
+                    }
+
+                    ConflictPolicy.OVERWRITE -> {
+                        Unit
+                    }
+
                     ConflictPolicy.RENAME_SUFFIX -> {
                         destName = resolveDestNameFile(destParent, sourceEntry.name)
                     }
@@ -501,16 +514,22 @@ class FileOperationRepository
             val existing = destParent.findFile(sourceEntry.name)
             if (existing != null) {
                 when (conflictPolicy) {
-                    ConflictPolicy.SKIP -> return FileMoved(
-                        fileName = sourceEntry.name,
-                        sourceUri = sourceEntry.uri.toString(),
-                        destinationUri = existing.uri.toString(),
-                        fileSizeBytes = sourceEntry.size,
-                        relativeParentSegments = sourceEntry.relativeParentSegments,
-                        success = true,
-                        skipped = true,
-                    )
-                    ConflictPolicy.OVERWRITE -> existing.delete()
+                    ConflictPolicy.SKIP -> {
+                        return FileMoved(
+                            fileName = sourceEntry.name,
+                            sourceUri = sourceEntry.uri.toString(),
+                            destinationUri = existing.uri.toString(),
+                            fileSizeBytes = sourceEntry.size,
+                            relativeParentSegments = sourceEntry.relativeParentSegments,
+                            success = true,
+                            skipped = true,
+                        )
+                    }
+
+                    ConflictPolicy.OVERWRITE -> {
+                        existing.delete()
+                    }
+
                     ConflictPolicy.RENAME_SUFFIX -> { /* below */ }
                 }
             }
@@ -628,16 +647,22 @@ class FileOperationRepository
             val existing = File(destParent, destName)
             if (existing.exists()) {
                 when (conflictPolicy) {
-                    ConflictPolicy.SKIP -> return FileMoved(
-                        fileName = sourceEntry.name,
-                        sourceUri = sourceEntry.uri.toString(),
-                        destinationUri = existing.toUri().toString(),
-                        fileSizeBytes = sourceEntry.size,
-                        relativeParentSegments = sourceEntry.relativeParentSegments,
-                        success = true,
-                        skipped = true,
-                    )
-                    ConflictPolicy.OVERWRITE -> existing.delete()
+                    ConflictPolicy.SKIP -> {
+                        return FileMoved(
+                            fileName = sourceEntry.name,
+                            sourceUri = sourceEntry.uri.toString(),
+                            destinationUri = existing.toUri().toString(),
+                            fileSizeBytes = sourceEntry.size,
+                            relativeParentSegments = sourceEntry.relativeParentSegments,
+                            success = true,
+                            skipped = true,
+                        )
+                    }
+
+                    ConflictPolicy.OVERWRITE -> {
+                        existing.delete()
+                    }
+
                     ConflictPolicy.RENAME_SUFFIX -> {
                         destName = resolveDestNameFile(destParent, sourceEntry.name)
                     }
@@ -737,16 +762,22 @@ class FileOperationRepository
             val existing = destParent.findFile(sourceEntry.name)
             if (existing != null) {
                 when (conflictPolicy) {
-                    ConflictPolicy.SKIP -> return FileMoved(
-                        fileName = sourceEntry.name,
-                        sourceUri = sourceEntry.uri.toString(),
-                        destinationUri = existing.uri.toString(),
-                        fileSizeBytes = sourceEntry.size,
-                        relativeParentSegments = sourceEntry.relativeParentSegments,
-                        success = true,
-                        skipped = true,
-                    )
-                    ConflictPolicy.OVERWRITE -> existing.delete()
+                    ConflictPolicy.SKIP -> {
+                        return FileMoved(
+                            fileName = sourceEntry.name,
+                            sourceUri = sourceEntry.uri.toString(),
+                            destinationUri = existing.uri.toString(),
+                            fileSizeBytes = sourceEntry.size,
+                            relativeParentSegments = sourceEntry.relativeParentSegments,
+                            success = true,
+                            skipped = true,
+                        )
+                    }
+
+                    ConflictPolicy.OVERWRITE -> {
+                        existing.delete()
+                    }
+
                     ConflictPolicy.RENAME_SUFFIX -> { /* handled below */ }
                 }
             }
@@ -873,8 +904,14 @@ class FileOperationRepository
                 if (segment.isEmpty() || segment == "." || segment == "..") continue
                 val next = File(current, segment)
                 when {
-                    next.isDirectory -> current = next
-                    next.exists() -> return null
+                    next.isDirectory -> {
+                        current = next
+                    }
+
+                    next.exists() -> {
+                        return null
+                    }
+
                     else -> {
                         if (!next.mkdirs() && !next.isDirectory) return null
                         destFoldersCreatedCollector?.add(next.toUri().toString())
@@ -963,7 +1000,10 @@ class FileOperationRepository
             }
 
             return when (val resolution = peekDestParentForPreviewFile(destRoot, sourceEntry.relativeParentSegments)) {
-                is DestParentFilePreview.Partial, is DestParentFilePreview.BlockedByFile -> unchangedPreviewResult(sourceEntry, simulatedRootPath)
+                is DestParentFilePreview.Partial, is DestParentFilePreview.BlockedByFile -> {
+                    unchangedPreviewResult(sourceEntry, simulatedRootPath)
+                }
+
                 is DestParentFilePreview.Resolved -> {
                     val existing = File(resolution.parent, sourceEntry.name)
                     if (!existing.exists()) {
@@ -989,7 +1029,7 @@ class FileOperationRepository
             parent: File,
         ): PreviewFileResult =
             when (conflictPolicy) {
-                ConflictPolicy.SKIP ->
+                ConflictPolicy.SKIP -> {
                     PreviewFileResult(
                         fileName = sourceEntry.name,
                         sourcePath = sourceEntry.uri.toString(),
@@ -999,7 +1039,9 @@ class FileOperationRepository
                         renamedTo = null,
                         sizeBytes = sourceEntry.size,
                     )
-                ConflictPolicy.OVERWRITE ->
+                }
+
+                ConflictPolicy.OVERWRITE -> {
                     PreviewFileResult(
                         fileName = sourceEntry.name,
                         sourcePath = sourceEntry.uri.toString(),
@@ -1009,6 +1051,8 @@ class FileOperationRepository
                         renamedTo = null,
                         sizeBytes = sourceEntry.size,
                     )
+                }
+
                 ConflictPolicy.RENAME_SUFFIX -> {
                     val resolvedName = resolveDestNameFile(parent, sourceEntry.name)
                     PreviewFileResult(
@@ -1047,7 +1091,10 @@ class FileOperationRepository
             }
 
             return when (val resolution = peekDestParentForPreview(destTree, sourceEntry.relativeParentSegments)) {
-                is DestParentPreview.Partial, is DestParentPreview.BlockedByFile -> unchangedPreviewResult(sourceEntry, simulatedRootPath)
+                is DestParentPreview.Partial, is DestParentPreview.BlockedByFile -> {
+                    unchangedPreviewResult(sourceEntry, simulatedRootPath)
+                }
+
                 is DestParentPreview.Resolved -> {
                     val existing = resolution.parent.findFile(sourceEntry.name)
                     if (existing == null) {
@@ -1073,7 +1120,7 @@ class FileOperationRepository
             parent: DocumentFile,
         ): PreviewFileResult =
             when (conflictPolicy) {
-                ConflictPolicy.SKIP ->
+                ConflictPolicy.SKIP -> {
                     PreviewFileResult(
                         fileName = sourceEntry.name,
                         sourcePath = sourceEntry.uri.toString(),
@@ -1083,7 +1130,9 @@ class FileOperationRepository
                         renamedTo = null,
                         sizeBytes = sourceEntry.size,
                     )
-                ConflictPolicy.OVERWRITE ->
+                }
+
+                ConflictPolicy.OVERWRITE -> {
                     PreviewFileResult(
                         fileName = sourceEntry.name,
                         sourcePath = sourceEntry.uri.toString(),
@@ -1093,6 +1142,8 @@ class FileOperationRepository
                         renamedTo = null,
                         sizeBytes = sourceEntry.size,
                     )
+                }
+
                 ConflictPolicy.RENAME_SUFFIX -> {
                     val resolvedName = resolveDestName(sourceEntry.name, parent)
                     PreviewFileResult(
@@ -1158,12 +1209,21 @@ class FileOperationRepository
                 when {
                     isFilesystemFolderPathString(effectivePath) -> {
                         when {
-                            !filesystemAccessEnabled -> FolderAccessResult.PermissionDenied
+                            !filesystemAccessEnabled -> {
+                                FolderAccessResult.PermissionDenied
+                            }
+
                             else -> {
                                 val canonical = normalizeFilesystemFolderPath(effectivePath)
                                 when {
-                                    canonical == null -> FolderAccessResult.Unavailable
-                                    !isCanonicalPathUnderAllowedSharedStorage(canonical) -> FolderAccessResult.Unavailable
+                                    canonical == null -> {
+                                        FolderAccessResult.Unavailable
+                                    }
+
+                                    !isCanonicalPathUnderAllowedSharedStorage(canonical) -> {
+                                        FolderAccessResult.Unavailable
+                                    }
+
                                     else -> {
                                         val dir = File(canonical)
                                         when {
@@ -1176,7 +1236,8 @@ class FileOperationRepository
                             }
                         }
                     }
-                    effectivePath.startsWith("content://") ->
+
+                    effectivePath.startsWith("content://") -> {
                         try {
                             val document = DocumentFile.fromTreeUri(context, effectivePath.toUri())
                             when {
@@ -1188,7 +1249,11 @@ class FileOperationRepository
                         } catch (_: SecurityException) {
                             FolderAccessResult.PermissionDenied
                         }
-                    else -> FolderAccessResult.Unavailable
+                    }
+
+                    else -> {
+                        FolderAccessResult.Unavailable
+                    }
                 }
             accessCache[cacheKey] = resolved to System.currentTimeMillis()
             return resolved
@@ -1215,8 +1280,14 @@ class FileOperationRepository
                 val next = current.findFile(segment)
                 current =
                     when {
-                        next != null && next.isDirectory -> next
-                        next != null -> return null
+                        next != null && next.isDirectory -> {
+                            next
+                        }
+
+                        next != null -> {
+                            return null
+                        }
+
                         else -> {
                             val created = current.createDirectory(segment) ?: return null
                             destFoldersCreatedCollector?.add(created.uri.toString())
@@ -1293,13 +1364,22 @@ class FileOperationRepository
             val sb = StringBuilder("^")
             for (ch in pattern) {
                 when (ch) {
-                    '*' -> sb.append(".*")
-                    '?' -> sb.append(".")
+                    '*' -> {
+                        sb.append(".*")
+                    }
+
+                    '?' -> {
+                        sb.append(".")
+                    }
+
                     '.', '(', ')', '[', ']', '^', '$', '+', '{', '}', '|', '\\' -> {
                         sb.append('\\')
                         sb.append(ch)
                     }
-                    else -> sb.append(ch)
+
+                    else -> {
+                        sb.append(ch)
+                    }
                 }
             }
             sb.append("$")

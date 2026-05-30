@@ -698,12 +698,16 @@ private fun ExpandedContent(
                     Spacer(Modifier.height(4.dp))
                     val scheduleText =
                         when (schedule.type) {
-                            ScheduleType.DAILY -> "Daily at %02d:%02d".format(schedule.hour, schedule.minute)
+                            ScheduleType.DAILY -> {
+                                "Daily at %02d:%02d".format(schedule.hour, schedule.minute)
+                            }
+
                             ScheduleType.WEEKLY -> {
                                 val days = arrayOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
                                 val dayName = schedule.dayOfWeek?.let { days.getOrNull(it - 2) } ?: "?"
                                 "Weekly $dayName at %02d:%02d".format(schedule.hour, schedule.minute)
                             }
+
                             ScheduleType.EVERY_N_HOURS -> {
                                 val hours = schedule.intervalHours ?: 1
                                 "Every ${hours}h"
@@ -731,25 +735,35 @@ private fun ExpandedContent(
                             if (runProgress.isComplete) {
                                 val summary =
                                     when {
-                                        runProgress.error != null -> stringResource(R.string.rule_card_progress_error, runProgress.error)
-                                        runProgress.totalFiles == 0 -> stringResource(R.string.rule_card_progress_no_matching_files)
-                                        else ->
+                                        runProgress.error != null -> {
+                                            stringResource(R.string.rule_card_progress_error, runProgress.error)
+                                        }
+
+                                        runProgress.totalFiles == 0 -> {
+                                            stringResource(R.string.rule_card_progress_no_matching_files)
+                                        }
+
+                                        else -> {
                                             when (rule.operationMode) {
-                                                OperationMode.COPY ->
+                                                OperationMode.COPY -> {
                                                     pluralStringResource(
                                                         R.plurals.rule_card_progress_files_copied_summary,
                                                         runProgress.totalFiles,
                                                         runProgress.filesMoved,
                                                         runProgress.totalFiles,
                                                     )
-                                                OperationMode.MOVE ->
+                                                }
+
+                                                OperationMode.MOVE -> {
                                                     pluralStringResource(
                                                         R.plurals.rule_card_progress_files_moved_summary,
                                                         runProgress.totalFiles,
                                                         runProgress.filesMoved,
                                                         runProgress.totalFiles,
                                                     )
+                                                }
                                             }
+                                        }
                                     }
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -793,20 +807,23 @@ private fun ExpandedContent(
                                     Text(
                                         text =
                                             when (rule.operationMode) {
-                                                OperationMode.COPY ->
+                                                OperationMode.COPY -> {
                                                     stringResource(
                                                         R.string.rule_card_progress_copying_file,
                                                         currentFileName,
                                                         runProgress.filesMoved + 1,
                                                         runProgress.totalFiles,
                                                     )
-                                                OperationMode.MOVE ->
+                                                }
+
+                                                OperationMode.MOVE -> {
                                                     stringResource(
                                                         R.string.rule_card_progress_moving_file,
                                                         currentFileName,
                                                         runProgress.filesMoved + 1,
                                                         runProgress.totalFiles,
                                                     )
+                                                }
                                             },
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,

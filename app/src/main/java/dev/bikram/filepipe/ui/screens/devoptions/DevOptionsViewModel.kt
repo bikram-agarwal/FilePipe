@@ -861,11 +861,21 @@ class DevOptionsViewModel
 
         private fun safAccessLabel(uriPermission: UriPermission): String =
             when {
-                uriPermission.isReadPermission && uriPermission.isWritePermission ->
+                uriPermission.isReadPermission && uriPermission.isWritePermission -> {
                     context.getString(R.string.dev_options_saf_access_read_write)
-                uriPermission.isReadPermission -> context.getString(R.string.dev_options_saf_access_read)
-                uriPermission.isWritePermission -> context.getString(R.string.dev_options_saf_access_write)
-                else -> context.getString(R.string.dev_options_saf_access_none)
+                }
+
+                uriPermission.isReadPermission -> {
+                    context.getString(R.string.dev_options_saf_access_read)
+                }
+
+                uriPermission.isWritePermission -> {
+                    context.getString(R.string.dev_options_saf_access_write)
+                }
+
+                else -> {
+                    context.getString(R.string.dev_options_saf_access_none)
+                }
             }
 
         private fun allFilesAccessStatusLabel(): String =

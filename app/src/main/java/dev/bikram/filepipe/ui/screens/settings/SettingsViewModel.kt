@@ -585,15 +585,25 @@ class SettingsViewModel
             val providerAuthority = authority?.takeIf { it.isNotBlank() } ?: return null
             val normalizedAuthority = providerAuthority.lowercase()
             return when {
-                normalizedAuthority.contains("google.android.apps.docs") ->
+                normalizedAuthority.contains("google.android.apps.docs") -> {
                     context.getString(R.string.cloud_provider_google_drive)
-                normalizedAuthority.contains("skydrive") || normalizedAuthority.contains("onedrive") ->
+                }
+
+                normalizedAuthority.contains("skydrive") || normalizedAuthority.contains("onedrive") -> {
                     context.getString(R.string.cloud_provider_onedrive)
-                normalizedAuthority.contains("dropbox") ->
+                }
+
+                normalizedAuthority.contains("dropbox") -> {
                     context.getString(R.string.cloud_provider_dropbox)
-                normalizedAuthority.contains("box.android") ->
+                }
+
+                normalizedAuthority.contains("box.android") -> {
                     context.getString(R.string.cloud_provider_box)
-                else -> null
+                }
+
+                else -> {
+                    null
+                }
             }
         }
 
@@ -652,7 +662,7 @@ class SettingsViewModel
                     return@launch
                 }
             when (action) {
-                BackupImportPickAction.ImportMerge ->
+                BackupImportPickAction.ImportMerge -> {
                     importRulesUseCase.mergeRulesFromJson(text).fold(
                         onSuccess = { result ->
                             _userMessage.value =
@@ -668,7 +678,9 @@ class SettingsViewModel
                             _userMessage.value = "Import failed: ${it.message}"
                         },
                     )
-                BackupImportPickAction.RestoreFull ->
+                }
+
+                BackupImportPickAction.RestoreFull -> {
                     importRulesUseCase.restoreFromBackupJson(text).fold(
                         onSuccess = { result ->
                             val parts =
@@ -690,6 +702,7 @@ class SettingsViewModel
                             _userMessage.value = "Restore failed: ${it.message}"
                         },
                     )
+                }
             }
         }
 
@@ -950,20 +963,29 @@ class SettingsViewModel
             mockStage: DevReleasePlayBannerMockStage,
         ): PlayInAppUpdateBannerUiState =
             when (mockStage) {
-                DevReleasePlayBannerMockStage.OFF -> realState
-                DevReleasePlayBannerMockStage.STARTING ->
+                DevReleasePlayBannerMockStage.OFF -> {
+                    realState
+                }
+
+                DevReleasePlayBannerMockStage.STARTING -> {
                     PlayInAppUpdateBannerUiState.Downloading(
                         bytesDownloaded = 0L,
                         totalBytesToDownload = 0L,
                         indeterminateProgress = true,
                     )
-                DevReleasePlayBannerMockStage.DOWNLOADING ->
+                }
+
+                DevReleasePlayBannerMockStage.DOWNLOADING -> {
                     PlayInAppUpdateBannerUiState.Downloading(
                         bytesDownloaded = MOCK_PLAY_UPDATE_BYTES_DOWNLOADED,
                         totalBytesToDownload = MOCK_PLAY_UPDATE_BYTES_TOTAL,
                         indeterminateProgress = false,
                     )
-                DevReleasePlayBannerMockStage.READY -> PlayInAppUpdateBannerUiState.ReadyToInstall
+                }
+
+                DevReleasePlayBannerMockStage.READY -> {
+                    PlayInAppUpdateBannerUiState.ReadyToInstall
+                }
             }
 
         private fun resolvePlayBannerUiStateForSessionLogic(): PlayInAppUpdateBannerUiState {

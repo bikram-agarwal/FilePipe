@@ -559,12 +559,15 @@ class RulesViewModel
                                     _progressMap.update { current -> current + (progress.ruleId to progress) }
                                 }
                             when {
-                                results.size == 1 ->
+                                results.size == 1 -> {
                                     _navigateAfterRun.emit(
                                         RulesRunNavigation.HistoryDetail(results.first().historyId),
                                     )
-                                results.isNotEmpty() ->
+                                }
+
+                                results.isNotEmpty() -> {
                                     _navigateAfterRun.emit(RulesRunNavigation.HistoryList)
+                                }
                             }
                         } catch (_: CancellationException) {
                             // History finalized inside ExecuteRulesUseCase
@@ -778,28 +781,41 @@ class RulesViewModel
             var sourceHasBlockedLocation = false
             for (path in rule.sourceFolderPaths) {
                 when (fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)) {
-                    FolderAccessResult.PermissionDenied -> sourcePermissionDenied = true
+                    FolderAccessResult.PermissionDenied -> {
+                        sourcePermissionDenied = true
+                    }
+
                     FolderAccessResult.Unavailable -> {
                         when {
                             isFolderPathAllFilesAccessLocationForRules(path) -> sourceHasBlockedLocation = true
                             else -> sourceHasUnavailable = true
                         }
                     }
-                    FolderAccessResult.Accessible -> Unit
+
+                    FolderAccessResult.Accessible -> {
+                        Unit
+                    }
                 }
             }
             val destinationPath = rule.destinationFolderPath.takeIf { it.isNotBlank() }
             var destinationShowsStale = false
             destinationPath?.let { path ->
                 when (fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)) {
-                    FolderAccessResult.PermissionDenied -> return RuleFolderIssueSeverity.ERROR
-                    FolderAccessResult.Unavailable ->
+                    FolderAccessResult.PermissionDenied -> {
+                        return RuleFolderIssueSeverity.ERROR
+                    }
+
+                    FolderAccessResult.Unavailable -> {
                         if (isFolderPathAllFilesAccessLocationForRules(path)) {
                             return RuleFolderIssueSeverity.ERROR
                         } else {
                             destinationShowsStale = true
                         }
-                    FolderAccessResult.Accessible -> Unit
+                    }
+
+                    FolderAccessResult.Accessible -> {
+                        Unit
+                    }
                 }
             }
             if (sourcePermissionDenied) return RuleFolderIssueSeverity.ERROR
@@ -822,25 +838,31 @@ class RulesViewModel
             lastRunStartedAtByRuleId: Map<Long, Long>,
         ): List<Rule> {
             when (sortKey) {
-                HistorySortKey.MY_ORDER ->
+                HistorySortKey.MY_ORDER -> {
                     return rules.sortedWith(compareBy({ it.sortOrder }, { it.id }))
+                }
+
                 HistorySortKey.LAST_RAN -> {
                     val locale = Locale.getDefault()
                     return when (sortDirection) {
-                        HistorySortDirection.DESCENDING ->
+                        HistorySortDirection.DESCENDING -> {
                             rules.sortedWith(
                                 compareByDescending<Rule> { lastRunStartedAtByRuleId[it.id] ?: Long.MIN_VALUE }
                                     .thenBy { it.name.lowercase(locale) }
                                     .thenBy { it.id },
                             )
-                        HistorySortDirection.ASCENDING ->
+                        }
+
+                        HistorySortDirection.ASCENDING -> {
                             rules.sortedWith(
                                 compareBy<Rule> { lastRunStartedAtByRuleId[it.id] ?: Long.MAX_VALUE }
                                     .thenBy { it.name.lowercase(locale) }
                                     .thenBy { it.id },
                             )
+                        }
                     }
                 }
+
                 HistorySortKey.RULE_NAME -> {
                     val sorted =
                         rules.sortedWith(

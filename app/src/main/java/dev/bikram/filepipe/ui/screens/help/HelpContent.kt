@@ -156,17 +156,27 @@ fun parseHelpContent(markdown: String): List<FaqSectionContent> {
         .forEach { rawLine ->
             val line = rawLine.trimEnd()
             when {
-                line.startsWith("# ") -> Unit
+                line.startsWith("# ") -> {
+                    Unit
+                }
+
                 line.startsWith("## ") -> {
                     flushSection()
                     sectionHeading = parseSectionHeading(line.removePrefix("## "))
                 }
+
                 line.startsWith("### ") -> {
                     flushItem()
                     itemHeading = parseItemHeading(line.removePrefix("### "))
                 }
-                line == "---" -> Unit
-                itemHeading != null -> bodyLines.add(line)
+
+                line == "---" -> {
+                    Unit
+                }
+
+                itemHeading != null -> {
+                    bodyLines.add(line)
+                }
             }
         }
     flushSection()

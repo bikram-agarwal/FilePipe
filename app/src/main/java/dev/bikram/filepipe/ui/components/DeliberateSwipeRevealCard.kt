@@ -113,10 +113,12 @@ fun DeliberateSwipeRevealCard(
                                                     onSwipeStartToEnd()
                                                     offsetX = 0f
                                                 }
+
                                                 allowSwipeEndToStart && offsetX <= -thresholdPx -> {
                                                     onSwipeEndToStart()
                                                     offsetX = 0f
                                                 }
+
                                                 else -> {
                                                     val start = offsetX
                                                     val anim = Animatable(start)

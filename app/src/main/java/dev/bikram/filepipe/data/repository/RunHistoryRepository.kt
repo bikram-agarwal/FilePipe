@@ -51,16 +51,19 @@ class RunHistoryRepository
         ): Flow<PagingData<RunHistory>> =
             Pager(PagingConfig(pageSize = 30, enablePlaceholders = false)) {
                 when (sortKey) {
-                    HistorySortKey.LAST_RAN, HistorySortKey.MY_ORDER ->
+                    HistorySortKey.LAST_RAN, HistorySortKey.MY_ORDER -> {
                         when (sortDirection) {
                             HistorySortDirection.DESCENDING -> runHistoryDao.getAllHistoryPagedLastRanDesc()
                             HistorySortDirection.ASCENDING -> runHistoryDao.getAllHistoryPagedLastRanAsc()
                         }
-                    HistorySortKey.RULE_NAME ->
+                    }
+
+                    HistorySortKey.RULE_NAME -> {
                         when (sortDirection) {
                             HistorySortDirection.ASCENDING -> runHistoryDao.getAllHistoryPagedRuleNameAsc()
                             HistorySortDirection.DESCENDING -> runHistoryDao.getAllHistoryPagedRuleNameDesc()
                         }
+                    }
                 }
             }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
 
@@ -71,16 +74,19 @@ class RunHistoryRepository
         ): Flow<PagingData<RunHistory>> =
             Pager(PagingConfig(pageSize = 30, enablePlaceholders = false)) {
                 when (sortKey) {
-                    HistorySortKey.LAST_RAN, HistorySortKey.MY_ORDER ->
+                    HistorySortKey.LAST_RAN, HistorySortKey.MY_ORDER -> {
                         when (sortDirection) {
                             HistorySortDirection.DESCENDING -> runHistoryDao.getHistoryForRulePagedLastRanDesc(ruleId)
                             HistorySortDirection.ASCENDING -> runHistoryDao.getHistoryForRulePagedLastRanAsc(ruleId)
                         }
-                    HistorySortKey.RULE_NAME ->
+                    }
+
+                    HistorySortKey.RULE_NAME -> {
                         when (sortDirection) {
                             HistorySortDirection.ASCENDING -> runHistoryDao.getHistoryForRulePagedRuleNameAsc(ruleId)
                             HistorySortDirection.DESCENDING -> runHistoryDao.getHistoryForRulePagedRuleNameDesc(ruleId)
                         }
+                    }
                 }
             }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
 

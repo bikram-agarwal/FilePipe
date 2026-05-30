@@ -557,14 +557,20 @@ private fun RuleSectionCard(
 private fun isScheduleInvalid(schedule: RuleSchedule?): Boolean {
     if (schedule == null) return false
     return when (schedule.type) {
-        ScheduleType.EVERY_N_HOURS -> schedule.intervalHours !in 1..24
-        ScheduleType.WEEKLY ->
+        ScheduleType.EVERY_N_HOURS -> {
+            schedule.intervalHours !in 1..24
+        }
+
+        ScheduleType.WEEKLY -> {
             schedule.dayOfWeek == null ||
                 schedule.hour !in 0..23 ||
                 schedule.minute !in 0..59
-        ScheduleType.DAILY ->
+        }
+
+        ScheduleType.DAILY -> {
             schedule.hour !in 0..23 ||
                 schedule.minute !in 0..59
+        }
     }
 }
 
@@ -616,10 +622,18 @@ fun RuleDetailScreen(
             )
             val uriString = uri.toString()
             when (pending) {
-                FolderPickIntent.AddSource -> viewModel.addSourceFolder(uriString)
-                is FolderPickIntent.ReplaceSource ->
+                FolderPickIntent.AddSource -> {
+                    viewModel.addSourceFolder(uriString)
+                }
+
+                is FolderPickIntent.ReplaceSource -> {
                     viewModel.replaceSourceFolder(pending.previousPath, uriString)
-                FolderPickIntent.SetDestination -> viewModel.setDestination(uriString)
+                }
+
+                FolderPickIntent.SetDestination -> {
+                    viewModel.setDestination(uriString)
+                }
+
                 null -> {}
             }
             pendingFolderPick = null
@@ -747,12 +761,17 @@ fun RuleDetailScreen(
                     )
             val summaryRes =
                 when {
-                    hasAllFilesAccessLocationIssue || (showPermissionHint && usesFilesystemPaths) ->
+                    hasAllFilesAccessLocationIssue || (showPermissionHint && usesFilesystemPaths) -> {
                         R.string.rule_detail_folder_access_summary_filesystem
-                    showPermissionHint ->
+                    }
+
+                    showPermissionHint -> {
                         R.string.rule_detail_folder_access_summary_permission
-                    else ->
+                    }
+
+                    else -> {
                         R.string.rule_detail_folder_access_summary_unavailable
+                    }
                 }
             stringResource(summaryRes)
         } else {
@@ -1478,14 +1497,19 @@ fun RuleDetailScreen(
                         if (schedule != null) {
                             val scheduleText =
                                 when (schedule.type) {
-                                    ScheduleType.DAILY -> "Daily at %02d:%02d".format(schedule.hour, schedule.minute)
+                                    ScheduleType.DAILY -> {
+                                        "Daily at %02d:%02d".format(schedule.hour, schedule.minute)
+                                    }
+
                                     ScheduleType.WEEKLY -> {
                                         val days = arrayOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
                                         val dayName = schedule.dayOfWeek?.let { days.getOrNull(it - 2) } ?: "?"
                                         "Weekly ($dayName) at %02d:%02d".format(schedule.hour, schedule.minute)
                                     }
-                                    ScheduleType.EVERY_N_HOURS ->
+
+                                    ScheduleType.EVERY_N_HOURS -> {
                                         "Every ${schedule.intervalHours ?: 1}h"
+                                    }
                                 }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1878,10 +1902,17 @@ fun RuleDetailScreen(
                 onDismiss = { pendingFilesystemFolderPick = null },
                 onFolderChosen = { absolutePath ->
                     when (pickedIntent) {
-                        FolderPickIntent.AddSource -> viewModel.addSourceFolder(absolutePath)
-                        is FolderPickIntent.ReplaceSource ->
+                        FolderPickIntent.AddSource -> {
+                            viewModel.addSourceFolder(absolutePath)
+                        }
+
+                        is FolderPickIntent.ReplaceSource -> {
                             viewModel.replaceSourceFolder(pickedIntent.previousPath, absolutePath)
-                        FolderPickIntent.SetDestination -> viewModel.setDestination(absolutePath)
+                        }
+
+                        FolderPickIntent.SetDestination -> {
+                            viewModel.setDestination(absolutePath)
+                        }
                     }
                     pendingFilesystemFolderPick = null
                     viewModel.refreshFolderAccessAfterPermissionChange()
@@ -2234,19 +2265,23 @@ fun RuleDetailScreen(
                                                 overflow = TextOverflow.Ellipsis,
                                             )
                                             when {
-                                                file.wouldSkip ->
+                                                file.wouldSkip -> {
                                                     Text(
                                                         text = stringResource(R.string.preview_would_skip),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     )
-                                                file.wouldOverwrite ->
+                                                }
+
+                                                file.wouldOverwrite -> {
                                                     Text(
                                                         text = stringResource(R.string.preview_would_overwrite),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     )
-                                                file.renamedTo != null ->
+                                                }
+
+                                                file.renamedTo != null -> {
                                                     Text(
                                                         text =
                                                             stringResource(
@@ -2258,6 +2293,7 @@ fun RuleDetailScreen(
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
                                                     )
+                                                }
                                             }
                                         }
                                         val sizeKb = file.sizeBytes / 1024

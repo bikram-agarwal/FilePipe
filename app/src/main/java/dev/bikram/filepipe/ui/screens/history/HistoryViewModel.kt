@@ -289,24 +289,30 @@ class HistoryViewModel
             sortDirection: HistorySortDirection,
         ): List<RunHistory> =
             when (sortKey) {
-                HistorySortKey.LAST_RAN, HistorySortKey.MY_ORDER ->
+                HistorySortKey.LAST_RAN, HistorySortKey.MY_ORDER -> {
                     when (sortDirection) {
                         HistorySortDirection.DESCENDING -> list.sortedByDescending { it.startedAt }
                         HistorySortDirection.ASCENDING -> list.sortedBy { it.startedAt }
                     }
-                HistorySortKey.RULE_NAME ->
+                }
+
+                HistorySortKey.RULE_NAME -> {
                     when (sortDirection) {
-                        HistorySortDirection.ASCENDING ->
+                        HistorySortDirection.ASCENDING -> {
                             list.sortedWith(
                                 compareBy<RunHistory> { it.ruleName.lowercase(Locale.getDefault()) }
                                     .thenByDescending { it.startedAt },
                             )
-                        HistorySortDirection.DESCENDING ->
+                        }
+
+                        HistorySortDirection.DESCENDING -> {
                             list.sortedWith(
                                 compareByDescending<RunHistory> { it.ruleName.lowercase(Locale.getDefault()) }
                                     .thenByDescending { it.startedAt },
                             )
+                        }
                     }
+                }
             }
 
         private fun buildDateGroupedItems(list: List<RunHistory>): List<HistoryItem> {
@@ -399,12 +405,31 @@ class HistoryViewModel
 
 private fun RunHistory.matchesHistoryStatusFilter(filter: HistoryStatusFilter): Boolean =
     when (filter) {
-        HistoryStatusFilter.ALL -> true
-        HistoryStatusFilter.SUCCESS ->
+        HistoryStatusFilter.ALL -> {
+            true
+        }
+
+        HistoryStatusFilter.SUCCESS -> {
             status == RunStatus.SUCCESS && !isNoChangesRun() && !isEffectivelyUndone()
-        HistoryStatusFilter.FAILED -> status == RunStatus.FAILED
-        HistoryStatusFilter.PARTIAL -> status == RunStatus.PARTIAL_FAILURE
-        HistoryStatusFilter.NO_CHANGES -> isNoChangesRun()
-        HistoryStatusFilter.CANCELLED -> status == RunStatus.CANCELLED
-        HistoryStatusFilter.UNDONE -> isEffectivelyUndone()
+        }
+
+        HistoryStatusFilter.FAILED -> {
+            status == RunStatus.FAILED
+        }
+
+        HistoryStatusFilter.PARTIAL -> {
+            status == RunStatus.PARTIAL_FAILURE
+        }
+
+        HistoryStatusFilter.NO_CHANGES -> {
+            isNoChangesRun()
+        }
+
+        HistoryStatusFilter.CANCELLED -> {
+            status == RunStatus.CANCELLED
+        }
+
+        HistoryStatusFilter.UNDONE -> {
+            isEffectivelyUndone()
+        }
     }

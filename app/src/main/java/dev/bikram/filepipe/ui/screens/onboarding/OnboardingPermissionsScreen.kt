@@ -329,6 +329,7 @@ fun OnboardingPermissionsScreen(
                                             viewModel.setFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
                                             onContinue()
                                         }
+
                                         else -> {
                                             viewModel.setFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
                                             hasEnteredAllFilesGrantFlow = true
@@ -1022,19 +1023,25 @@ private fun PermissionTextWithBullets(
         text.lines().forEach { line ->
             val trimmed = line.trim()
             when {
-                trimmed.isEmpty() -> Spacer(Modifier.height(2.dp))
-                trimmed.startsWith("\u2022") ->
+                trimmed.isEmpty() -> {
+                    Spacer(Modifier.height(2.dp))
+                }
+
+                trimmed.startsWith("\u2022") -> {
                     PermissionBulletLine(
                         text = trimmed.removePrefix("\u2022").trimStart(),
                         style = style,
                         color = color,
                     )
-                else ->
+                }
+
+                else -> {
                     Text(
                         text = line,
                         style = style,
                         color = color,
                     )
+                }
             }
         }
     }

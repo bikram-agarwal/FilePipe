@@ -623,13 +623,15 @@ private fun loadFileThumbnail(
         }
 
     return when {
-        uri.scheme == "content" ->
+        uri.scheme == "content" -> {
             loadContentThumbnail(
                 context = context,
                 uri = uri,
                 mediaType = mediaType,
                 targetSize = targetSize,
             )
+        }
+
         uri.scheme == "file" -> {
             val filePath = uri.path ?: return null
             loadFilePathThumbnail(
@@ -639,14 +641,19 @@ private fun loadFileThumbnail(
                 targetSize = targetSize,
             )
         }
-        uri.scheme.isNullOrBlank() && uriString.startsWith("/") ->
+
+        uri.scheme.isNullOrBlank() && uriString.startsWith("/") -> {
             loadFilePathThumbnail(
                 context = context,
                 file = File(uriString),
                 mediaType = mediaType,
                 targetSize = targetSize,
             )
-        else -> null
+        }
+
+        else -> {
+            null
+        }
     }
 }
 
@@ -665,21 +672,27 @@ private fun loadContentThumbnail(
     }
 
     return when (mediaType) {
-        ThumbnailMediaType.IMAGE -> loadImageContentThumbnail(context, uri, targetSize)
-        ThumbnailMediaType.VIDEO ->
+        ThumbnailMediaType.IMAGE -> {
+            loadImageContentThumbnail(context, uri, targetSize)
+        }
+
+        ThumbnailMediaType.VIDEO -> {
             loadVideoFrameThumbnail(
                 context = context,
                 uri = uri,
                 file = null,
                 targetSize = targetSize,
             )
-        ThumbnailMediaType.AUDIO ->
+        }
+
+        ThumbnailMediaType.AUDIO -> {
             loadAudioArtworkThumbnail(
                 context = context,
                 uri = uri,
                 file = null,
                 targetSize = targetSize,
             )
+        }
     }
 }
 
@@ -694,8 +707,11 @@ private fun loadFilePathThumbnail(
     }
 
     return when (mediaType) {
-        ThumbnailMediaType.IMAGE -> loadImageFileThumbnail(file, targetSize)
-        ThumbnailMediaType.VIDEO ->
+        ThumbnailMediaType.IMAGE -> {
+            loadImageFileThumbnail(file, targetSize)
+        }
+
+        ThumbnailMediaType.VIDEO -> {
             runCatching {
                 ThumbnailUtils.createVideoThumbnail(file, targetSize, null)
             }.getOrNull()
@@ -705,13 +721,16 @@ private fun loadFilePathThumbnail(
                     file = file,
                     targetSize = targetSize,
                 )
-        ThumbnailMediaType.AUDIO ->
+        }
+
+        ThumbnailMediaType.AUDIO -> {
             loadAudioArtworkThumbnail(
                 context = context,
                 uri = null,
                 file = file,
                 targetSize = targetSize,
             )
+        }
     }
 }
 
@@ -900,13 +919,18 @@ private fun openFileWithDefaultApp(
                             File(filePath),
                         )
                     }
-                    uri.scheme.isNullOrBlank() && uriString.startsWith("/") ->
+
+                    uri.scheme.isNullOrBlank() && uriString.startsWith("/") -> {
                         FileProvider.getUriForFile(
                             context,
                             "${context.packageName}.fileprovider",
                             File(uriString),
                         )
-                    else -> uri
+                    }
+
+                    else -> {
+                        uri
+                    }
                 }
             val fileName = uriString.substringAfterLast('/')
             val ext = fileName.substringAfterLast('.', "").lowercase()

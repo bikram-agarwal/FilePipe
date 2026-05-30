@@ -22,9 +22,18 @@ fun rememberContentOverflowScrollEnabled(
             val layoutInfo = listState.layoutInfo
             val visibleItems = layoutInfo.visibleItemsInfo
             when {
-                additionalScrollEnabled -> true
-                layoutInfo.totalItemsCount == 0 || visibleItems.isEmpty() -> false
-                visibleItems.size < layoutInfo.totalItemsCount -> true
+                additionalScrollEnabled -> {
+                    true
+                }
+
+                layoutInfo.totalItemsCount == 0 || visibleItems.isEmpty() -> {
+                    false
+                }
+
+                visibleItems.size < layoutInfo.totalItemsCount -> {
+                    true
+                }
+
                 else -> {
                     val firstItemTop = visibleItems.minOf { item -> item.offset }
                     val lastItemBottom = visibleItems.maxOf { item -> item.offset + item.size }

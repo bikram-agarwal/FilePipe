@@ -74,6 +74,7 @@ enum class AppColorSource {
                 PRESET_ROSE,
                 PRESET_SLATE,
                 -> true
+
                 else -> false
             }
 

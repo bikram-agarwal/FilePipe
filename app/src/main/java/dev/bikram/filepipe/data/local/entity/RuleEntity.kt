@@ -62,7 +62,7 @@ fun RuleEntity.toDomain(): Rule =
         trashedAt = trashedAt,
         schedule =
             when {
-                scheduleType == ScheduleType.EVERY_N_HOURS && scheduleIntervalHours != null ->
+                scheduleType == ScheduleType.EVERY_N_HOURS && scheduleIntervalHours != null -> {
                     RuleSchedule(
                         type = scheduleType,
                         dayOfWeek = null,
@@ -70,7 +70,9 @@ fun RuleEntity.toDomain(): Rule =
                         minute = scheduleMinute ?: 0,
                         intervalHours = scheduleIntervalHours,
                     )
-                scheduleType != null && scheduleHour != null && scheduleMinute != null ->
+                }
+
+                scheduleType != null && scheduleHour != null && scheduleMinute != null -> {
                     RuleSchedule(
                         type = scheduleType,
                         dayOfWeek = scheduleDayOfWeek,
@@ -78,7 +80,11 @@ fun RuleEntity.toDomain(): Rule =
                         minute = scheduleMinute,
                         intervalHours = null,
                     )
-                else -> null
+                }
+
+                else -> {
+                    null
+                }
             },
         conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
         operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),

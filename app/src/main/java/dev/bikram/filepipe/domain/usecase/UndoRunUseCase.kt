@@ -127,6 +127,7 @@ class UndoRunUseCase
                                 }
                             }
                         }
+
                         OperationMode.MOVE -> {
                             val destUri = fileMoved.destinationUri.toUri()
                             val sourceFolderUriString = parentSourceFolderForUndo(fileMoved.sourceUri)
@@ -152,6 +153,7 @@ class UndoRunUseCase
                                         }
                                         destFile.length()
                                     }
+
                                     else -> {
                                         val destDoc = DocumentFile.fromSingleUri(context, destUri)
                                         if (destDoc == null || !destDoc.exists()) {

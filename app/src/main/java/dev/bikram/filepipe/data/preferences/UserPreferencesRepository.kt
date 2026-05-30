@@ -150,7 +150,10 @@ class UserPreferencesRepository
                     }
                 val colorSource =
                     storedColorSource ?: when {
-                        legacyMaterialYou -> AppColorSource.MATERIAL_YOU
+                        legacyMaterialYou -> {
+                            AppColorSource.MATERIAL_YOU
+                        }
+
                         else -> {
                             val legacyToggle = prefs[PrefKeys.USE_MATERIAL_YOU] ?: true
                             if (legacyToggle) AppColorSource.MATERIAL_YOU else AppColorSource.DEFAULT
@@ -617,10 +620,12 @@ class UserPreferencesRepository
                         prefs[PrefKeys.COLOR_SOURCE] = parsedColorSource.name
                         prefs.remove(PrefKeys.USE_MATERIAL_YOU)
                     }
+
                     dto.useMaterialYou == true -> {
                         prefs.remove(PrefKeys.COLOR_SOURCE)
                         prefs[PrefKeys.USE_MATERIAL_YOU] = true
                     }
+
                     dto.useMaterialYou == false -> {
                         prefs.remove(PrefKeys.COLOR_SOURCE)
                         prefs[PrefKeys.USE_MATERIAL_YOU] = false
@@ -654,11 +659,18 @@ class UserPreferencesRepository
                 prefs[PrefKeys.PROGRESSIVE_BLUR] = dto.progressiveBlurEnabled
                 val resolvedSchedule =
                     when {
-                        !dto.updateCheckSchedule.isNullOrBlank() ->
+                        !dto.updateCheckSchedule.isNullOrBlank() -> {
                             runCatching { UpdateCheckSchedule.valueOf(dto.updateCheckSchedule) }.getOrNull()
                                 ?: UpdateCheckSchedule.AT_APP_START
-                        dto.autoCheckForUpdates == false -> UpdateCheckSchedule.NEVER
-                        else -> UpdateCheckSchedule.AT_APP_START
+                        }
+
+                        dto.autoCheckForUpdates == false -> {
+                            UpdateCheckSchedule.NEVER
+                        }
+
+                        else -> {
+                            UpdateCheckSchedule.AT_APP_START
+                        }
                     }
                 prefs[PrefKeys.UPDATE_CHECK_SCHEDULE] = resolvedSchedule.name
                 prefs.remove(PrefKeys.AUTO_CHECK_UPDATES)
@@ -681,12 +693,21 @@ class UserPreferencesRepository
 
                 val restoredList: List<String>? =
                     when {
-                        dto.customSeedHexes != null -> dto.customSeedHexes
-                        !dto.activeCustomSeedHex.isNullOrBlank() ->
+                        dto.customSeedHexes != null -> {
+                            dto.customSeedHexes
+                        }
+
+                        !dto.activeCustomSeedHex.isNullOrBlank() -> {
                             listOf(dto.activeCustomSeedHex.trim())
-                        !dto.customSeedHex.isNullOrBlank() ->
+                        }
+
+                        !dto.customSeedHex.isNullOrBlank() -> {
                             listOf(dto.customSeedHex.trim())
-                        else -> null
+                        }
+
+                        else -> {
+                            null
+                        }
                     }
                 if (restoredList != null) {
                     val normalizedList = restoredList.mapNotNull { normalizeCustomSeedHexOrNull(it) }.distinct()
@@ -704,19 +725,28 @@ class UserPreferencesRepository
                     } else {
                         val activeCandidate =
                             when {
-                                !dto.activeCustomSeedHex.isNullOrBlank() ->
+                                !dto.activeCustomSeedHex.isNullOrBlank() -> {
                                     normalizeCustomSeedHexOrNull(dto.activeCustomSeedHex.trim())
-                                !dto.customSeedHex.isNullOrBlank() ->
+                                }
+
+                                !dto.customSeedHex.isNullOrBlank() -> {
                                     normalizeCustomSeedHexOrNull(dto.customSeedHex.trim())
-                                else -> normalizedList.firstOrNull()
+                                }
+
+                                else -> {
+                                    normalizedList.firstOrNull()
+                                }
                             }
                         val activeNorm =
                             when {
                                 activeCandidate != null &&
-                                    normalizedList.any { normalizeCustomSeedHexOrNull(it) == activeCandidate } ->
+                                    normalizedList.any { normalizeCustomSeedHexOrNull(it) == activeCandidate } -> {
                                     activeCandidate
-                                else ->
+                                }
+
+                                else -> {
                                     normalizeCustomSeedHexOrNull(normalizedList.first()) ?: normalizedList.first()
+                                }
                             }
                         prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] = activeNorm
                     }
