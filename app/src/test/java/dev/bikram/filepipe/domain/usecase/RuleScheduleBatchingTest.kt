@@ -5,6 +5,8 @@ import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.ScheduleType
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.util.Calendar
+import java.util.concurrent.TimeUnit
 
 class RuleScheduleBatchingTest {
     @Test
@@ -34,6 +36,42 @@ class RuleScheduleBatchingTest {
         assertEquals("batch_1_3_9", batchTagForRuleIds(longArrayOf(9L, 1L, 3L)))
     }
 
+    @Test
+    fun nextDailyRunUsesTodayWhenTimeIsStillAhead() {
+        val now = millisFor(day = 10, hour = 8, minute = 30)
+        val next =
+            nextRunAtMillis(
+                RuleSchedule(ScheduleType.DAILY, hour = 9, minute = 15),
+                nowMillis = now,
+            )
+
+        assertEquals(millisFor(day = 10, hour = 9, minute = 15), next)
+    }
+
+    @Test
+    fun nextDailyRunMovesToTomorrowWhenTimeAlreadyPassed() {
+        val now = millisFor(day = 10, hour = 10, minute = 0)
+        val next =
+            nextRunAtMillis(
+                RuleSchedule(ScheduleType.DAILY, hour = 9, minute = 15),
+                nowMillis = now,
+            )
+
+        assertEquals(millisFor(day = 11, hour = 9, minute = 15), next)
+    }
+
+    @Test
+    fun nextIntervalRunCanBeImmediateForNewSchedulesAndDelayedForRecurringAlarms() {
+        val now = millisFor(day = 10, hour = 8, minute = 30)
+        val schedule = RuleSchedule(ScheduleType.EVERY_N_HOURS, hour = 0, minute = 0, intervalHours = 3)
+
+        assertEquals(now, nextRunAtMillis(schedule, nowMillis = now, allowImmediateIntervalRun = true))
+        assertEquals(
+            now + TimeUnit.HOURS.toMillis(3),
+            nextRunAtMillis(schedule, nowMillis = now, allowImmediateIntervalRun = false),
+        )
+    }
+
     private fun rule(
         id: Long,
         schedule: RuleSchedule?,
@@ -48,4 +86,17 @@ class RuleScheduleBatchingTest {
             isEnabled = isEnabled,
             schedule = schedule,
         )
+
+    private fun millisFor(
+        day: Int,
+        hour: Int,
+        minute: Int,
+    ): Long =
+        Calendar
+            .getInstance()
+            .apply {
+                clear()
+                set(2026, Calendar.JANUARY, day, hour, minute, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
 }

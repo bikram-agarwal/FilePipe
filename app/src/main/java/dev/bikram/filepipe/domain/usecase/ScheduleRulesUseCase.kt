@@ -1,23 +1,25 @@
 package dev.bikram.filepipe.domain.usecase
 
-import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
 import androidx.work.WorkManager
-import androidx.work.workDataOf
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.domain.model.Rule
-import dev.bikram.filepipe.domain.model.ScheduleType
-import dev.bikram.filepipe.worker.FileOrganizerWorker
-import dev.bikram.filepipe.worker.RunAllScheduledRulesWorker
-import java.util.Calendar
-import java.util.concurrent.TimeUnit
+import dev.bikram.filepipe.domain.model.RuleSchedule
+import dev.bikram.filepipe.receiver.ScheduledRuleAlarmReceiver
 import javax.inject.Inject
 
 class ScheduleRulesUseCase
     @Inject
     constructor(
+        @param:ApplicationContext private val context: Context,
         private val workManager: WorkManager,
     ) {
+        private val alarmManager: AlarmManager
+            get() = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
         fun scheduleRule(rule: Rule) {
             val schedule =
                 rule.schedule ?: run {
@@ -29,158 +31,153 @@ class ScheduleRulesUseCase
                 return
             }
 
-            val tag = workTagFor(rule.id)
-            val inputData = workDataOf(FileOrganizerWorker.KEY_RULE_ID to rule.id)
-            val constraints =
-                Constraints
-                    .Builder()
-                    .setRequiresBatteryNotLow(true)
-                    .build()
-
-            val delayMs =
-                when (schedule.type) {
-                    ScheduleType.EVERY_N_HOURS -> {
-                        0L
-                    }
-
-                    else -> {
-                        calculateDelayUntilNextRun(
-                            schedule.hour,
-                            schedule.minute,
-                            if (schedule.type == ScheduleType.WEEKLY) schedule.dayOfWeek else null,
-                        )
-                    }
-                }
-
-            val request =
-                when (schedule.type) {
-                    ScheduleType.EVERY_N_HOURS -> {
-                        val hours = schedule.intervalHours?.toLong()?.coerceIn(1L, 24L) ?: 1L
-                        PeriodicWorkRequestBuilder<FileOrganizerWorker>(hours, TimeUnit.HOURS)
-                    }
-
-                    ScheduleType.DAILY -> {
-                        PeriodicWorkRequestBuilder<FileOrganizerWorker>(1L, TimeUnit.DAYS)
-                    }
-
-                    ScheduleType.WEEKLY -> {
-                        PeriodicWorkRequestBuilder<FileOrganizerWorker>(7L, TimeUnit.DAYS)
-                    }
-                }.setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
-                    .setInputData(inputData)
-                    .addTag(tag)
-                    .setConstraints(constraints)
-                    .build()
-
-            workManager.enqueueUniquePeriodicWork(
-                tag,
-                ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
-                request,
-            )
+            cancelRule(rule)
+            scheduleRuleAlarm(rule, allowImmediateIntervalRun = true)
         }
 
         fun cancelRule(rule: Rule) {
-            workManager.cancelAllWorkByTag(workTagFor(rule.id))
+            cancelRuleAlarm(rule.id)
+            workManager.cancelAllWorkByTag(scheduledRuleWorkTag(rule.id))
         }
 
         fun cancelRuleById(ruleId: Long) {
-            workManager.cancelAllWorkByTag(workTagFor(ruleId))
+            cancelRuleAlarm(ruleId)
+            workManager.cancelAllWorkByTag(scheduledRuleWorkTag(ruleId))
         }
 
         /**
          * Batch-schedules a list of enabled rules by grouping rules that share an identical schedule
-         * configuration into a single [RunAllScheduledRulesWorker] periodic request.
+         * configuration into a single alarm-triggered worker pass.
          *
          * Rules with unique schedules still get their own worker, but rules that would otherwise
-         * fire at the same time are coalesced into one foreground service pass — reducing wake-lock
+         * fire at the same time are coalesced into one foreground service pass - reducing wake-lock
          * overhead and notification noise when many rules share the same schedule.
          *
-         * Existing per-rule workers for all provided rules are cancelled before the batch workers
-         * are enqueued.
+         * Existing per-rule scheduled work for all provided rules is cancelled before batch alarms
+         * are scheduled.
          */
         fun scheduleCoalesced(rules: List<Rule>) {
             val enabled = rules.filter { it.isEnabled && it.schedule != null }
-            // Cancel existing per-rule workers first
             enabled.forEach { cancelRule(it) }
-
-            val constraints = Constraints.Builder().setRequiresBatteryNotLow(true).build()
 
             coalescedRuleScheduleGroups(rules)
                 .forEach { group ->
-                    val schedule = group.schedule
-                    val delayMs =
-                        when (schedule.type) {
-                            ScheduleType.EVERY_N_HOURS -> {
-                                0L
-                            }
-
-                            else -> {
-                                calculateDelayUntilNextRun(
-                                    schedule.hour,
-                                    schedule.minute,
-                                    if (schedule.type == ScheduleType.WEEKLY) schedule.dayOfWeek else null,
-                                )
-                            }
-                        }
                     val ruleIds = group.ruleIds.toLongArray()
-                    val inputData = workDataOf(RunAllScheduledRulesWorker.KEY_RULE_IDS to ruleIds)
-                    val batchTag = batchTagFor(ruleIds)
+                    cancelBatchAlarm(ruleIds)
+                    workManager.cancelAllWorkByTag(scheduledBatchWorkTag(ruleIds))
+                    scheduleBatchAlarm(group.schedule, ruleIds, allowImmediateIntervalRun = true)
+                }
+        }
 
-                    val request =
-                        when (schedule.type) {
-                            ScheduleType.EVERY_N_HOURS -> {
-                                val hours = schedule.intervalHours?.toLong()?.coerceIn(1L, 24L) ?: 1L
-                                PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(hours, TimeUnit.HOURS)
-                            }
+        internal fun scheduleNextRuleAlarm(rule: Rule) {
+            if (rule.isEnabled && rule.schedule != null) {
+                scheduleRuleAlarm(rule, allowImmediateIntervalRun = false)
+            }
+        }
 
-                            ScheduleType.DAILY -> {
-                                PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(1L, TimeUnit.DAYS)
-                            }
-
-                            ScheduleType.WEEKLY -> {
-                                PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(7L, TimeUnit.DAYS)
-                            }
-                        }.setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
-                            .setInputData(inputData)
-                            .addTag(batchTag)
-                            .setConstraints(constraints)
-                            .build()
-
-                    workManager.enqueueUniquePeriodicWork(
-                        batchTag,
-                        ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
-                        request,
+        internal fun scheduleNextCoalescedAlarm(rules: List<Rule>) {
+            coalescedRuleScheduleGroups(rules)
+                .forEach { group ->
+                    scheduleBatchAlarm(
+                        schedule = group.schedule,
+                        ruleIds = group.ruleIds.toLongArray(),
+                        allowImmediateIntervalRun = false,
                     )
                 }
         }
 
-        private fun workTagFor(ruleId: Long) = "rule_$ruleId"
-
-        private fun batchTagFor(ruleIds: LongArray) = batchTagForRuleIds(ruleIds)
-
-        private fun calculateDelayUntilNextRun(
-            hour: Int,
-            minute: Int,
-            dayOfWeek: Int?,
-        ): Long {
-            val now = Calendar.getInstance()
-            val target =
-                Calendar.getInstance().apply {
-                    set(Calendar.HOUR_OF_DAY, hour)
-                    set(Calendar.MINUTE, minute)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                    if (dayOfWeek != null) {
-                        set(Calendar.DAY_OF_WEEK, dayOfWeek)
-                    }
+        private fun scheduleRuleAlarm(
+            rule: Rule,
+            allowImmediateIntervalRun: Boolean,
+        ) {
+            val schedule = rule.schedule ?: return
+            val intent =
+                Intent(context, ScheduledRuleAlarmReceiver::class.java).apply {
+                    action = ScheduledRuleAlarmReceiver.ACTION_RUN_RULE
+                    putExtra(ScheduledRuleAlarmReceiver.EXTRA_RULE_ID, rule.id)
+                    putExtra(ScheduledRuleAlarmReceiver.EXTRA_EXPECTED_SCHEDULE_KEY, scheduleKey(schedule))
                 }
-            if (!target.after(now)) {
-                if (dayOfWeek != null) {
-                    target.add(Calendar.WEEK_OF_YEAR, 1)
-                } else {
-                    target.add(Calendar.DAY_OF_YEAR, 1)
-                }
-            }
-            return (target.timeInMillis - now.timeInMillis).coerceAtLeast(0L)
+            val pendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    alarmRequestCodeForRule(rule.id),
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+            scheduleAlarm(
+                triggerAtMillis = nextRunAtMillis(schedule, allowImmediateIntervalRun = allowImmediateIntervalRun),
+                pendingIntent = pendingIntent,
+            )
         }
+
+        private fun scheduleBatchAlarm(
+            schedule: RuleSchedule,
+            ruleIds: LongArray,
+            allowImmediateIntervalRun: Boolean,
+        ) {
+            val intent =
+                Intent(context, ScheduledRuleAlarmReceiver::class.java).apply {
+                    action = ScheduledRuleAlarmReceiver.ACTION_RUN_BATCH
+                    putExtra(ScheduledRuleAlarmReceiver.EXTRA_RULE_IDS, ruleIds)
+                    putExtra(ScheduledRuleAlarmReceiver.EXTRA_EXPECTED_SCHEDULE_KEY, scheduleKey(schedule))
+                }
+            val pendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    alarmRequestCodeForBatch(ruleIds),
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+            scheduleAlarm(
+                triggerAtMillis = nextRunAtMillis(schedule, allowImmediateIntervalRun = allowImmediateIntervalRun),
+                pendingIntent = pendingIntent,
+            )
+        }
+
+        private fun scheduleAlarm(
+            triggerAtMillis: Long,
+            pendingIntent: PendingIntent,
+        ) {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+        }
+
+        private fun cancelRuleAlarm(ruleId: Long) {
+            val intent =
+                Intent(context, ScheduledRuleAlarmReceiver::class.java).apply {
+                    action = ScheduledRuleAlarmReceiver.ACTION_RUN_RULE
+                }
+            val pendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    alarmRequestCodeForRule(ruleId),
+                    intent,
+                    PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+                )
+            if (pendingIntent != null) {
+                alarmManager.cancel(pendingIntent)
+                pendingIntent.cancel()
+            }
+        }
+
+        private fun cancelBatchAlarm(ruleIds: LongArray) {
+            val intent =
+                Intent(context, ScheduledRuleAlarmReceiver::class.java).apply {
+                    action = ScheduledRuleAlarmReceiver.ACTION_RUN_BATCH
+                }
+            val pendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    alarmRequestCodeForBatch(ruleIds),
+                    intent,
+                    PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+                )
+            if (pendingIntent != null) {
+                alarmManager.cancel(pendingIntent)
+                pendingIntent.cancel()
+            }
+        }
+
+        private fun alarmRequestCodeForRule(ruleId: Long): Int = ruleId.hashCode()
+
+        private fun alarmRequestCodeForBatch(ruleIds: LongArray): Int = batchTagForRuleIds(ruleIds).hashCode()
     }

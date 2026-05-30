@@ -1,3 +1,11 @@
+## v3.7.6 - Improve scheduled runs
+
+### ✨ Improved Features
+
+- Scheduled rules can now wake and run in the background without waiting for the app to be opened.
+- Scheduled rules are restored after reboot, app update, time change, or timezone change.
+
+
 ## v3.7.5 - Granular color control
 
 ### 🚀 New Features
