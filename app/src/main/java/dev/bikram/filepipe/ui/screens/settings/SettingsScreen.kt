@@ -2879,10 +2879,8 @@ private fun SettingsExpandableSectionHeader(
             modifier =
                 Modifier
                     .size(chevronContainerSize)
-                    .background(
-                        color = chevronContainerColor,
-                        shape = MaterialTheme.shapes.extraExtraLarge,
-                    ),
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(chevronContainerColor),
             contentAlignment = Alignment.Center,
         ) {
             FilePipeMaterialRoundedSymbol(
@@ -2937,10 +2935,8 @@ private fun SettingsStandaloneNavigationRow(
             modifier =
                 Modifier
                     .size(36.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f),
-                        shape = MaterialTheme.shapes.extraExtraLarge,
-                    ),
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)),
             contentAlignment = Alignment.Center,
         ) {
             FilePipeMaterialRoundedSymbol(
@@ -2962,10 +2958,8 @@ private fun SettingsStandaloneNavigationRow(
             modifier =
                 Modifier
                     .size(32.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        shape = MaterialTheme.shapes.extraExtraLarge,
-                    ),
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             contentAlignment = Alignment.Center,
         ) {
             FilePipeMaterialRoundedSymbol(

@@ -36,11 +36,7 @@ class ScheduledRulesBootReceiver : BroadcastReceiver() {
                         .getEnabledRules()
                         .filter { rule -> rule.schedule != null }
                 scheduledRules.forEach { rule ->
-                    if (action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
-                        scheduleRulesUseCase.scheduleNextRuleAlarm(rule)
-                    } else {
-                        scheduleRulesUseCase.scheduleRule(rule)
-                    }
+                    scheduleRulesUseCase.scheduleNextRuleAlarm(rule)
                 }
             } finally {
                 pendingResult.finish()

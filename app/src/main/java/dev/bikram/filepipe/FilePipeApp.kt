@@ -9,7 +9,6 @@ import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
-import dev.bikram.filepipe.manualrun.ManualRunProcessLifecycleBinder
 import dev.bikram.filepipe.update.UpdateApkCacheMaintenance
 import dev.bikram.filepipe.update.UpdateAvailableNotifier
 import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
@@ -28,9 +27,6 @@ class FilePipeApp :
     Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
-
-    @Inject
-    lateinit var manualRunProcessLifecycleBinder: ManualRunProcessLifecycleBinder
 
     @Inject
     lateinit var userPreferencesRepository: UserPreferencesRepository
@@ -57,7 +53,6 @@ class FilePipeApp :
         super.onCreate()
         DiagnosticLog.installCrashHandler(this)
         DiagnosticLog.record(this, "FilePipeApp.onCreate started")
-        manualRunProcessLifecycleBinder.ensureRegistered()
         preferencesMigrationScope.launch {
             runCatching {
                 userPreferencesRepository.migrateLegacyEnhancedShadingPreferenceIfNeeded()
