@@ -7,7 +7,7 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 <b>━━ 📋 RULES ━━</b>
 Use templates to start fast, or build your own. Create a rule by choosing source folders, file extensions, and a destination. Each rule can move or copy files, and you control what happens when a filename collision occurs — skip, overwrite, or rename automatically. Rules can scan subfolders recursively and each one gets its own schedule.
 
-<b>━━ ADVANCED FILTERS ━━</b>
+<b>━━ 🎛️ ADVANCED FILTERS ━━</b>
 Not every file in a folder should match. Narrow things down with:
 • Filename patterns (wildcards)
 • Minimum and maximum file size

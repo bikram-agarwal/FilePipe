@@ -23,13 +23,13 @@ import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
-import dev.bikram.filepipe.manualrun.ManualRunProcessLifecycleBinder
 import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.ui.InAppRatingAutoPromptHost
 import dev.bikram.filepipe.ui.navigation.AppNavigation
 import dev.bikram.filepipe.ui.theme.FilePipeTheme
 import dev.bikram.filepipe.update.AppReviewLauncher
+import dev.bikram.filepipe.manualrun.ManualRunProcessLifecycleBinder
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 

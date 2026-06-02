@@ -527,8 +527,8 @@ class RulesViewModel
         }
 
         /**
-         * Runs [rules] in-process for immediate start. [ManualRunForegroundService] is started from
-         * [MainActivity] when the app goes to background while a manual run is active.
+         * Runs [rules] in-process for immediate start. [ManualRunForegroundService] starts while
+         * the app is still foregrounded so the same run can continue if the app backgrounds.
          *
          * Uses a [CoroutineStart.LAZY] job so the slot can be updated before the previous runner is
          * cancelled and joined, avoiding overlapping executions and stale [manualRunJob] identity.
