@@ -29,6 +29,7 @@ import dev.bikram.filepipe.ui.InAppRatingAutoPromptHost
 import dev.bikram.filepipe.ui.navigation.AppNavigation
 import dev.bikram.filepipe.ui.theme.FilePipeTheme
 import dev.bikram.filepipe.update.AppReviewLauncher
+import dev.bikram.filepipe.manualrun.ManualRunProcessLifecycleBinder
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -46,11 +47,15 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var appReviewLauncher: AppReviewLauncher
 
+    @Inject
+    lateinit var manualRunProcessLifecycleBinder: ManualRunProcessLifecycleBinder
+
     private var isReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        manualRunProcessLifecycleBinder.ensureRegistered()
         splashScreen.setKeepOnScreenCondition { !isReady }
         enableEdgeToEdge()
         handleShortcutIntent(intent)
