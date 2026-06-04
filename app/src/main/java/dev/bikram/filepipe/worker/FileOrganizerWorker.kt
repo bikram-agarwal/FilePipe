@@ -46,6 +46,16 @@ class FileOrganizerWorker
 
         private val summaryNotificationIdForWork: Int by lazy { progressNotificationId + 1 }
 
+        override suspend fun getForegroundInfo(): ForegroundInfo {
+            val ruleId = inputData.getLong(KEY_RULE_ID, -1L)
+            val ruleName = if (ruleId != -1L) {
+                ruleRepository.getRuleById(ruleId)?.name
+            } else {
+                null
+            } ?: appContext.getString(R.string.app_name)
+            return createForegroundInfo(ruleName)
+        }
+
         override suspend fun doWork(): Result {
             val ruleId = inputData.getLong(KEY_RULE_ID, -1L)
             if (ruleId == -1L) {
@@ -60,7 +70,11 @@ class FileOrganizerWorker
                         return Result.failure()
                     }
 
-            setForeground(createForegroundInfo(rule.name))
+            try {
+                setForeground(createForegroundInfo(rule.name))
+            } catch (e: Exception) {
+                DiagnosticLog.record(appContext, "Failed to setForeground for rule=${rule.name}", e)
+            }
             refreshProgressNotification(rule, RunProgress(rule.id, rule.name, 0f, totalFiles = 0))
 
             return try {
