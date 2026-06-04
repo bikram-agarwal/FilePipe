@@ -666,6 +666,7 @@
     <string name="diagnostics_post_notifications_granted_format">POST_NOTIFICATIONS granted: %1$s</string>
     <string name="diagnostics_all_files_access_granted_format">All files access granted: %1$s</string>
     <string name="diagnostics_ignoring_battery_optimizations_format">Ignoring battery optimizations: %1$s</string>
+    <string name="diagnostics_exact_alarms_allowed_format">Exact alarms allowed: %1$s</string>
     <string name="diagnostics_section_settings">FilePipe settings</string>
     <string name="diagnostics_settings_snapshot_unavailable">Settings snapshot unavailable.</string>
     <string name="diagnostics_theme_mode_format">Theme mode: %1$s</string>

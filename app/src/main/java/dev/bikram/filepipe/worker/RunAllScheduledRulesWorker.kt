@@ -47,6 +47,12 @@ class RunAllScheduledRulesWorker
         /** Rules that have reported [RunProgress.isComplete]; used so one finished rule does not show Finishing while others run. */
         private val completedRuleIdsInBatch = mutableSetOf<Long>()
 
+        override suspend fun getForegroundInfo(): ForegroundInfo {
+            val ruleIds = inputData.getLongArray(KEY_RULE_IDS)
+            val ruleCount = ruleIds?.size ?: 0
+            return createForegroundInfo(ruleCount)
+        }
+
         override suspend fun doWork(): Result {
             val ruleIds =
                 inputData.getLongArray(KEY_RULE_IDS)
@@ -62,7 +68,11 @@ class RunAllScheduledRulesWorker
                 }
             if (rules.isEmpty()) return Result.success()
 
-            setForeground(createForegroundInfo(rules.size))
+            try {
+                setForeground(createForegroundInfo(rules.size))
+            } catch (e: Exception) {
+                DiagnosticLog.record(appContext, "Failed to setForeground for batch size=${rules.size}", e)
+            }
             val firstRule = rules.first()
             synchronized(progressNotifyLock) {
                 completedRuleIdsInBatch.clear()

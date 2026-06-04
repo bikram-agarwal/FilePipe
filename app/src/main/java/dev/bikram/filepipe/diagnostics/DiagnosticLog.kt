@@ -2,6 +2,7 @@ package dev.bikram.filepipe.diagnostics
 
 import android.Manifest
 import android.app.NotificationManager
+import android.app.AlarmManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -171,6 +172,22 @@ object DiagnosticLog {
                 powerManager.isIgnoringBatteryOptimizations(context.packageName).toString(),
             ),
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            appendLine(
+                context.getString(
+                    R.string.diagnostics_exact_alarms_allowed_format,
+                    alarmManager.canScheduleExactAlarms().toString(),
+                ),
+            )
+        } else {
+            appendLine(
+                context.getString(
+                    R.string.diagnostics_exact_alarms_allowed_format,
+                    context.getString(R.string.diagnostics_value_not_required),
+                ),
+            )
+        }
         appendPersistedUriPermissions(context)
         appendLine()
         appendNotificationChannels(context)
