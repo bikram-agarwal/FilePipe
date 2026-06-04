@@ -60,6 +60,17 @@ class RunAllScheduledRulesWorker
                         DiagnosticLog.record(appContext, "Scheduled batch worker failed: missing rule ids")
                         return Result.failure()
                     }
+            val scheduledTriggerAtMillis = inputData.getLong(KEY_SCHEDULED_TRIGGER_AT_MILLIS, UNKNOWN_SCHEDULED_TIME_MILLIS)
+            val alarmReceivedAtMillis = inputData.getLong(KEY_ALARM_RECEIVED_AT_MILLIS, UNKNOWN_SCHEDULED_TIME_MILLIS)
+            val workerStartedAtMillis = System.currentTimeMillis()
+            DiagnosticLog.record(
+                appContext,
+                "Scheduled batch worker starting: ruleCount=${ruleIds.size}, triggerAt=$scheduledTriggerAtMillis, " +
+                    "alarmReceivedAt=$alarmReceivedAtMillis, startedAt=$workerStartedAtMillis, " +
+                    "alarmToWorkerDelayMs=${elapsedMillis(alarmReceivedAtMillis, workerStartedAtMillis)}, " +
+                    "triggerToWorkerDelayMs=${elapsedMillis(scheduledTriggerAtMillis, workerStartedAtMillis)}",
+            )
+
             val rules =
                 buildList {
                     for (id in ruleIds) {
@@ -121,6 +132,16 @@ class RunAllScheduledRulesWorker
                 )
                 if (runAttemptCount < 2) Result.retry() else Result.failure()
             }
+        }
+
+        private fun elapsedMillis(
+            startMillis: Long,
+            endMillis: Long,
+        ): Long {
+            if (startMillis == UNKNOWN_SCHEDULED_TIME_MILLIS) {
+                return UNKNOWN_SCHEDULED_TIME_MILLIS
+            }
+            return endMillis - startMillis
         }
 
         private fun postSummaryNotification(
@@ -362,7 +383,10 @@ class RunAllScheduledRulesWorker
 
         companion object {
             const val KEY_RULE_IDS = "rule_ids"
+            const val KEY_SCHEDULED_TRIGGER_AT_MILLIS = "scheduled_trigger_at_millis"
+            const val KEY_ALARM_RECEIVED_AT_MILLIS = "alarm_received_at_millis"
             const val NOTIFICATION_ID = 1003
             const val SUMMARY_NOTIFICATION_BASE_ID = 2000
+            private const val UNKNOWN_SCHEDULED_TIME_MILLIS = -1L
         }
     }

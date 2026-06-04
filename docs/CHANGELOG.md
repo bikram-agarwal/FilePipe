@@ -1,18 +1,16 @@
-## v3.7.6 - Improve scheduled runs
-
-### ✨ Improved Features
-
-- Scheduled rules can now wake and run in the background without waiting for the app to be opened.
-- Scheduled rules are restored after reboot, app update, time change, or timezone change.
-
-
-## v3.7.5 - Granular color control
+## v3.7.8 - Improved theming, better schedules
 
 ### 🚀 New Features
 
 - Added a Surface shading slider so you can fine-tune how much color tint appears in app backgrounds and surfaces.
 - Added separate custom color controls for primary, secondary, and tertiary theme colors.
 - Custom themes can now show and save multi-color accent palettes.
+
+### ✨ Improved Features
+
+- Play Store version now asks for alarm permission, so that scheduled rules can run more reliably.
+  - GitHub version automatically gets exact alarm permission. 
+- Scheduled rules are restored after reboot, app update, time change, or timezone change.
 
 ---
 

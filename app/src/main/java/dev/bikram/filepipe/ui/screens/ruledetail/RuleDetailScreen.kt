@@ -1490,7 +1490,7 @@ fun RuleDetailScreen(
                     RuleSectionCard(
                         title = stringResource(R.string.schedule_label),
                         subtitle = stringResource(R.string.rule_section_schedule_subtitle),
-                        iconName = "calendar_month",
+                        iconName = "calendar_clock",
                         highlightColor = if (scheduleHasError) blockingHighlightColor else null,
                     ) {
                         val schedule = state.schedule

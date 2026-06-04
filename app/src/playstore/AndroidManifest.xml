@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <application>
+        <receiver
+            android:name=".receiver.ScheduledRulesBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

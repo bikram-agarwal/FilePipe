@@ -48,20 +48,32 @@ class FileOrganizerWorker
 
         override suspend fun getForegroundInfo(): ForegroundInfo {
             val ruleId = inputData.getLong(KEY_RULE_ID, -1L)
-            val ruleName = if (ruleId != -1L) {
-                ruleRepository.getRuleById(ruleId)?.name
-            } else {
-                null
-            } ?: appContext.getString(R.string.app_name)
+            val ruleName =
+                if (ruleId != -1L) {
+                    ruleRepository.getRuleById(ruleId)?.name
+                } else {
+                    null
+                } ?: appContext.getString(R.string.app_name)
             return createForegroundInfo(ruleName)
         }
 
         override suspend fun doWork(): Result {
             val ruleId = inputData.getLong(KEY_RULE_ID, -1L)
+            val scheduledTriggerAtMillis = inputData.getLong(KEY_SCHEDULED_TRIGGER_AT_MILLIS, UNKNOWN_SCHEDULED_TIME_MILLIS)
+            val alarmReceivedAtMillis = inputData.getLong(KEY_ALARM_RECEIVED_AT_MILLIS, UNKNOWN_SCHEDULED_TIME_MILLIS)
+            val workerStartedAtMillis = System.currentTimeMillis()
             if (ruleId == -1L) {
                 DiagnosticLog.record(appContext, "Scheduled rule worker failed: missing rule id")
                 return Result.failure()
             }
+
+            DiagnosticLog.record(
+                appContext,
+                "Scheduled rule worker starting: ruleId=$ruleId, triggerAt=$scheduledTriggerAtMillis, " +
+                    "alarmReceivedAt=$alarmReceivedAtMillis, startedAt=$workerStartedAtMillis, " +
+                    "alarmToWorkerDelayMs=${elapsedMillis(alarmReceivedAtMillis, workerStartedAtMillis)}, " +
+                    "triggerToWorkerDelayMs=${elapsedMillis(scheduledTriggerAtMillis, workerStartedAtMillis)}",
+            )
 
             val rule =
                 ruleRepository.getRuleById(ruleId)
@@ -107,6 +119,16 @@ class FileOrganizerWorker
                 )
                 if (runAttemptCount < 2) Result.retry() else Result.failure()
             }
+        }
+
+        private fun elapsedMillis(
+            startMillis: Long,
+            endMillis: Long,
+        ): Long {
+            if (startMillis == UNKNOWN_SCHEDULED_TIME_MILLIS) {
+                return UNKNOWN_SCHEDULED_TIME_MILLIS
+            }
+            return endMillis - startMillis
         }
 
         private fun postSummaryNotification(
@@ -298,6 +320,8 @@ class FileOrganizerWorker
 
         companion object {
             const val KEY_RULE_ID = "rule_id"
+            const val KEY_SCHEDULED_TRIGGER_AT_MILLIS = "scheduled_trigger_at_millis"
+            const val KEY_ALARM_RECEIVED_AT_MILLIS = "alarm_received_at_millis"
 
             /** New id so upgrades get IMPORTANCE_DEFAULT without orphaned low-importance channel. */
             const val CHANNEL_ID = "rule_execution_v2"
@@ -308,5 +332,6 @@ class FileOrganizerWorker
             // 12_000 slots × 2 IDs = 24_000 IDs max, well within Android's Int range.
             private const val NOTIFICATION_ID_SLOT_BASE = 30_000
             private const val NOTIFICATION_ID_SLOT_COUNT = 12_000
+            private const val UNKNOWN_SCHEDULED_TIME_MILLIS = -1L
         }
     }
