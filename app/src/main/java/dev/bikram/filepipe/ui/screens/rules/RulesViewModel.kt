@@ -792,9 +792,7 @@ class RulesViewModel
                         }
                     }
 
-                    FolderAccessResult.Accessible -> {
-                        Unit
-                    }
+                    FolderAccessResult.Accessible -> {}
                 }
             }
             val destinationPath = rule.destinationFolderPath.takeIf { it.isNotBlank() }

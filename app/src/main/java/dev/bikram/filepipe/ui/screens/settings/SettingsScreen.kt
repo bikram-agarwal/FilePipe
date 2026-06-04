@@ -2,6 +2,7 @@ package dev.bikram.filepipe.ui.screens.settings
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlarmManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -185,7 +186,7 @@ import kotlinx.coroutines.launch
  * before the optional Updates block. Used to scroll from Help quick actions.
  */
 private const val SETTINGS_LIST_INDEX_FOLDER_ACCESS = 1
-private const val SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS = 2
+private const val SETTINGS_LIST_INDEX_SCHEDULE = 2
 private const val SETTINGS_SECTION_HIGHLIGHT_DURATION_MS = 4_500L
 private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
 private const val DEVELOPER_OPTIONS_UNLOCK_TAPS = 7
@@ -277,7 +278,9 @@ fun SettingsScreen(
         } else {
             NotificationManagerCompat.from(context).areNotificationsEnabled()
         }
+    val alarmManager = remember(context) { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
     var notificationsGranted by remember { mutableStateOf(computeNotificationsEnabled()) }
+    var canScheduleExactAlarms by remember { mutableStateOf(alarmManager.canScheduleExactAlarms()) }
     var allFilesAccessGranted by remember { mutableStateOf(Environment.isExternalStorageManager()) }
     var pendingFolderAccessSwitch by remember { mutableStateOf<FolderAccessMode?>(null) }
     var pendingEnableUpdateNotificationsAfterPermission by remember { mutableStateOf(false) }
@@ -307,9 +310,9 @@ fun SettingsScreen(
             buildSet {
                 add("appearance")
                 add("folder_access")
+                add("schedule")
                 add("touch_sound")
                 add("swipe_actions")
-                add("history")
                 add("backup")
                 if (BuildConfig.SHOW_UPDATES) add("updates")
             }
@@ -327,7 +330,7 @@ fun SettingsScreen(
         val key = highlightSection ?: return@LaunchedEffect
         val settingsSectionKey =
             when (key) {
-                "notifications" -> "touch_sound"
+                "notifications" -> "schedule"
                 else -> key
             }
         val wasCollapsed = settingsSectionKey in collapsedSettingsSectionKeys
@@ -340,7 +343,7 @@ fun SettingsScreen(
                 }
 
                 "notifications" -> {
-                    SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS
+                    SETTINGS_LIST_INDEX_SCHEDULE
                 }
 
                 else -> {
@@ -430,12 +433,30 @@ fun SettingsScreen(
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
+
+    fun openExactAlarmSettings() {
+        val exactAlarmIntent =
+            Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                data = "package:${context.packageName}".toUri()
+            }
+        runCatching {
+            context.startActivity(exactAlarmIntent)
+        }.onFailure {
+            val appInfoIntent =
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = "package:${context.packageName}".toUri()
+                }
+            runCatching { context.startActivity(appInfoIntent) }
+        }
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
                     notificationsGranted = computeNotificationsEnabled()
+                    canScheduleExactAlarms = alarmManager.canScheduleExactAlarms()
                     allFilesAccessGranted = Environment.isExternalStorageManager()
                 }
             }
@@ -568,9 +589,7 @@ fun SettingsScreen(
                 viewModel.dismissUpdateSheet()
             }
 
-            else -> {
-                Unit
-            }
+            else -> {}
         }
     }
 
@@ -962,7 +981,7 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Touch & Sound ────────────────────────────────────────────────
+            // Schedule
             item {
                 val notificationsHighlightPulse =
                     rememberSectionHighlightPulseAlpha(notificationsHighlightActive)
@@ -979,23 +998,14 @@ fun SettingsScreen(
                             ),
                 ) {
                     SettingsExpandableSection(
-                        sectionKey = "touch_sound",
-                        iconName = "vibration",
-                        title = stringResource(R.string.settings_touch_sound_section),
+                        sectionKey = "schedule",
+                        iconName = "calendar_clock",
+                        title = stringResource(R.string.settings_schedule_section),
                         collapsedSectionKeys = collapsedSettingsSectionKeys,
                         onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
                     ) {
                         GroupedListColumn {
                             GroupedListItem(position = GroupPosition.FIRST) {
-                                SettingsToggleItem(
-                                    iconName = "vibration",
-                                    title = stringResource(R.string.settings_haptic_feedback),
-                                    subtitle = stringResource(R.string.settings_haptic_feedback_desc),
-                                    checked = preferences.hapticFeedbackEnabled,
-                                    onCheckedChange = viewModel::setHapticFeedbackEnabled,
-                                )
-                            }
-                            GroupedListItem(position = GroupPosition.LAST) {
                                 ListItem(
                                     headlineContent = {
                                         Text(
@@ -1063,12 +1073,81 @@ fun SettingsScreen(
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 )
                             }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                SettingsToggleItem(
+                                    iconName = "alarm_on",
+                                    title = stringResource(R.string.settings_reliable_schedules),
+                                    subtitle =
+                                        stringResource(
+                                            if (canScheduleExactAlarms) {
+                                                R.string.settings_reliable_schedules_desc_enabled
+                                            } else {
+                                                R.string.settings_reliable_schedules_desc_disabled
+                                            },
+                                        ),
+                                    checked = canScheduleExactAlarms,
+                                    onCheckedChange = { openExactAlarmSettings() },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.LAST) {
+                                ListItem(
+                                    leadingContent = {
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "history",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    },
+                                    headlineContent = {
+                                        Text(
+                                            stringResource(R.string.settings_log_retention),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            stringResource(R.string.settings_log_retention_hint),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    },
+                                    trailingContent = {
+                                        LogRetentionDropdown(
+                                            currentDays = preferences.logRetentionDays,
+                                            onSelect = { viewModel.setLogRetentionDays(it) },
+                                        )
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // ── Swipe Actions ─────────────────────────────────────────────────
+            // Touch & Sound
+            item {
+                SettingsExpandableSection(
+                    sectionKey = "touch_sound",
+                    iconName = "vibration",
+                    title = stringResource(R.string.settings_touch_sound_section),
+                    collapsedSectionKeys = collapsedSettingsSectionKeys,
+                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                ) {
+                    GroupedListColumn {
+                        GroupedListItem(position = GroupPosition.ONLY) {
+                            SettingsToggleItem(
+                                iconName = "vibration",
+                                title = stringResource(R.string.settings_haptic_feedback),
+                                subtitle = stringResource(R.string.settings_haptic_feedback_desc),
+                                checked = preferences.hapticFeedbackEnabled,
+                                onCheckedChange = viewModel::setHapticFeedbackEnabled,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Swipe Actions
             item {
                 SettingsExpandableSection(
                     sectionKey = "swipe_actions",
@@ -1086,44 +1165,6 @@ fun SettingsScreen(
                                 endAction = preferences.swipeEndToStart,
                                 onStartActionChange = { viewModel.setSwipeStartToEnd(it) },
                                 onEndActionChange = { viewModel.setSwipeEndToStart(it) },
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ── History ───────────────────────────────────────────────────────
-            item {
-                SettingsExpandableSection(
-                    sectionKey = "history",
-                    iconName = "history",
-                    title = stringResource(R.string.settings_history_section),
-                    collapsedSectionKeys = collapsedSettingsSectionKeys,
-                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                ) {
-                    GroupedListColumn {
-                        GroupedListItem(position = GroupPosition.ONLY) {
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        stringResource(R.string.settings_log_retention),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                },
-                                supportingContent = {
-                                    Text(
-                                        stringResource(R.string.settings_log_retention_hint),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                },
-                                trailingContent = {
-                                    LogRetentionDropdown(
-                                        currentDays = preferences.logRetentionDays,
-                                        onSelect = { viewModel.setLogRetentionDays(it) },
-                                    )
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             )
                         }
                     }
@@ -2810,8 +2851,13 @@ private fun SettingsExpandableSectionHeader(
             modifier =
                 Modifier
                     .size(iconContainerSize)
-                    .clip(MaterialTheme.shapes.extraExtraLarge)
-                    .background(iconContainerColor),
+                    .then(
+                        if (collapsed) {
+                            Modifier.clip(MaterialTheme.shapes.extraExtraLarge)
+                        } else {
+                            Modifier
+                        },
+                    ).background(iconContainerColor),
             contentAlignment = Alignment.Center,
         ) {
             FilePipeMaterialRoundedSymbol(
@@ -2833,8 +2879,10 @@ private fun SettingsExpandableSectionHeader(
             modifier =
                 Modifier
                     .size(chevronContainerSize)
-                    .clip(MaterialTheme.shapes.extraExtraLarge)
-                    .background(chevronContainerColor),
+                    .background(
+                        color = chevronContainerColor,
+                        shape = MaterialTheme.shapes.extraExtraLarge,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             FilePipeMaterialRoundedSymbol(
@@ -2889,8 +2937,10 @@ private fun SettingsStandaloneNavigationRow(
             modifier =
                 Modifier
                     .size(36.dp)
-                    .clip(MaterialTheme.shapes.extraExtraLarge)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)),
+                    .background(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f),
+                        shape = MaterialTheme.shapes.extraExtraLarge,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             FilePipeMaterialRoundedSymbol(
@@ -2912,8 +2962,10 @@ private fun SettingsStandaloneNavigationRow(
             modifier =
                 Modifier
                     .size(32.dp)
-                    .clip(MaterialTheme.shapes.extraExtraLarge)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        shape = MaterialTheme.shapes.extraExtraLarge,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             FilePipeMaterialRoundedSymbol(

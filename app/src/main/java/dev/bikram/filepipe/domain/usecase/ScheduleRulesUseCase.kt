@@ -92,11 +92,13 @@ class ScheduleRulesUseCase
             allowImmediateIntervalRun: Boolean,
         ) {
             val schedule = rule.schedule ?: return
+            val triggerAtMillis = nextRunAtMillis(schedule, allowImmediateIntervalRun = allowImmediateIntervalRun)
             val intent =
                 Intent(context, ScheduledRuleAlarmReceiver::class.java).apply {
                     action = ScheduledRuleAlarmReceiver.ACTION_RUN_RULE
                     putExtra(ScheduledRuleAlarmReceiver.EXTRA_RULE_ID, rule.id)
                     putExtra(ScheduledRuleAlarmReceiver.EXTRA_EXPECTED_SCHEDULE_KEY, scheduleKey(schedule))
+                    putExtra(ScheduledRuleAlarmReceiver.EXTRA_TRIGGER_AT_MILLIS, triggerAtMillis)
                 }
             val pendingIntent =
                 PendingIntent.getBroadcast(
@@ -106,7 +108,7 @@ class ScheduleRulesUseCase
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
             scheduleAlarm(
-                triggerAtMillis = nextRunAtMillis(schedule, allowImmediateIntervalRun = allowImmediateIntervalRun),
+                triggerAtMillis = triggerAtMillis,
                 pendingIntent = pendingIntent,
             )
         }
@@ -116,11 +118,13 @@ class ScheduleRulesUseCase
             ruleIds: LongArray,
             allowImmediateIntervalRun: Boolean,
         ) {
+            val triggerAtMillis = nextRunAtMillis(schedule, allowImmediateIntervalRun = allowImmediateIntervalRun)
             val intent =
                 Intent(context, ScheduledRuleAlarmReceiver::class.java).apply {
                     action = ScheduledRuleAlarmReceiver.ACTION_RUN_BATCH
                     putExtra(ScheduledRuleAlarmReceiver.EXTRA_RULE_IDS, ruleIds)
                     putExtra(ScheduledRuleAlarmReceiver.EXTRA_EXPECTED_SCHEDULE_KEY, scheduleKey(schedule))
+                    putExtra(ScheduledRuleAlarmReceiver.EXTRA_TRIGGER_AT_MILLIS, triggerAtMillis)
                 }
             val pendingIntent =
                 PendingIntent.getBroadcast(
@@ -130,7 +134,7 @@ class ScheduleRulesUseCase
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
             scheduleAlarm(
-                triggerAtMillis = nextRunAtMillis(schedule, allowImmediateIntervalRun = allowImmediateIntervalRun),
+                triggerAtMillis = triggerAtMillis,
                 pendingIntent = pendingIntent,
             )
         }

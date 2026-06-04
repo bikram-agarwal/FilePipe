@@ -639,13 +639,9 @@ fun HistoryScreen(
                                 )
                             }
 
-                            is HistoryItem.RuleHeader -> {
-                                Unit
-                            }
+                            is HistoryItem.RuleHeader -> {}
 
-                            is HistoryItem.StatusHeader -> {
-                                Unit
-                            }
+                            is HistoryItem.StatusHeader -> {}
 
                             is HistoryItem.Entry -> {
                                 SwipeToDismissHistoryCard(
@@ -656,9 +652,7 @@ fun HistoryScreen(
                                 )
                             }
 
-                            null -> {
-                                Unit
-                            }
+                            null -> {}
                         }
                     }
                 }

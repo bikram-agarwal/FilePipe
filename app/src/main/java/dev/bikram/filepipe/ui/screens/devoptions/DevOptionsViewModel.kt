@@ -2,6 +2,7 @@ package dev.bikram.filepipe.ui.screens.devoptions
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -558,6 +559,13 @@ class DevOptionsViewModel
                     DevOptionsInfoRow(R.string.dev_options_info_first_install, formatInstant(packageInfo.firstInstallTime)),
                     DevOptionsInfoRow(R.string.dev_options_info_last_update, formatInstant(packageInfo.lastUpdateTime)),
                 )
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val exactAlarmAllowed =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    alarmManager.canScheduleExactAlarms()
+                } else {
+                    true
+                }
             val permissions =
                 listOf(
                     DevOptionsInfoRow(R.string.dev_options_info_folder_access_mode, prefs.folderAccessMode.name),
@@ -565,6 +573,10 @@ class DevOptionsViewModel
                     DevOptionsInfoRow(
                         R.string.dev_options_info_notifications_enabled,
                         NotificationManagerCompat.from(context).areNotificationsEnabled().toString(),
+                    ),
+                    DevOptionsInfoRow(
+                        R.string.dev_options_info_exact_alarm_access,
+                        exactAlarmAllowed.toString(),
                     ),
                     DevOptionsInfoRow(
                         R.string.dev_options_info_battery_optimization,

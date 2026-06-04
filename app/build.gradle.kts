@@ -56,8 +56,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = filePipeApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 376
-        versionName = "3.7.6"
+        versionCode = 378
+        versionName = "3.7.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -183,6 +183,12 @@ configurations.named("detekt") {
             "io.github.detekt.sarif4k:sarif4k-jvm:${libs.versions.sarif4k.get()}",
             "io.github.oshai:kotlin-logging:${libs.versions.kotlinLogging.get()}",
         )
+    }
+}
+
+configurations.configureEach {
+    resolutionStrategy {
+        force("org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlin.get()}")
     }
 }
 

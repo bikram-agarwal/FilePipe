@@ -1191,9 +1191,7 @@ private fun UpdateFloatingBar(
                         }
                     }
 
-                    is UpdateChromeState.Downloading -> {
-                        Unit
-                    }
+                    is UpdateChromeState.Downloading -> {}
 
                     UpdateChromeState.ReadyToInstall -> {
                         FilePipeButton(
@@ -1212,9 +1210,7 @@ private fun UpdateFloatingBar(
                         }
                     }
 
-                    UpdateChromeState.Hidden -> {
-                        Unit
-                    }
+                    UpdateChromeState.Hidden -> {}
                 }
             }
 
@@ -1484,9 +1480,7 @@ private fun MainNavFabSlot(
             )
         }
 
-        else -> {
-            Unit
-        }
+        else -> {}
     }
 }
 
