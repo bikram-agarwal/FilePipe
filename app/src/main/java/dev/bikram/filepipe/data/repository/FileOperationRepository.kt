@@ -404,9 +404,7 @@ class FileOperationRepository
                         )
                     }
 
-                    ConflictPolicy.OVERWRITE -> {
-                        Unit
-                    }
+                    ConflictPolicy.OVERWRITE -> {}
 
                     ConflictPolicy.RENAME_SUFFIX -> {
                         destName = resolveDestNameFile(destParent, sourceEntry.name)

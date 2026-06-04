@@ -67,13 +67,9 @@ class PlayStorePlayInAppUpdateCoordinator
                         bannerState.value = PlayInAppUpdateBannerUiState.Hidden
                     }
 
-                    InstallStatus.UNKNOWN -> {
-                        Unit
-                    }
+                    InstallStatus.UNKNOWN -> {}
 
-                    else -> {
-                        Unit
-                    }
+                    else -> {}
                 }
             }
 

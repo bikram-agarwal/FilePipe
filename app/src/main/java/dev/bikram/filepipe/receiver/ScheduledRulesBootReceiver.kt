@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.receiver
 
+import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -35,7 +36,11 @@ class ScheduledRulesBootReceiver : BroadcastReceiver() {
                         .getEnabledRules()
                         .filter { rule -> rule.schedule != null }
                 scheduledRules.forEach { rule ->
-                    scheduleRulesUseCase.scheduleRule(rule)
+                    if (action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
+                        scheduleRulesUseCase.scheduleNextRuleAlarm(rule)
+                    } else {
+                        scheduleRulesUseCase.scheduleRule(rule)
+                    }
                 }
             } finally {
                 pendingResult.finish()
@@ -50,6 +55,7 @@ class ScheduledRulesBootReceiver : BroadcastReceiver() {
                 Intent.ACTION_MY_PACKAGE_REPLACED,
                 Intent.ACTION_TIME_CHANGED,
                 Intent.ACTION_TIMEZONE_CHANGED,
+                AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED,
             )
     }
 }

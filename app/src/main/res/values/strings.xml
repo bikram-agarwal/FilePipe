@@ -525,6 +525,7 @@
     <string name="dev_options_info_notifications_enabled">Notifications enabled</string>
     <string name="dev_options_info_battery_optimization">Battery optimization</string>
     <string name="dev_options_info_backup_destinations">Backup destinations</string>
+    <string name="dev_options_info_exact_alarm_access">Exact alarm access</string>
     <string name="dev_options_info_rules">Rules</string>
     <string name="dev_options_info_enabled_rules">Enabled rules</string>
     <string name="dev_options_info_scheduled_rules">Scheduled rules</string>
@@ -729,8 +730,12 @@
     <string name="settings_haptic_feedback_desc">Tap sounds and swipe vibrations</string>
     <string name="settings_progressive_blur">Progressive blur</string>
     <string name="settings_progressive_blur_desc">Frosted blur at top &amp; bottom of screen</string>
+    <string name="settings_schedule_section">Schedule</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_desc">Run summaries and reminders</string>
+    <string name="settings_reliable_schedules">Reliable schedules</string>
+    <string name="settings_reliable_schedules_desc_enabled">Scheduled rules can run at the selected time</string>
+    <string name="settings_reliable_schedules_desc_disabled">Enable to run scheduled rules close to their set time</string>
     <string name="theme_black">Black (OLED)</string>
 
     <!-- Settings – Updates (GitHub builds) -->
@@ -821,7 +826,6 @@
     <!-- Template picker -->
 
     <!-- Settings — history section -->
-    <string name="settings_history_section">History</string>
     <string name="settings_log_retention">Keep history for</string>
     <string name="settings_log_retention_hint">Older records are deleted automatically</string>
     <string name="log_retention_7_days">7 days</string>
