@@ -263,9 +263,7 @@ class RunAllScheduledRulesWorker
                         )
                 if (allRulesInBatchFinished) {
                     builder.setProgress(0, 0, false)
-                    if (progress.error != null) {
-                        builder.setOngoing(false)
-                    }
+                    builder.setOngoing(false)
                     builder.setContentText(appContext.notificationContentTextForTerminalProgress(progress))
                 } else {
                     builder.setProgress(0, 0, true)
@@ -298,9 +296,7 @@ class RunAllScheduledRulesWorker
             when {
                 progress.isComplete -> {
                     builder.setProgress(0, 0, false)
-                    if (progress.error != null) {
-                        builder.setOngoing(false)
-                    }
+                    builder.setOngoing(false)
                     builder.setContentText(appContext.notificationContentTextForTerminalProgress(progress))
                 }
 
