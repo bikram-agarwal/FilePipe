@@ -245,12 +245,19 @@ fun ScheduleDialog(
                             text = stringResource(R.string.schedule_time),
                             style = MaterialTheme.typography.labelMedium,
                         )
-                        val hour12 =
-                            when (val hourMod = hour % 12) {
-                                0 -> 12
-                                else -> hourMod
-                            }
-                        val amPm = if (hour < 12) "AM" else "PM"
+                        val dialogContext = androidx.compose.ui.platform.LocalContext.current
+                        val isSystem24Hour = android.text.format.DateFormat.is24HourFormat(dialogContext)
+                        val timeStr = if (isSystem24Hour) {
+                            "%02d:%02d".format(hour, minute)
+                        } else {
+                            val hour12 =
+                                when (val hourMod = hour % 12) {
+                                    0 -> 12
+                                    else -> hourMod
+                                }
+                            val amPm = if (hour < 12) "AM" else "PM"
+                            "%d:%02d %s".format(hour12, minute, amPm)
+                        }
                         FilePipeOutlinedButton(
                             onClick = { showTimePicker = true },
                             modifier = Modifier.fillMaxWidth(),
@@ -259,7 +266,7 @@ fun ScheduleDialog(
                             Text(
                                 text =
                                     stringResource(R.string.schedule_pick_time) + ": " +
-                                        "%d:%02d %s".format(hour12, minute, amPm),
+                                        timeStr,
                             )
                         }
                     }
@@ -339,11 +346,12 @@ private fun ScheduleTimePickerDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         key(initialHour, initialMinute) {
+            val pickerContext = androidx.compose.ui.platform.LocalContext.current
             val timePickerState =
                 rememberTimePickerState(
                     initialHour = initialHour,
                     initialMinute = initialMinute,
-                    is24Hour = false,
+                    is24Hour = android.text.format.DateFormat.is24HourFormat(pickerContext),
                 )
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,

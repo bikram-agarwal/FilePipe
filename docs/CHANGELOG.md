@@ -1,4 +1,4 @@
-## v3.7.8 - Improved theming, better schedules
+## v3.7.9 - Improved theming, better schedules
 
 ### 🚀 New Features
 
@@ -11,6 +11,11 @@
 - Play Store version now asks for alarm permission, so that scheduled rules can run more reliably.
   - GitHub version automatically gets exact alarm permission. 
 - Scheduled rules are restored after reboot, app update, time change, or timezone change.
+- App now follows system time format (12 hours / 24 hours)
+
+### 📦 Others
+
+- For scheduled runs, the "Finishing" notification gets auto-dismissed so that each run doesn't cause 2 notifications. 
 
 ---
 

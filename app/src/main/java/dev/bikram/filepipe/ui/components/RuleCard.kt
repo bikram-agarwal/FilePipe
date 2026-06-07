@@ -696,16 +696,29 @@ private fun ExpandedContent(
 
                 rule.schedule?.let { schedule ->
                     Spacer(Modifier.height(4.dp))
+                    val cardContext = androidx.compose.ui.platform.LocalContext.current
+                    val isSystem24Hour = android.text.format.DateFormat.is24HourFormat(cardContext)
+                    val timeStr = if (isSystem24Hour) {
+                        "%02d:%02d".format(schedule.hour, schedule.minute)
+                    } else {
+                        val hour12 =
+                            when (val hourMod = schedule.hour % 12) {
+                                0 -> 12
+                                else -> hourMod
+                            }
+                        val amPm = if (schedule.hour < 12) "AM" else "PM"
+                        "%d:%02d %s".format(hour12, schedule.minute, amPm)
+                    }
                     val scheduleText =
                         when (schedule.type) {
                             ScheduleType.DAILY -> {
-                                "Daily at %02d:%02d".format(schedule.hour, schedule.minute)
+                                "Daily at $timeStr"
                             }
 
                             ScheduleType.WEEKLY -> {
                                 val days = arrayOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
                                 val dayName = schedule.dayOfWeek?.let { days.getOrNull(it - 2) } ?: "?"
-                                "Weekly $dayName at %02d:%02d".format(schedule.hour, schedule.minute)
+                                "Weekly $dayName at $timeStr"
                             }
 
                             ScheduleType.EVERY_N_HOURS -> {

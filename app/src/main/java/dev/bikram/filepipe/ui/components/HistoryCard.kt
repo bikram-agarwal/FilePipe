@@ -83,7 +83,8 @@ fun HistoryCard(
                     TriggerType.MANUAL -> stringResource(R.string.history_triggered_manual)
                     TriggerType.SCHEDULED -> stringResource(R.string.history_triggered_scheduled)
                 }
-            val timeLabel = formatTime(history.startedAt)
+            val cardContext = androidx.compose.ui.platform.LocalContext.current
+            val timeLabel = formatTime(cardContext, history.startedAt)
             val successPart =
                 if (history.totalFilesMoved > 0) {
                     when (history.operationMode) {
@@ -204,16 +205,13 @@ fun StatusChip(
     }
 }
 
-private const val TIME_PATTERN = "h:mm a"
-private const val DATE_TIME_PATTERN = "MMM d, h:mm a"
-
-fun formatTime(millis: Long): String {
+fun formatTime(context: android.content.Context, millis: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - millis
     val locale = Locale.getDefault()
-    return if (diff < 24 * 60 * 60 * 1000L) {
-        SimpleDateFormat(TIME_PATTERN, locale).format(Date(millis))
-    } else {
-        SimpleDateFormat(DATE_TIME_PATTERN, locale).format(Date(millis))
-    }
+    val isSystem24Hour = android.text.format.DateFormat.is24HourFormat(context)
+    val timePattern = if (isSystem24Hour) "HH:mm" else "h:mm a"
+    val dateTimePattern = if (isSystem24Hour) "MMM d, HH:mm" else "MMM d, h:mm a"
+    val pattern = if (diff < 24 * 60 * 60 * 1000L) timePattern else dateTimePattern
+    return SimpleDateFormat(pattern, locale).format(Date(millis))
 }

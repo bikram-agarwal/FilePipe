@@ -305,9 +305,10 @@ private fun RunSummaryCard(
                     TriggerType.SCHEDULED -> "Scheduled"
                 },
             )
-            SummaryRow("Started", formatTime(history.startedAt))
+            val cardContext = LocalContext.current
+            SummaryRow("Started", formatTime(cardContext, history.startedAt))
             history.completedAt?.let { completed ->
-                SummaryRow("Completed", formatTime(completed))
+                SummaryRow("Completed", formatTime(cardContext, completed))
                 val durationSec = (completed - history.startedAt) / 1000
                 SummaryRow("Duration", "${durationSec}s")
             }
