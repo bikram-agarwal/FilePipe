@@ -583,6 +583,8 @@ private fun isScheduleInvalid(schedule: RuleSchedule?): Boolean {
 fun RuleDetailScreen(
     onNavigateBack: () -> Unit,
     onOpenFaq: () -> Unit,
+    onSavedRule: ((Long) -> Unit)? = null,
+    showNavigateBack: Boolean = true,
     viewModel: RuleDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -694,7 +696,13 @@ fun RuleDetailScreen(
     }
 
     LaunchedEffect(state.isSaved) {
-        if (state.isSaved) onNavigateBack()
+        if (state.isSaved) {
+            if (onSavedRule != null) {
+                onSavedRule(state.id)
+            } else {
+                onNavigateBack()
+            }
+        }
     }
 
     LaunchedEffect(state.removedRedundantFolders) {
@@ -1748,24 +1756,26 @@ fun RuleDetailScreen(
             modifier = Modifier.align(Alignment.TopCenter),
             title = { Text(if (viewModel.isNewRule) stringResource(R.string.new_rule) else stringResource(R.string.edit_rule)) },
             navigationIcon = {
-                TooltipBox(
-                    positionProvider =
-                        TooltipDefaults.rememberTooltipPositionProvider(
-                            TooltipAnchorPosition.Above,
-                        ),
-                    tooltip = {
-                        PlainTooltip {
-                            CenteredTooltipText(stringResource(R.string.nav_back))
+                if (showNavigateBack) {
+                    TooltipBox(
+                        positionProvider =
+                            TooltipDefaults.rememberTooltipPositionProvider(
+                                TooltipAnchorPosition.Above,
+                            ),
+                        tooltip = {
+                            PlainTooltip {
+                                CenteredTooltipText(stringResource(R.string.nav_back))
+                            }
+                        },
+                        state = rememberTooltipState(),
+                    ) {
+                        FilePipeIconButton(onClick = { tryNavigateBack() }) {
+                            FilePipeMaterialRoundedSymbol(
+                                name = "arrow_back",
+                                contentDescription = stringResource(R.string.nav_back),
+                                autoMirror = true,
+                            )
                         }
-                    },
-                    state = rememberTooltipState(),
-                ) {
-                    FilePipeIconButton(onClick = { tryNavigateBack() }) {
-                        FilePipeMaterialRoundedSymbol(
-                            name = "arrow_back",
-                            contentDescription = stringResource(R.string.nav_back),
-                            autoMirror = true,
-                        )
                     }
                 }
             },

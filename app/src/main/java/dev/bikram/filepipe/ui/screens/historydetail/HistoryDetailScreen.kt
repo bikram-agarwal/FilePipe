@@ -116,6 +116,7 @@ private enum class ThumbnailMediaType {
 @Composable
 fun HistoryDetailScreen(
     onNavigateBack: () -> Unit,
+    showNavigateBack: Boolean = true,
     viewModel: HistoryDetailViewModel = hiltViewModel(),
 ) {
     val history by viewModel.history.collectAsStateWithLifecycle()
@@ -225,7 +226,7 @@ fun HistoryDetailScreen(
                     if (files.isNotEmpty()) {
                         item {
                             Text(
-                                "Files (${files.size})",
+                                stringResource(R.string.history_detail_files_header, files.size),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
@@ -237,7 +238,7 @@ fun HistoryDetailScreen(
                     } else {
                         item {
                             Text(
-                                "No file records for this run.",
+                                stringResource(R.string.history_detail_no_file_records),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -255,12 +256,15 @@ fun HistoryDetailScreen(
                 )
             },
             navigationIcon = {
-                FilePipeIconButton(onClick = onNavigateBack) {
-                    FilePipeMaterialRoundedSymbol(
-                        name = "arrow_back",
-                        contentDescription = "Back",
-                        autoMirror = true,
-                    )
+                if (showNavigateBack) {
+                    val backLabel = stringResource(R.string.nav_back)
+                    FilePipeIconButton(onClick = onNavigateBack) {
+                        FilePipeMaterialRoundedSymbol(
+                            name = "arrow_back",
+                            contentDescription = backLabel,
+                            autoMirror = true,
+                        )
+                    }
                 }
             },
             colors = gradientOverlayTopAppBarColors(),

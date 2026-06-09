@@ -182,6 +182,7 @@ private fun RuleCardClickableBody(
 fun RuleCard(
     rule: Rule,
     isSelected: Boolean,
+    isActiveInDetailPane: Boolean,
     isExpanded: Boolean,
     progress: RunProgress?,
     onClick: () -> Unit, // toggles expansion (or selection when in selection mode)
@@ -218,6 +219,8 @@ fun RuleCard(
                 .then(
                     if (isSelected) {
                         Modifier.border(2.dp, MaterialTheme.colorScheme.primary, cardShape)
+                    } else if (isActiveInDetailPane) {
+                        Modifier.border(1.dp, MaterialTheme.colorScheme.secondary, cardShape)
                     } else {
                         Modifier
                     },

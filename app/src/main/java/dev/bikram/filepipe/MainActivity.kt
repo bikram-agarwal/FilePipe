@@ -2,7 +2,6 @@ package dev.bikram.filepipe
 
 import android.content.Intent
 import android.os.Bundle
-import android.graphics.Color as AndroidColor
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -30,6 +29,7 @@ import dev.bikram.filepipe.ui.theme.FilePipeTheme
 import dev.bikram.filepipe.update.AppReviewLauncher
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.graphics.Color as AndroidColor
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {

@@ -111,6 +111,7 @@ fun DevOptionsScreen(
     contentPadding: PaddingValues,
     onNavigateBack: () -> Unit,
     settingsViewModel: SettingsViewModel,
+    showNavigateBack: Boolean = true,
     viewModel: DevOptionsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -515,6 +516,7 @@ fun DevOptionsScreen(
                     topPadding = scaffoldPadding.calculateTopPadding(),
                     allSectionsCollapsed = allSectionsCollapsed,
                     onNavigateBack = onNavigateBack,
+                    showNavigateBack = showNavigateBack,
                     onToggleAllSections = {
                         val collapsed = !allSectionsCollapsed
                         infoCollapsed = collapsed
@@ -555,6 +557,7 @@ private fun DevDeveloperModeHeader(
     topPadding: Dp,
     allSectionsCollapsed: Boolean,
     onNavigateBack: () -> Unit,
+    showNavigateBack: Boolean,
     onToggleAllSections: () -> Unit,
     onDeveloperOptionsEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -576,15 +579,17 @@ private fun DevDeveloperModeHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FilePipeFilledTonalIconButton(
-                onClick = onNavigateBack,
-                shape = CircleShape,
-            ) {
-                FilePipeMaterialRoundedSymbol(
-                    name = "arrow_back",
-                    contentDescription = stringResource(R.string.dev_options_back),
-                    autoMirror = true,
-                )
+            if (showNavigateBack) {
+                FilePipeFilledTonalIconButton(
+                    onClick = onNavigateBack,
+                    shape = CircleShape,
+                ) {
+                    FilePipeMaterialRoundedSymbol(
+                        name = "arrow_back",
+                        contentDescription = stringResource(R.string.dev_options_back),
+                        autoMirror = true,
+                    )
+                }
             }
             DevDeveloperModeCard(
                 developerOptionsEnabled = developerOptionsEnabled,

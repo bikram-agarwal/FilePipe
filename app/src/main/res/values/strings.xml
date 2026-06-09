@@ -11,6 +11,9 @@
     <string name="rules_empty_title">No rules yet</string>
     <string name="rules_empty_subtitle">Tap \"Add rule\" to create your first organizing rule</string>
     <string name="rules_add_rule">Add rule</string>
+    <string name="rules_two_pane_empty_title">No rule selected</string>
+    <string name="rules_two_pane_empty_message">Create or select a rule to see its details here.</string>
+    <string name="rules_two_pane_empty_action">Create rule</string>
     <string name="rule_card_types_none">None</string>
     <string name="rule_card_from">From</string>
     <string name="rule_card_from_none">No sources</string>
@@ -137,6 +140,12 @@
     <!-- History screen -->
     <string name="history_no_files_affected">No files affected</string>
     <string name="history_detail_title">Run details</string>
+    <string name="history_detail_files_header">Files (%1$d)</string>
+    <string name="history_detail_no_file_records">No file records for this run.</string>
+    <string name="history_two_pane_empty_title">No run selected</string>
+    <string name="history_two_pane_empty_message">Run details will appear here when history is available.</string>
+    <string name="history_two_pane_trash_title">Trash selected</string>
+    <string name="history_two_pane_trash_message">Trashed rules stay in the list. Run details appear when you switch back to Runs.</string>
     <string name="history_detail_files_moved_label">Files moved</string>
     <string name="history_detail_files_copied_label">Files copied</string>
     <plurals name="history_detail_undo_files">

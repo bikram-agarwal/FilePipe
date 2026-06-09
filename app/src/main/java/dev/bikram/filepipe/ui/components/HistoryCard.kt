@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,14 +42,22 @@ fun HistoryCard(
     history: RunHistory,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    isActiveInDetailPane: Boolean = false,
 ) {
     val cardColors = elevatedCardColors()
     val historyCardShape = MaterialTheme.shapes.medium
+    val activePaneModifier =
+        if (isActiveInDetailPane) {
+            Modifier.border(1.dp, MaterialTheme.colorScheme.secondary, historyCardShape)
+        } else {
+            Modifier
+        }
     FilePipeSurface(
         onClick = onClick,
         modifier =
             modifier
                 .fillMaxWidth()
+                .then(activePaneModifier)
                 .semantics(mergeDescendants = true) {
                     role = Role.Button
                 },

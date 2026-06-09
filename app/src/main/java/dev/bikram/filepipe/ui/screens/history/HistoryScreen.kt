@@ -63,6 +63,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -115,6 +116,9 @@ fun HistoryScreen(
     contentPadding: PaddingValues = PaddingValues(),
     onHistoryClick: (Long) -> Unit,
     onNavigateBack: (() -> Unit)? = null,
+    activeHistoryId: Long? = null,
+    listStartPadding: Dp = 16.dp,
+    listEndPadding: Dp = 16.dp,
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -375,14 +379,14 @@ fun HistoryScreen(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(start = listStartPadding, end = listEndPadding),
                 )
                 if (section == HistorySection.RUNS) {
                     LazyRow(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                                .padding(start = listStartPadding, end = listEndPadding, top = 8.dp, bottom = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(
@@ -552,8 +556,8 @@ fun HistoryScreen(
                             .then(scrollBlurModifier),
                     contentPadding =
                         PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
+                            start = listStartPadding,
+                            end = listEndPadding,
                             top = innerPadding.calculateTopPadding() + 8.dp,
                             bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
                         ),
@@ -599,8 +603,8 @@ fun HistoryScreen(
                             .then(scrollBlurModifier),
                     contentPadding =
                         PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
+                            start = listStartPadding,
+                            end = listEndPadding,
                             top = innerPadding.calculateTopPadding() + 8.dp,
                             bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
                         ),
@@ -648,6 +652,7 @@ fun HistoryScreen(
                                     history = item.history,
                                     onClick = { onHistoryClick(item.history.id) },
                                     onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
+                                    isActiveInDetailPane = item.history.id == activeHistoryId,
                                     modifier = Modifier.animateItem(),
                                 )
                             }
@@ -665,8 +670,8 @@ fun HistoryScreen(
                             .then(scrollBlurModifier),
                     contentPadding =
                         PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
+                            start = listStartPadding,
+                            end = listEndPadding,
                             top = innerPadding.calculateTopPadding() + 8.dp,
                             bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
                         ),
@@ -737,6 +742,7 @@ fun HistoryScreen(
                                     history = item.history,
                                     onClick = { onHistoryClick(item.history.id) },
                                     onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
+                                    isActiveInDetailPane = item.history.id == activeHistoryId,
                                     modifier = Modifier.animateItem(),
                                 )
                             }
@@ -946,6 +952,7 @@ private fun TrashRuleCard(
         RuleCard(
             rule = rule,
             isSelected = false,
+            isActiveInDetailPane = false,
             isSelectionMode = false,
             isExpanded = isExpanded,
             progress = null,
@@ -1028,6 +1035,7 @@ private fun SwipeToDismissHistoryCard(
     onClick: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    isActiveInDetailPane: Boolean = false,
 ) {
     val hapticEnabled = LocalHapticEnabled.current
     val cardShape = MaterialTheme.shapes.medium
@@ -1077,6 +1085,10 @@ private fun SwipeToDismissHistoryCard(
         },
         modifier = modifier,
     ) {
-        HistoryCard(history = history, onClick = onClick)
+        HistoryCard(
+            history = history,
+            onClick = onClick,
+            isActiveInDetailPane = isActiveInDetailPane,
+        )
     }
 }

@@ -213,6 +213,25 @@ class HistoryViewModel
                 }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+        val visibleRunIds: StateFlow<List<Long>> =
+            combine(
+                historySourceFlow,
+                _statusFilter,
+                _sortKey,
+                _sortDirection,
+                _section,
+            ) { all, status, sortKey, sortDir, section ->
+                if (section == HistorySection.TRASH) {
+                    emptyList()
+                } else {
+                    sortHistories(
+                        all.filter { history -> history.matchesHistoryStatusFilter(status) },
+                        sortKey,
+                        sortDir,
+                    ).map { history -> history.id }
+                }
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
         private val _userMessage = MutableStateFlow<String?>(null)
         val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 

@@ -18,6 +18,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.animateColorAsState
@@ -57,6 +58,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -191,6 +193,42 @@ private const val SETTINGS_SECTION_HIGHLIGHT_DURATION_MS = 4_500L
 private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
 private const val DEVELOPER_OPTIONS_UNLOCK_TAPS = 7
 
+enum class SettingsSectionKey(
+    val routeKey: String,
+    val iconName: String,
+    @StringRes val titleRes: Int,
+) {
+    Appearance("appearance", "palette", R.string.settings_appearance_section),
+    FolderAccess("folder_access", "folder_open", R.string.settings_folder_access_section),
+    Schedule("schedule", "calendar_clock", R.string.settings_schedule_section),
+    TouchSound("touch_sound", "vibration", R.string.settings_touch_sound_section),
+    SwipeActions("swipe_actions", "swipe_left", R.string.settings_swipe_gestures_section),
+    Backup("backup", "save", R.string.settings_backup_section),
+    Updates("updates", "system_update", R.string.settings_updates_section),
+    About("about", "info", R.string.settings_about_section),
+    DeveloperOptions("developer_options", "developer_board", R.string.settings_developer_options_section),
+}
+
+val settingsPaneSections: List<SettingsSectionKey>
+    get() =
+        SettingsSectionKey.entries.filter { sectionKey ->
+            sectionKey != SettingsSectionKey.DeveloperOptions &&
+                (sectionKey != SettingsSectionKey.Updates || BuildConfig.SHOW_UPDATES)
+        }
+
+fun settingsSectionKeyForHighlight(highlightSectionKey: String?): SettingsSectionKey? =
+    when (highlightSectionKey?.substringBefore(".")) {
+        "appearance" -> SettingsSectionKey.Appearance
+        "folder_access" -> SettingsSectionKey.FolderAccess
+        "notifications", "schedule" -> SettingsSectionKey.Schedule
+        "touch_sound" -> SettingsSectionKey.TouchSound
+        "swipe_actions" -> SettingsSectionKey.SwipeActions
+        "backup" -> SettingsSectionKey.Backup
+        "updates" -> SettingsSectionKey.Updates.takeIf { BuildConfig.SHOW_UPDATES }
+        "about" -> SettingsSectionKey.About
+        else -> null
+    }
+
 private enum class BackupFolderTarget {
     Local,
     Cloud,
@@ -243,6 +281,137 @@ private fun Modifier.pulsingSectionHighlightOutline(
         }
 }
 
+@Composable
+fun SettingsSectionListPane(
+    contentPadding: PaddingValues,
+    selectedSectionKey: SettingsSectionKey,
+    developerOptionsEnabled: Boolean,
+    onSectionSelected: (SettingsSectionKey) -> Unit,
+    showSelectedState: Boolean = true,
+    modifier: Modifier = Modifier,
+    startPadding: Dp = 16.dp,
+    endPadding: Dp = 16.dp,
+    extraTopPadding: Dp = 16.dp,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding =
+            PaddingValues(
+                start = startPadding,
+                end = endPadding,
+                top = contentPadding.calculateTopPadding() + extraTopPadding,
+                bottom = contentPadding.calculateBottomPadding() + 24.dp,
+            ),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(
+            items = settingsPaneSections,
+            key = { sectionKey -> sectionKey.routeKey },
+        ) { sectionKey ->
+            SettingsSectionListRow(
+                iconName = sectionKey.iconName,
+                title = stringResource(sectionKey.titleRes),
+                selected = showSelectedState && sectionKey == selectedSectionKey,
+                onClick = { onSectionSelected(sectionKey) },
+            )
+        }
+        if (developerOptionsEnabled) {
+            item(key = "developer_options") {
+                SettingsSectionListRow(
+                    iconName = "developer_board",
+                    title = stringResource(R.string.settings_developer_options_section),
+                    selected = showSelectedState && selectedSectionKey == SettingsSectionKey.DeveloperOptions,
+                    onClick = { onSectionSelected(SettingsSectionKey.DeveloperOptions) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun SettingsSectionListRow(
+    iconName: String,
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    trailingIconName: String = "chevron_right",
+) {
+    val colorSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
+    val containerColor by animateColorAsState(
+        targetValue =
+            if (selected) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+        animationSpec = colorSpec,
+        label = "settings_section_list_container",
+    )
+    val contentColor =
+        if (selected) {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        }
+    Surface(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .tapSoundClickable(
+                    onClick = onClick,
+                    indication = null,
+                ),
+        shape = RoundedCornerShape(28.dp),
+        color = containerColor,
+        contentColor = contentColor,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(MaterialTheme.shapes.extraExtraLarge)
+                        .background(
+                            if (selected) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
+                            },
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                FilePipeMaterialRoundedSymbol(
+                    name = iconName,
+                    contentDescription = null,
+                    size = 21.dp,
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            FilePipeMaterialRoundedSymbol(
+                name = trailingIconName,
+                contentDescription = null,
+                size = 20.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                autoMirror = trailingIconName == "chevron_right",
+            )
+        }
+    }
+}
+
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
@@ -259,6 +428,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     highlightSectionKey: String? = null,
     onHighlightHandled: () -> Unit = {},
+    selectedSectionKey: SettingsSectionKey? = null,
+    showTopBar: Boolean = true,
+    showSectionHeaders: Boolean = true,
 ) {
     val preferences by viewModel.preferencesFlow.collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
     val developerOptionsEnabled by viewModel.developerOptionsEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
@@ -287,6 +459,9 @@ fun SettingsScreen(
     val snackbarHostState = LocalSnackbarHostState.current
     val coroutineScope = rememberCoroutineScope()
     val settingsLazyListState = rememberLazyListState()
+    val forceExpandedSections = selectedSectionKey != null
+
+    fun shouldRenderSection(sectionKey: SettingsSectionKey): Boolean = selectedSectionKey == null || selectedSectionKey == sectionKey
 
     val topAlphaMultiplier by remember(settingsLazyListState) {
         derivedStateOf {
@@ -720,56 +895,58 @@ fun SettingsScreen(
     Scaffold(
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
-            Column(Modifier.fillMaxWidth()) {
-                TopAppBar(
-                    title = {},
-                    colors = gradientOverlayTopAppBarColors(),
-                    actions = {
-                        val helpOpenLabel = stringResource(R.string.settings_fab_open_help)
-                        FilePipeFilledTonalIconButton(
-                            onClick = onOpenHelp,
-                            modifier = Modifier.semantics { contentDescription = helpOpenLabel },
-                        ) {
-                            Text(
-                                text = "?",
-                                style =
-                                    MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Medium,
-                                        lineHeight = MaterialTheme.typography.titleLarge.fontSize,
-                                    ),
-                            )
-                        }
-                        val expandCollapseAllLabel =
-                            stringResource(
-                                if (allSettingsSectionsCollapsed) {
-                                    R.string.settings_expand_all_sections_cd
-                                } else {
-                                    R.string.settings_collapse_all_sections_cd
-                                },
-                            )
-                        FilePipeFilledTonalIconButton(
-                            onClick = {
-                                collapsedSettingsSectionKeys =
+            if (showTopBar) {
+                Column(Modifier.fillMaxWidth()) {
+                    TopAppBar(
+                        title = {},
+                        colors = gradientOverlayTopAppBarColors(),
+                        actions = {
+                            val helpOpenLabel = stringResource(R.string.settings_fab_open_help)
+                            FilePipeFilledTonalIconButton(
+                                onClick = onOpenHelp,
+                                modifier = Modifier.semantics { contentDescription = helpOpenLabel },
+                            ) {
+                                Text(
+                                    text = "?",
+                                    style =
+                                        MaterialTheme.typography.titleLarge.copy(
+                                            fontWeight = FontWeight.Medium,
+                                            lineHeight = MaterialTheme.typography.titleLarge.fontSize,
+                                        ),
+                                )
+                            }
+                            val expandCollapseAllLabel =
+                                stringResource(
                                     if (allSettingsSectionsCollapsed) {
-                                        collapsedSettingsSectionKeys - settingsExpandableSectionKeys
+                                        R.string.settings_expand_all_sections_cd
                                     } else {
-                                        collapsedSettingsSectionKeys + settingsExpandableSectionKeys
-                                    }
-                            },
-                            modifier = Modifier.semantics { contentDescription = expandCollapseAllLabel },
-                        ) {
-                            FilePipeMaterialRoundedSymbol(
-                                name =
-                                    if (allSettingsSectionsCollapsed) {
-                                        "unfold_more"
-                                    } else {
-                                        "unfold_less"
+                                        R.string.settings_collapse_all_sections_cd
                                     },
-                                contentDescription = null,
-                            )
-                        }
-                    },
-                )
+                                )
+                            FilePipeFilledTonalIconButton(
+                                onClick = {
+                                    collapsedSettingsSectionKeys =
+                                        if (allSettingsSectionsCollapsed) {
+                                            collapsedSettingsSectionKeys - settingsExpandableSectionKeys
+                                        } else {
+                                            collapsedSettingsSectionKeys + settingsExpandableSectionKeys
+                                        }
+                                },
+                                modifier = Modifier.semantics { contentDescription = expandCollapseAllLabel },
+                            ) {
+                                FilePipeMaterialRoundedSymbol(
+                                    name =
+                                        if (allSettingsSectionsCollapsed) {
+                                            "unfold_more"
+                                        } else {
+                                            "unfold_less"
+                                        },
+                                    contentDescription = null,
+                                )
+                            }
+                        },
+                    )
+                }
             }
         },
     ) { innerPadding ->
@@ -783,198 +960,206 @@ fun SettingsScreen(
                 PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
-                    top = innerPadding.calculateTopPadding() + 8.dp,
+                    top = innerPadding.calculateTopPadding() + contentPadding.calculateTopPadding() + 8.dp,
                     bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 24.dp,
                 ),
             verticalArrangement = Arrangement.spacedBy(20.dp),
             userScrollEnabled = settingsScrollEnabled,
         ) {
-            // ── Appearance ───────────────────────────────────────────────────
-            item {
-                SettingsExpandableSection(
-                    sectionKey = "appearance",
-                    iconName = "palette",
-                    title = stringResource(R.string.settings_appearance_section),
-                    collapsedSectionKeys = collapsedSettingsSectionKeys,
-                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                ) {
-                    AppearanceSection(
-                        themeMode = preferences.themeMode,
-                        colorSource = preferences.colorSource,
-                        savedCustomSeedHexes = preferences.savedCustomSeedHexes,
-                        activeCustomSeedHex = preferences.activeCustomSeedHex,
-                        themePaletteStyle = preferences.themePaletteStyle,
-                        useGradientBackground = preferences.useGradientBackground,
-                        shadingIntensity = preferences.shadingIntensity,
-                        progressiveBlurEnabled = preferences.progressiveBlurEnabled,
-                        onThemeMode = viewModel::setThemeMode,
-                        onColorSource = viewModel::setColorSource,
-                        onPaletteStyle = viewModel::setThemePaletteStyle,
-                        onAddCustomSeedHex = viewModel::addCustomSeedHex,
-                        onSelectCustomSeedHex = viewModel::selectCustomSeedHex,
-                        onPreviewCustomSeedHex = viewModel::previewCustomSeedHex,
-                        onRemoveCustomSeedHex = viewModel::removeCustomSeedHex,
-                        onUseGradientBackground = viewModel::setUseGradientBackground,
-                        onShadingIntensity = viewModel::setShadingIntensity,
-                        onProgressiveBlurEnabled = viewModel::setProgressiveBlurEnabled,
-                        onBlackThemeEffectClick = {
-                            coroutineScope.launch {
-                                snackbarHostState.currentSnackbarData?.dismiss()
-                                snackbarHostState.showSnackbar(
-                                    resources.getString(R.string.settings_black_theme_effect_disabled),
-                                )
-                            }
-                        },
-                    )
+            // Appearance
+            if (shouldRenderSection(SettingsSectionKey.Appearance)) {
+                item {
+                    SettingsExpandableSection(
+                        sectionKey = SettingsSectionKey.Appearance.routeKey,
+                        iconName = SettingsSectionKey.Appearance.iconName,
+                        title = stringResource(R.string.settings_appearance_section),
+                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                        showHeader = showSectionHeaders,
+                        forceExpanded = forceExpandedSections,
+                    ) {
+                        AppearanceSection(
+                            themeMode = preferences.themeMode,
+                            colorSource = preferences.colorSource,
+                            savedCustomSeedHexes = preferences.savedCustomSeedHexes,
+                            activeCustomSeedHex = preferences.activeCustomSeedHex,
+                            themePaletteStyle = preferences.themePaletteStyle,
+                            useGradientBackground = preferences.useGradientBackground,
+                            shadingIntensity = preferences.shadingIntensity,
+                            progressiveBlurEnabled = preferences.progressiveBlurEnabled,
+                            onThemeMode = viewModel::setThemeMode,
+                            onColorSource = viewModel::setColorSource,
+                            onPaletteStyle = viewModel::setThemePaletteStyle,
+                            onAddCustomSeedHex = viewModel::addCustomSeedHex,
+                            onSelectCustomSeedHex = viewModel::selectCustomSeedHex,
+                            onPreviewCustomSeedHex = viewModel::previewCustomSeedHex,
+                            onRemoveCustomSeedHex = viewModel::removeCustomSeedHex,
+                            onUseGradientBackground = viewModel::setUseGradientBackground,
+                            onShadingIntensity = viewModel::setShadingIntensity,
+                            onProgressiveBlurEnabled = viewModel::setProgressiveBlurEnabled,
+                            onBlackThemeEffectClick = {
+                                coroutineScope.launch {
+                                    snackbarHostState.currentSnackbarData?.dismiss()
+                                    snackbarHostState.showSnackbar(
+                                        resources.getString(R.string.settings_black_theme_effect_disabled),
+                                    )
+                                }
+                            },
+                        )
+                    }
                 }
             }
 
-            // ── Folder access ─────────────────────────────────────────────────
-            item {
-                val folderHighlightPulse = rememberSectionHighlightPulseAlpha(folderAccessHighlightActive)
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .pulsingSectionHighlightOutline(
-                                active = folderAccessHighlightActive,
-                                outlineColor =
-                                    MaterialTheme.colorScheme.primary.copy(
-                                        alpha = folderHighlightPulse,
-                                    ),
-                            ),
-                ) {
-                    SettingsExpandableSection(
-                        sectionKey = "folder_access",
-                        iconName = "folder_open",
-                        title = stringResource(R.string.settings_folder_access_section),
-                        collapsedSectionKeys = collapsedSettingsSectionKeys,
-                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+            // Folder access
+            if (shouldRenderSection(SettingsSectionKey.FolderAccess)) {
+                item {
+                    val folderHighlightPulse = rememberSectionHighlightPulseAlpha(folderAccessHighlightActive)
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .pulsingSectionHighlightOutline(
+                                    active = folderAccessHighlightActive,
+                                    outlineColor =
+                                        MaterialTheme.colorScheme.primary.copy(
+                                            alpha = folderHighlightPulse,
+                                        ),
+                                ),
                     ) {
-                        GroupedListColumn {
-                            GroupedListItem(position = GroupPosition.FIRST) {
-                                ListItem(
-                                    headlineContent = {
-                                        Text(
-                                            stringResource(R.string.settings_folder_access_saf_only),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                    },
-                                    trailingContent = {
-                                        RadioButton(
-                                            selected = preferences.folderAccessMode == FolderAccessMode.SAF_ONLY,
-                                            onClick = null,
-                                        )
-                                    },
-                                    modifier =
-                                        Modifier.tapSoundClickable {
-                                            applyFolderAccessMode(FolderAccessMode.SAF_ONLY)
-                                        },
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                )
-                            }
-                            GroupedListItem(position = GroupPosition.LAST) {
-                                ListItem(
-                                    headlineContent = {
-                                        Text(
-                                            stringResource(R.string.settings_folder_access_all_files),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                    },
-                                    trailingContent = {
-                                        RadioButton(
-                                            selected = preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED,
-                                            onClick = null,
-                                        )
-                                    },
-                                    modifier =
-                                        Modifier.tapSoundClickable {
-                                            applyFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
-                                        },
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        val selectiveLike =
-                            preferences.folderAccessMode == FolderAccessMode.SAF_ONLY ||
-                                preferences.folderAccessMode == FolderAccessMode.DEFERRED
-                        val allFilesModeSelected =
-                            preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED
-                        val allFilesStatusLine =
-                            when {
-                                selectiveLike && allFilesAccessGranted -> {
-                                    stringResource(R.string.settings_folder_access_all_files_status_granted_unused)
-                                }
-
-                                selectiveLike && !allFilesAccessGranted -> {
-                                    stringResource(R.string.settings_folder_access_all_files_status_not_granted_idle)
-                                }
-
-                                allFilesModeSelected && allFilesAccessGranted -> {
-                                    stringResource(R.string.settings_folder_access_all_files_status_granted_used)
-                                }
-
-                                else -> {
-                                    stringResource(R.string.settings_folder_access_all_files_status_not_granted_required)
-                                }
-                            }
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                        SettingsExpandableSection(
+                            sectionKey = SettingsSectionKey.FolderAccess.routeKey,
+                            iconName = SettingsSectionKey.FolderAccess.iconName,
+                            title = stringResource(R.string.settings_folder_access_section),
+                            collapsedSectionKeys = collapsedSettingsSectionKeys,
+                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                            showHeader = showSectionHeaders,
+                            forceExpanded = forceExpandedSections,
                         ) {
-                            val statusStyle = MaterialTheme.typography.bodySmall
-                            val statusColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            Text(
-                                text = allFilesStatusLine,
-                                style = statusStyle,
-                                color = statusColor,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = stringResource(R.string.onboarding_permissions_learn_more),
-                                style = statusStyle,
-                                color = statusColor,
+                            GroupedListColumn {
+                                GroupedListItem(position = GroupPosition.FIRST) {
+                                    ListItem(
+                                        headlineContent = {
+                                            Text(
+                                                stringResource(R.string.settings_folder_access_saf_only),
+                                                style = MaterialTheme.typography.bodyLarge,
+                                            )
+                                        },
+                                        trailingContent = {
+                                            RadioButton(
+                                                selected = preferences.folderAccessMode == FolderAccessMode.SAF_ONLY,
+                                                onClick = null,
+                                            )
+                                        },
+                                        modifier =
+                                            Modifier.tapSoundClickable {
+                                                applyFolderAccessMode(FolderAccessMode.SAF_ONLY)
+                                            },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    )
+                                }
+                                GroupedListItem(position = GroupPosition.LAST) {
+                                    ListItem(
+                                        headlineContent = {
+                                            Text(
+                                                stringResource(R.string.settings_folder_access_all_files),
+                                                style = MaterialTheme.typography.bodyLarge,
+                                            )
+                                        },
+                                        trailingContent = {
+                                            RadioButton(
+                                                selected = preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED,
+                                                onClick = null,
+                                            )
+                                        },
+                                        modifier =
+                                            Modifier.tapSoundClickable {
+                                                applyFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
+                                            },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            val selectiveLike =
+                                preferences.folderAccessMode == FolderAccessMode.SAF_ONLY ||
+                                    preferences.folderAccessMode == FolderAccessMode.DEFERRED
+                            val allFilesModeSelected =
+                                preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED
+                            val allFilesStatusLine =
+                                when {
+                                    selectiveLike && allFilesAccessGranted -> {
+                                        stringResource(R.string.settings_folder_access_all_files_status_granted_unused)
+                                    }
+
+                                    selectiveLike && !allFilesAccessGranted -> {
+                                        stringResource(R.string.settings_folder_access_all_files_status_not_granted_idle)
+                                    }
+
+                                    allFilesModeSelected && allFilesAccessGranted -> {
+                                        stringResource(R.string.settings_folder_access_all_files_status_granted_used)
+                                    }
+
+                                    else -> {
+                                        stringResource(R.string.settings_folder_access_all_files_status_not_granted_required)
+                                    }
+                                }
+                            Row(
                                 modifier =
                                     Modifier
-                                        .padding(start = 8.dp)
-                                        .tapSoundClickable(onClick = onOpenFaqStorageSection),
-                            )
-                        }
-                        val showAllFilesActionButton =
-                            when {
-                                selectiveLike && !allFilesAccessGranted -> false
-                                selectiveLike && allFilesAccessGranted -> true
-                                allFilesModeSelected && !allFilesAccessGranted -> true
-                                allFilesModeSelected && allFilesAccessGranted -> false
-                                else -> false
-                            }
-                        if (showAllFilesActionButton) {
-                            Spacer(Modifier.height(8.dp))
-                            FilePipeOutlinedButton(
-                                onClick = {
-                                    val manageIntent =
-                                        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                            data = "package:${context.packageName}".toUri()
-                                        }
-                                    context.startActivity(manageIntent)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
+                                val statusStyle = MaterialTheme.typography.bodySmall
+                                val statusColor = MaterialTheme.colorScheme.onSurfaceVariant
                                 Text(
-                                    stringResource(
-                                        if (selectiveLike) {
-                                            R.string.settings_folder_access_open_manage
-                                        } else {
-                                            R.string.settings_folder_access_grant_all_files
-                                        },
-                                    ),
+                                    text = allFilesStatusLine,
+                                    style = statusStyle,
+                                    color = statusColor,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
+                                Text(
+                                    text = stringResource(R.string.onboarding_permissions_learn_more),
+                                    style = statusStyle,
+                                    color = statusColor,
+                                    modifier =
+                                        Modifier
+                                            .padding(start = 8.dp)
+                                            .tapSoundClickable(onClick = onOpenFaqStorageSection),
+                                )
+                            }
+                            val showAllFilesActionButton =
+                                when {
+                                    selectiveLike && !allFilesAccessGranted -> false
+                                    selectiveLike && allFilesAccessGranted -> true
+                                    allFilesModeSelected && !allFilesAccessGranted -> true
+                                    allFilesModeSelected && allFilesAccessGranted -> false
+                                    else -> false
+                                }
+                            if (showAllFilesActionButton) {
+                                Spacer(Modifier.height(8.dp))
+                                FilePipeOutlinedButton(
+                                    onClick = {
+                                        val manageIntent =
+                                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                                data = "package:${context.packageName}".toUri()
+                                            }
+                                        context.startActivity(manageIntent)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(
+                                        stringResource(
+                                            if (selectiveLike) {
+                                                R.string.settings_folder_access_open_manage
+                                            } else {
+                                                R.string.settings_folder_access_grant_all_files
+                                            },
+                                        ),
+                                    )
+                                }
                             }
                         }
                     }
@@ -982,142 +1167,146 @@ fun SettingsScreen(
             }
 
             // Schedule
-            item {
-                val notificationsHighlightPulse =
-                    rememberSectionHighlightPulseAlpha(notificationsHighlightActive)
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .pulsingSectionHighlightOutline(
-                                active = notificationsHighlightActive,
-                                outlineColor =
-                                    MaterialTheme.colorScheme.primary.copy(
-                                        alpha = notificationsHighlightPulse,
-                                    ),
-                            ),
-                ) {
-                    SettingsExpandableSection(
-                        sectionKey = "schedule",
-                        iconName = "calendar_clock",
-                        title = stringResource(R.string.settings_schedule_section),
-                        collapsedSectionKeys = collapsedSettingsSectionKeys,
-                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+            if (shouldRenderSection(SettingsSectionKey.Schedule)) {
+                item {
+                    val notificationsHighlightPulse =
+                        rememberSectionHighlightPulseAlpha(notificationsHighlightActive)
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .pulsingSectionHighlightOutline(
+                                    active = notificationsHighlightActive,
+                                    outlineColor =
+                                        MaterialTheme.colorScheme.primary.copy(
+                                            alpha = notificationsHighlightPulse,
+                                        ),
+                                ),
                     ) {
-                        GroupedListColumn {
-                            GroupedListItem(position = GroupPosition.FIRST) {
-                                ListItem(
-                                    headlineContent = {
-                                        Text(
-                                            stringResource(R.string.settings_notifications),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                    },
-                                    supportingContent = {
-                                        Text(
-                                            stringResource(R.string.settings_notifications_desc),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    },
-                                    leadingContent = {
-                                        FilePipeMaterialRoundedSymbol(
-                                            name = "notifications",
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    },
-                                    trailingContent = {
-                                        FilePipeSwitch(
-                                            checked = notificationsGranted,
-                                            onCheckedChange = { wantEnabled ->
-                                                when {
-                                                    wantEnabled &&
-                                                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                        SettingsExpandableSection(
+                            sectionKey = SettingsSectionKey.Schedule.routeKey,
+                            iconName = SettingsSectionKey.Schedule.iconName,
+                            title = stringResource(R.string.settings_schedule_section),
+                            collapsedSectionKeys = collapsedSettingsSectionKeys,
+                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                            showHeader = showSectionHeaders,
+                            forceExpanded = forceExpandedSections,
+                        ) {
+                            GroupedListColumn {
+                                GroupedListItem(position = GroupPosition.FIRST) {
+                                    ListItem(
+                                        headlineContent = {
+                                            Text(
+                                                stringResource(R.string.settings_notifications),
+                                                style = MaterialTheme.typography.bodyLarge,
+                                            )
+                                        },
+                                        supportingContent = {
+                                            Text(
+                                                stringResource(R.string.settings_notifications_desc),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        },
+                                        leadingContent = {
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = "notifications",
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        },
+                                        trailingContent = {
+                                            FilePipeSwitch(
+                                                checked = notificationsGranted,
+                                                onCheckedChange = { wantEnabled ->
+                                                    when {
+                                                        wantEnabled &&
+                                                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                                                            pendingEnableUpdateNotificationsAfterPermission = false
+                                                            requestPostNotificationPermissionOrOpenAppSettings()
+                                                        }
+
+                                                        wantEnabled &&
+                                                            !NotificationManagerCompat
+                                                                .from(context)
+                                                                .areNotificationsEnabled() -> {
+                                                            viewModel.openAppNotificationSettings()
+                                                        }
+
+                                                        !wantEnabled -> {
+                                                            viewModel.openAppNotificationSettings()
+                                                        }
+                                                    }
+                                                },
+                                            )
+                                        },
+                                        modifier =
+                                            Modifier.tapSoundClickable {
+                                                if (!notificationsGranted) {
+                                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                                         pendingEnableUpdateNotificationsAfterPermission = false
                                                         requestPostNotificationPermissionOrOpenAppSettings()
-                                                    }
-
-                                                    wantEnabled &&
-                                                        !NotificationManagerCompat
+                                                    } else if (!NotificationManagerCompat
                                                             .from(context)
-                                                            .areNotificationsEnabled() -> {
+                                                            .areNotificationsEnabled()
+                                                    ) {
                                                         viewModel.openAppNotificationSettings()
                                                     }
-
-                                                    !wantEnabled -> {
-                                                        viewModel.openAppNotificationSettings()
-                                                    }
-                                                }
-                                            },
-                                        )
-                                    },
-                                    modifier =
-                                        Modifier.tapSoundClickable {
-                                            if (!notificationsGranted) {
-                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                                    pendingEnableUpdateNotificationsAfterPermission = false
-                                                    requestPostNotificationPermissionOrOpenAppSettings()
-                                                } else if (!NotificationManagerCompat
-                                                        .from(context)
-                                                        .areNotificationsEnabled()
-                                                ) {
+                                                } else {
                                                     viewModel.openAppNotificationSettings()
                                                 }
-                                            } else {
-                                                viewModel.openAppNotificationSettings()
-                                            }
-                                        },
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                )
-                            }
-                            GroupedListItem(position = GroupPosition.MIDDLE) {
-                                SettingsToggleItem(
-                                    iconName = "alarm_on",
-                                    title = stringResource(R.string.settings_reliable_schedules),
-                                    subtitle =
-                                        stringResource(
-                                            if (canScheduleExactAlarms) {
-                                                R.string.settings_reliable_schedules_desc_enabled
-                                            } else {
-                                                R.string.settings_reliable_schedules_desc_disabled
                                             },
-                                        ),
-                                    checked = canScheduleExactAlarms,
-                                    onCheckedChange = { openExactAlarmSettings() },
-                                )
-                            }
-                            GroupedListItem(position = GroupPosition.LAST) {
-                                ListItem(
-                                    leadingContent = {
-                                        FilePipeMaterialRoundedSymbol(
-                                            name = "history",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    },
-                                    headlineContent = {
-                                        Text(
-                                            stringResource(R.string.settings_log_retention),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                    },
-                                    supportingContent = {
-                                        Text(
-                                            stringResource(R.string.settings_log_retention_hint),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    },
-                                    trailingContent = {
-                                        LogRetentionDropdown(
-                                            currentDays = preferences.logRetentionDays,
-                                            onSelect = { viewModel.setLogRetentionDays(it) },
-                                        )
-                                    },
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                )
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    )
+                                }
+                                GroupedListItem(position = GroupPosition.MIDDLE) {
+                                    SettingsToggleItem(
+                                        iconName = "alarm_on",
+                                        title = stringResource(R.string.settings_reliable_schedules),
+                                        subtitle =
+                                            stringResource(
+                                                if (canScheduleExactAlarms) {
+                                                    R.string.settings_reliable_schedules_desc_enabled
+                                                } else {
+                                                    R.string.settings_reliable_schedules_desc_disabled
+                                                },
+                                            ),
+                                        checked = canScheduleExactAlarms,
+                                        onCheckedChange = { openExactAlarmSettings() },
+                                    )
+                                }
+                                GroupedListItem(position = GroupPosition.LAST) {
+                                    ListItem(
+                                        leadingContent = {
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = "history",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        },
+                                        headlineContent = {
+                                            Text(
+                                                stringResource(R.string.settings_log_retention),
+                                                style = MaterialTheme.typography.bodyLarge,
+                                            )
+                                        },
+                                        supportingContent = {
+                                            Text(
+                                                stringResource(R.string.settings_log_retention_hint),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        },
+                                        trailingContent = {
+                                            LogRetentionDropdown(
+                                                currentDays = preferences.logRetentionDays,
+                                                onSelect = { viewModel.setLogRetentionDays(it) },
+                                            )
+                                        },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    )
+                                }
                             }
                         }
                     }
@@ -1125,236 +1314,248 @@ fun SettingsScreen(
             }
 
             // Touch & Sound
-            item {
-                SettingsExpandableSection(
-                    sectionKey = "touch_sound",
-                    iconName = "vibration",
-                    title = stringResource(R.string.settings_touch_sound_section),
-                    collapsedSectionKeys = collapsedSettingsSectionKeys,
-                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                ) {
-                    GroupedListColumn {
-                        GroupedListItem(position = GroupPosition.ONLY) {
-                            SettingsToggleItem(
-                                iconName = "vibration",
-                                title = stringResource(R.string.settings_haptic_feedback),
-                                subtitle = stringResource(R.string.settings_haptic_feedback_desc),
-                                checked = preferences.hapticFeedbackEnabled,
-                                onCheckedChange = viewModel::setHapticFeedbackEnabled,
-                            )
+            if (shouldRenderSection(SettingsSectionKey.TouchSound)) {
+                item {
+                    SettingsExpandableSection(
+                        sectionKey = SettingsSectionKey.TouchSound.routeKey,
+                        iconName = SettingsSectionKey.TouchSound.iconName,
+                        title = stringResource(R.string.settings_touch_sound_section),
+                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                        showHeader = showSectionHeaders,
+                        forceExpanded = forceExpandedSections,
+                    ) {
+                        GroupedListColumn {
+                            GroupedListItem(position = GroupPosition.ONLY) {
+                                SettingsToggleItem(
+                                    iconName = "vibration",
+                                    title = stringResource(R.string.settings_haptic_feedback),
+                                    subtitle = stringResource(R.string.settings_haptic_feedback_desc),
+                                    checked = preferences.hapticFeedbackEnabled,
+                                    onCheckedChange = viewModel::setHapticFeedbackEnabled,
+                                )
+                            }
                         }
                     }
                 }
             }
 
             // Swipe Actions
-            item {
-                SettingsExpandableSection(
-                    sectionKey = "swipe_actions",
-                    iconName = "swipe_left",
-                    title = stringResource(R.string.settings_swipe_gestures_section),
-                    collapsedSectionKeys = collapsedSettingsSectionKeys,
-                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                ) {
-                    GroupedListColumn {
-                        GroupedListItem(position = GroupPosition.ONLY) {
-                            SwipeExecuteOneActionsEditor(
-                                startTitle = stringResource(R.string.settings_swipe_right),
-                                endTitle = stringResource(R.string.settings_swipe_left),
-                                startAction = preferences.swipeStartToEnd,
-                                endAction = preferences.swipeEndToStart,
-                                onStartActionChange = { viewModel.setSwipeStartToEnd(it) },
-                                onEndActionChange = { viewModel.setSwipeEndToStart(it) },
-                            )
+            if (shouldRenderSection(SettingsSectionKey.SwipeActions)) {
+                item {
+                    SettingsExpandableSection(
+                        sectionKey = SettingsSectionKey.SwipeActions.routeKey,
+                        iconName = SettingsSectionKey.SwipeActions.iconName,
+                        title = stringResource(R.string.settings_swipe_gestures_section),
+                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                        showHeader = showSectionHeaders,
+                        forceExpanded = forceExpandedSections,
+                    ) {
+                        GroupedListColumn {
+                            GroupedListItem(position = GroupPosition.ONLY) {
+                                SwipeExecuteOneActionsEditor(
+                                    startTitle = stringResource(R.string.settings_swipe_right),
+                                    endTitle = stringResource(R.string.settings_swipe_left),
+                                    startAction = preferences.swipeStartToEnd,
+                                    endAction = preferences.swipeEndToStart,
+                                    onStartActionChange = { viewModel.setSwipeStartToEnd(it) },
+                                    onEndActionChange = { viewModel.setSwipeEndToStart(it) },
+                                )
+                            }
                         }
                     }
                 }
             }
 
             // ── Import/Export ────────────────────────────────────────────────
-            item {
-                SettingsExpandableSection(
-                    sectionKey = "backup",
-                    iconName = "save",
-                    title = stringResource(R.string.settings_backup_section),
-                    collapsedSectionKeys = collapsedSettingsSectionKeys,
-                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                ) {
-                    val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
-                    val localFolderLabel =
-                        preferences.exportFolderUri
-                            .takeIf { it.isNotBlank() }
-                            ?.let { displayPath(it, internalStorageDisplayName) }
-                            ?: stringResource(R.string.settings_choose_local_backup_folder)
-                    val cloudFolderLabel =
-                        preferences.cloudExportFolderUri
-                            .takeIf { it.isNotBlank() }
-                            ?.let { backupDestinationDisplayLabel(context, it, internalStorageDisplayName) }
-                            ?: stringResource(R.string.settings_choose_cloud_backup_file)
+            if (shouldRenderSection(SettingsSectionKey.Backup)) {
+                item {
+                    SettingsExpandableSection(
+                        sectionKey = SettingsSectionKey.Backup.routeKey,
+                        iconName = SettingsSectionKey.Backup.iconName,
+                        title = stringResource(R.string.settings_backup_section),
+                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                        showHeader = showSectionHeaders,
+                        forceExpanded = forceExpandedSections,
+                    ) {
+                        val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
+                        val localFolderLabel =
+                            preferences.exportFolderUri
+                                .takeIf { it.isNotBlank() }
+                                ?.let { displayPath(it, internalStorageDisplayName) }
+                                ?: stringResource(R.string.settings_choose_local_backup_folder)
+                        val cloudFolderLabel =
+                            preferences.cloudExportFolderUri
+                                .takeIf { it.isNotBlank() }
+                                ?.let { backupDestinationDisplayLabel(context, it, internalStorageDisplayName) }
+                                ?: stringResource(R.string.settings_choose_cloud_backup_file)
 
-                    val exportFolderReady =
-                        preferences.exportFolderUri.isNotBlank() ||
-                            preferences.cloudExportFolderUri.isNotBlank()
-                    val autoExportSwitchEnabled = exportFolderReady || preferences.autoExportOnRuleChange
-                    val scheduledExportSwitchEnabled = exportFolderReady || preferences.scheduledExportEnabled
+                        val exportFolderReady =
+                            preferences.exportFolderUri.isNotBlank() ||
+                                preferences.cloudExportFolderUri.isNotBlank()
+                        val autoExportSwitchEnabled = exportFolderReady || preferences.autoExportOnRuleChange
+                        val scheduledExportSwitchEnabled = exportFolderReady || preferences.scheduledExportEnabled
 
-                    GroupedListColumn {
-                        GroupedListItem(position = GroupPosition.FIRST) {
-                            BackupFolderPickerItem(
-                                title = localFolderLabel,
-                                subtitle = stringResource(R.string.settings_local_backup_folder_hint),
-                                onClick = {
-                                    pendingBackupFolderTarget = BackupFolderTarget.Local
-                                    folderLauncher.launch(null)
-                                },
-                                onLongClick = {
-                                    if (preferences.exportFolderUri.isNotBlank()) {
-                                        viewModel.setExportFolderUri("")
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                message = resources.getString(R.string.settings_local_backup_folder_cleared),
-                                                duration = SnackbarDuration.Short,
-                                            )
-                                        }
-                                    }
-                                },
-                            )
-                        }
-                        GroupedListItem(position = GroupPosition.MIDDLE) {
-                            BackupFolderPickerItem(
-                                title = cloudFolderLabel,
-                                subtitle = stringResource(R.string.settings_cloud_backup_folder_hint),
-                                onClick = {
-                                    cloudBackupDocumentLauncher.launch("filepipe_cloud_backup.json")
-                                },
-                                onLongClick = {
-                                    if (preferences.cloudExportFolderUri.isNotBlank()) {
-                                        viewModel.setCloudExportFolderUri("")
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                message = resources.getString(R.string.settings_cloud_backup_file_cleared),
-                                                duration = SnackbarDuration.Short,
-                                            )
-                                        }
-                                    }
-                                },
-                            )
-                        }
-                        GroupedListItem(position = GroupPosition.MIDDLE) {
-                            SettingsToggleItem(
-                                title = stringResource(R.string.settings_auto_export_on_change),
-                                subtitle = stringResource(R.string.settings_auto_export_on_change_hint),
-                                checked = preferences.autoExportOnRuleChange,
-                                switchEnabled = autoExportSwitchEnabled,
-                                onDisabledInteraction = {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            message = resources.getString(R.string.settings_export_select_folder_first),
-                                            duration = SnackbarDuration.Short,
-                                        )
-                                    }
-                                },
-                                onCheckedChange = viewModel::setAutoExportOnChange,
-                            )
-                        }
-                        GroupedListItem(position = GroupPosition.MIDDLE) {
-                            SettingsToggleItem(
-                                title = stringResource(R.string.settings_scheduled_export),
-                                subtitle = stringResource(R.string.settings_scheduled_export_hint),
-                                checked = preferences.scheduledExportEnabled,
-                                switchEnabled = scheduledExportSwitchEnabled,
-                                onDisabledInteraction = {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            message = resources.getString(R.string.settings_export_select_folder_first),
-                                            duration = SnackbarDuration.Short,
-                                        )
-                                    }
-                                },
-                                onCheckedChange = viewModel::setScheduledExportEnabled,
-                            )
-                        }
-                        GroupedListItem(position = GroupPosition.LAST) {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    FilePipeOutlinedButton(
-                                        onClick = {
-                                            pendingBackupPickAction = BackupImportPickAction.ImportMerge
-                                            importLauncher.launch("application/json")
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                    ) {
-                                        Text(stringResource(R.string.settings_import_rules))
-                                    }
-                                    FilePipeOutlinedButton(
-                                        onClick = {
-                                            if (exportFolderReady) {
-                                                viewModel.exportToConfiguredBackupFolders()
-                                            } else {
-                                                coroutineScope.launch {
-                                                    snackbarHostState.showSnackbar(
-                                                        message = resources.getString(R.string.settings_export_select_folder_first),
-                                                        duration = SnackbarDuration.Short,
-                                                    )
-                                                }
+                        GroupedListColumn {
+                            GroupedListItem(position = GroupPosition.FIRST) {
+                                BackupFolderPickerItem(
+                                    title = localFolderLabel,
+                                    subtitle = stringResource(R.string.settings_local_backup_folder_hint),
+                                    onClick = {
+                                        pendingBackupFolderTarget = BackupFolderTarget.Local
+                                        folderLauncher.launch(null)
+                                    },
+                                    onLongClick = {
+                                        if (preferences.exportFolderUri.isNotBlank()) {
+                                            viewModel.setExportFolderUri("")
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = resources.getString(R.string.settings_local_backup_folder_cleared),
+                                                    duration = SnackbarDuration.Short,
+                                                )
                                             }
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                    ) {
-                                        Text(stringResource(R.string.settings_export_now))
-                                    }
-                                }
-                                val restoreOutline = MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
-                                val restoreLabelColor = MaterialTheme.colorScheme.error
-                                val restoreButtonShape = ButtonDefaults.outlinedShape
-                                Box(
+                                        }
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                BackupFolderPickerItem(
+                                    title = cloudFolderLabel,
+                                    subtitle = stringResource(R.string.settings_cloud_backup_folder_hint),
+                                    onClick = {
+                                        cloudBackupDocumentLauncher.launch("filepipe_cloud_backup.json")
+                                    },
+                                    onLongClick = {
+                                        if (preferences.cloudExportFolderUri.isNotBlank()) {
+                                            viewModel.setCloudExportFolderUri("")
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = resources.getString(R.string.settings_cloud_backup_file_cleared),
+                                                    duration = SnackbarDuration.Short,
+                                                )
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                SettingsToggleItem(
+                                    title = stringResource(R.string.settings_auto_export_on_change),
+                                    subtitle = stringResource(R.string.settings_auto_export_on_change_hint),
+                                    checked = preferences.autoExportOnRuleChange,
+                                    switchEnabled = autoExportSwitchEnabled,
+                                    onDisabledInteraction = {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = resources.getString(R.string.settings_export_select_folder_first),
+                                                duration = SnackbarDuration.Short,
+                                            )
+                                        }
+                                    },
+                                    onCheckedChange = viewModel::setAutoExportOnChange,
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                SettingsToggleItem(
+                                    title = stringResource(R.string.settings_scheduled_export),
+                                    subtitle = stringResource(R.string.settings_scheduled_export_hint),
+                                    checked = preferences.scheduledExportEnabled,
+                                    switchEnabled = scheduledExportSwitchEnabled,
+                                    onDisabledInteraction = {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = resources.getString(R.string.settings_export_select_folder_first),
+                                                duration = SnackbarDuration.Short,
+                                            )
+                                        }
+                                    },
+                                    onCheckedChange = viewModel::setScheduledExportEnabled,
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.LAST) {
+                                Column(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .height(40.dp)
-                                            .clip(restoreButtonShape)
-                                            .border(BorderStroke(1.dp, restoreOutline), restoreButtonShape),
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .matchParentSize()
-                                                .tapSoundClickable {
-                                                    pendingBackupPickAction = BackupImportPickAction.RestoreFull
-                                                    importLauncher.launch("application/json")
-                                                },
-                                        contentAlignment = Alignment.Center,
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
                                     ) {
-                                        Text(
-                                            text = stringResource(R.string.settings_restore_backup),
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color = restoreLabelColor,
-                                        )
+                                        FilePipeOutlinedButton(
+                                            onClick = {
+                                                pendingBackupPickAction = BackupImportPickAction.ImportMerge
+                                                importLauncher.launch("application/json")
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            Text(stringResource(R.string.settings_import_rules))
+                                        }
+                                        FilePipeOutlinedButton(
+                                            onClick = {
+                                                if (exportFolderReady) {
+                                                    viewModel.exportToConfiguredBackupFolders()
+                                                } else {
+                                                    coroutineScope.launch {
+                                                        snackbarHostState.showSnackbar(
+                                                            message = resources.getString(R.string.settings_export_select_folder_first),
+                                                            duration = SnackbarDuration.Short,
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            Text(stringResource(R.string.settings_export_now))
+                                        }
                                     }
+                                    val restoreOutline = MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
+                                    val restoreLabelColor = MaterialTheme.colorScheme.error
+                                    val restoreButtonShape = ButtonDefaults.outlinedShape
                                     Box(
                                         modifier =
                                             Modifier
-                                                .align(Alignment.CenterEnd)
-                                                .fillMaxHeight()
-                                                .width(40.dp),
-                                        contentAlignment = Alignment.Center,
+                                                .fillMaxWidth()
+                                                .height(40.dp)
+                                                .clip(restoreButtonShape)
+                                                .border(BorderStroke(1.dp, restoreOutline), restoreButtonShape),
                                     ) {
-                                        SettingsInfoDropdown(
-                                            title = stringResource(R.string.settings_backup_import_restore_help_title),
-                                            tipText = stringResource(R.string.settings_backup_import_restore_help_body),
-                                            contentDescription = stringResource(R.string.settings_backup_help_icon_cd),
-                                            iconTint = restoreLabelColor.copy(alpha = 0.75f),
-                                        )
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .matchParentSize()
+                                                    .tapSoundClickable {
+                                                        pendingBackupPickAction = BackupImportPickAction.RestoreFull
+                                                        importLauncher.launch("application/json")
+                                                    },
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.settings_restore_backup),
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color = restoreLabelColor,
+                                            )
+                                        }
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .align(Alignment.CenterEnd)
+                                                    .fillMaxHeight()
+                                                    .width(40.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            SettingsInfoDropdown(
+                                                title = stringResource(R.string.settings_backup_import_restore_help_title),
+                                                tipText = stringResource(R.string.settings_backup_import_restore_help_body),
+                                                contentDescription = stringResource(R.string.settings_backup_help_icon_cd),
+                                                iconTint = restoreLabelColor.copy(alpha = 0.75f),
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1364,15 +1565,17 @@ fun SettingsScreen(
             }
 
             // ── Updates (GitHub APK or Play in-app updates by flavor) ─────────
-            if (BuildConfig.SHOW_UPDATES) {
+            if (BuildConfig.SHOW_UPDATES && shouldRenderSection(SettingsSectionKey.Updates)) {
                 item {
                     Column {
                         SettingsExpandableSection(
-                            sectionKey = "updates",
-                            iconName = "system_update",
+                            sectionKey = SettingsSectionKey.Updates.routeKey,
+                            iconName = SettingsSectionKey.Updates.iconName,
                             title = stringResource(R.string.settings_updates_section),
                             collapsedSectionKeys = collapsedSettingsSectionKeys,
                             onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                            showHeader = showSectionHeaders,
+                            forceExpanded = forceExpandedSections,
                         ) {
                             GroupedListColumn {
                                 GroupedListItem(position = GroupPosition.FIRST) {
@@ -1484,7 +1687,7 @@ fun SettingsScreen(
                 }
             }
 
-            if (developerOptionsEnabled) {
+            if (developerOptionsEnabled && selectedSectionKey == null) {
                 item {
                     SettingsStandaloneNavigationRow(
                         iconName = "developer_board",
@@ -1495,277 +1698,212 @@ fun SettingsScreen(
             }
 
             // ── About ─────────────────────────────────────────────────────────
-            item {
-                val aboutContext = LocalContext.current
-                val aboutResources = LocalResources.current
-                val githubRepoForSourceLink =
-                    BuildConfig.GITHUB_REPO
-                        .trim()
-                        .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
-                val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
-                val buildFlavorLabel =
-                    when (BuildConfig.FLAVOR) {
-                        "github" -> stringResource(R.string.build_flavor_github)
-                        "playstore" -> stringResource(R.string.build_flavor_playstore)
-                        else -> BuildConfig.FLAVOR
-                    }
-                val buildTypeLabel =
-                    when (BuildConfig.BUILD_TYPE) {
-                        "debug" -> stringResource(R.string.build_type_debug)
-                        "devRelease" -> stringResource(R.string.build_type_dev_release)
-                        "release" -> stringResource(R.string.build_type_release)
-                        else -> BuildConfig.BUILD_TYPE
-                    }
-                val buildVariantToastText = stringResource(R.string.about_build_variant_format, buildFlavorLabel, buildTypeLabel)
-                val developerOptionsUnlockedToast = stringResource(R.string.settings_developer_options_unlocked)
-                val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
-                val diagnosticsTooltip = stringResource(R.string.settings_share_diagnostics)
-                val aboutLinkCopiedToast = stringResource(R.string.toast_about_link_copied)
-                val authorGithubProfileUrl = stringResource(R.string.about_author_github_profile_url)
-                val shareDiagnostics =
-                    rememberDiagnosticsShareAction(
-                        context = aboutContext,
-                        chooserTitle = diagnosticsChooserTitle,
-                        preferences = preferences,
-                    )
-                val copyAboutLinkToClipboard =
-                    remember(aboutContext, aboutLinkCopiedToast) {
-                        { url: String ->
-                            val clipboard =
-                                aboutContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("link", url))
-                            Toast
-                                .makeText(
-                                    aboutContext,
-                                    aboutLinkCopiedToast,
-                                    Toast.LENGTH_SHORT,
-                                ).show()
+            if (shouldRenderSection(SettingsSectionKey.About)) {
+                item {
+                    val aboutContext = LocalContext.current
+                    val aboutResources = LocalResources.current
+                    val githubRepoForSourceLink =
+                        BuildConfig.GITHUB_REPO
+                            .trim()
+                            .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
+                    val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
+                    val buildFlavorLabel =
+                        when (BuildConfig.FLAVOR) {
+                            "github" -> stringResource(R.string.build_flavor_github)
+                            "playstore" -> stringResource(R.string.build_flavor_playstore)
+                            else -> BuildConfig.FLAVOR
                         }
-                    }
-                var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
-                var developerOptionsTapCount by rememberSaveable { mutableIntStateOf(0) }
-                Column(modifier = Modifier.padding(top = if (developerOptionsEnabled) 0.dp else 24.dp)) {
-                    SettingsSectionHeader(
-                        iconName = "info",
-                        title = stringResource(R.string.settings_about_section),
-                    ) {
-                        FilePipeIconButton(
-                            onClick = shareDiagnostics,
-                            modifier = Modifier.size(40.dp),
-                            tooltipLabel = diagnosticsTooltip,
-                        ) {
-                            FilePipeMaterialRoundedSymbol(
-                                name = "bug_report",
-                                contentDescription = diagnosticsTooltip,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
+                    val buildTypeLabel =
+                        when (BuildConfig.BUILD_TYPE) {
+                            "debug" -> stringResource(R.string.build_type_debug)
+                            "devRelease" -> stringResource(R.string.build_type_dev_release)
+                            "release" -> stringResource(R.string.build_type_release)
+                            else -> BuildConfig.BUILD_TYPE
                         }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    GroupedListColumn {
-                        GroupedListItem(position = GroupPosition.ONLY) {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 20.dp)
-                                        .padding(top = 24.dp, bottom = 8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
+                    val buildVariantToastText = stringResource(R.string.about_build_variant_format, buildFlavorLabel, buildTypeLabel)
+                    val developerOptionsUnlockedToast = stringResource(R.string.settings_developer_options_unlocked)
+                    val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
+                    val diagnosticsTooltip = stringResource(R.string.settings_share_diagnostics)
+                    val aboutLinkCopiedToast = stringResource(R.string.toast_about_link_copied)
+                    val authorGithubProfileUrl = stringResource(R.string.about_author_github_profile_url)
+                    val shareDiagnostics =
+                        rememberDiagnosticsShareAction(
+                            context = aboutContext,
+                            chooserTitle = diagnosticsChooserTitle,
+                            preferences = preferences,
+                        )
+                    val copyAboutLinkToClipboard =
+                        remember(aboutContext, aboutLinkCopiedToast) {
+                            { url: String ->
+                                val clipboard =
+                                    aboutContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("link", url))
+                                Toast
+                                    .makeText(
+                                        aboutContext,
+                                        aboutLinkCopiedToast,
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            }
+                        }
+                    var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
+                    var developerOptionsTapCount by rememberSaveable { mutableIntStateOf(0) }
+                    Column(modifier = Modifier.padding(top = if (developerOptionsEnabled) 0.dp else 24.dp)) {
+                        if (showSectionHeaders) {
+                            SettingsSectionHeader(
+                                iconName = SettingsSectionKey.About.iconName,
+                                title = stringResource(R.string.settings_about_section),
                             ) {
-                                Text(
-                                    text =
-                                        stringResource(
-                                            R.string.app_version_format,
-                                            stringResource(R.string.app_name),
-                                            BuildConfig.VERSION_NAME,
-                                        ),
-                                    modifier =
-                                        Modifier.combinedClickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
-                                            onClick = {
-                                                if (developerOptionsEnabled) {
-                                                    onOpenDevOptions()
-                                                    return@combinedClickable
-                                                }
-                                                developerOptionsTapCount += 1
-                                                val remaining = DEVELOPER_OPTIONS_UNLOCK_TAPS - developerOptionsTapCount
-                                                if (remaining > 0) {
-                                                    Toast
-                                                        .makeText(
-                                                            aboutContext,
-                                                            aboutResources.getQuantityString(
-                                                                R.plurals.settings_developer_options_taps_remaining,
-                                                                remaining,
-                                                                remaining,
-                                                            ),
-                                                            Toast.LENGTH_SHORT,
-                                                        ).show()
-                                                } else {
-                                                    developerOptionsTapCount = 0
-                                                    viewModel.setDeveloperOptionsEnabled(true)
-                                                    Toast
-                                                        .makeText(
-                                                            aboutContext,
-                                                            developerOptionsUnlockedToast,
-                                                            Toast.LENGTH_SHORT,
-                                                        ).show()
-                                                    onOpenDevOptions()
-                                                }
-                                            },
-                                            onLongClick = {
-                                                Toast
-                                                    .makeText(aboutContext, buildVariantToastText, Toast.LENGTH_SHORT)
-                                                    .show()
-                                            },
-                                        ),
-                                    style = MaterialTheme.typography.displaySmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Spacer(Modifier.height(10.dp))
-                                Text(
-                                    text = stringResource(R.string.app_tagline),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center,
-                                )
-                                Spacer(Modifier.height(20.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically,
+                                FilePipeIconButton(
+                                    onClick = shareDiagnostics,
+                                    modifier = Modifier.size(40.dp),
+                                    tooltipLabel = diagnosticsTooltip,
                                 ) {
-                                    AppIconImage(
-                                        modifier =
-                                            Modifier
-                                                .size(84.dp)
-                                                .clip(RoundedCornerShape(percent = 25))
-                                                .tapSoundClickable(onClick = onOpenIntro),
-                                    )
-                                    Spacer(Modifier.width(20.dp))
-                                    AboutAuthorPhoto(
-                                        modifier =
-                                            Modifier
-                                                .size(84.dp)
-                                                .clip(RoundedCornerShape(16.dp))
-                                                .tapSoundClickable {
-                                                    runCatching {
-                                                        aboutContext.startActivity(
-                                                            Intent(Intent.ACTION_VIEW, authorGithubProfileUrl.toUri()),
-                                                        )
-                                                    }
-                                                },
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "bug_report",
+                                        contentDescription = diagnosticsTooltip,
+                                        tint = MaterialTheme.colorScheme.primary,
                                     )
                                 }
-                                Spacer(Modifier.height(20.dp))
-                                Text(
-                                    text = stringResource(R.string.settings_byline),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    textAlign = TextAlign.Center,
-                                )
-                                Spacer(Modifier.height(24.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically,
+                            }
+                            Spacer(Modifier.height(8.dp))
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                FilePipeIconButton(
+                                    onClick = shareDiagnostics,
+                                    modifier = Modifier.size(40.dp),
+                                    tooltipLabel = diagnosticsTooltip,
                                 ) {
-                                    val hostActivity = context as? ComponentActivity
-                                    val aboutPillShape = pillShape
-                                    if (BuildConfig.FLAVOR == "github") {
-                                        Surface(
-                                            shape = aboutPillShape,
-                                            color = Color.Transparent,
-                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "bug_report",
+                                        contentDescription = diagnosticsTooltip,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                        }
+                        GroupedListColumn {
+                            GroupedListItem(position = GroupPosition.ONLY) {
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 20.dp)
+                                            .padding(top = 24.dp, bottom = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Text(
+                                        text =
+                                            stringResource(
+                                                R.string.app_version_format,
+                                                stringResource(R.string.app_name),
+                                                BuildConfig.VERSION_NAME,
+                                            ),
+                                        modifier =
+                                            Modifier.combinedClickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = {
+                                                    if (developerOptionsEnabled) {
+                                                        onOpenDevOptions()
+                                                        return@combinedClickable
+                                                    }
+                                                    developerOptionsTapCount += 1
+                                                    val remaining = DEVELOPER_OPTIONS_UNLOCK_TAPS - developerOptionsTapCount
+                                                    if (remaining > 0) {
+                                                        Toast
+                                                            .makeText(
+                                                                aboutContext,
+                                                                aboutResources.getQuantityString(
+                                                                    R.plurals.settings_developer_options_taps_remaining,
+                                                                    remaining,
+                                                                    remaining,
+                                                                ),
+                                                                Toast.LENGTH_SHORT,
+                                                            ).show()
+                                                    } else {
+                                                        developerOptionsTapCount = 0
+                                                        viewModel.setDeveloperOptionsEnabled(true)
+                                                        Toast
+                                                            .makeText(
+                                                                aboutContext,
+                                                                developerOptionsUnlockedToast,
+                                                                Toast.LENGTH_SHORT,
+                                                            ).show()
+                                                        onOpenDevOptions()
+                                                    }
+                                                },
+                                                onLongClick = {
+                                                    Toast
+                                                        .makeText(aboutContext, buildVariantToastText, Toast.LENGTH_SHORT)
+                                                        .show()
+                                                },
+                                            ),
+                                        style = MaterialTheme.typography.displaySmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Spacer(Modifier.height(10.dp))
+                                    Text(
+                                        text = stringResource(R.string.app_tagline),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                    Spacer(Modifier.height(20.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        AppIconImage(
                                             modifier =
                                                 Modifier
-                                                    .clip(aboutPillShape)
-                                                    .tapSoundCombinedClickable(
-                                                        onClick = {
-                                                            runCatching {
-                                                                aboutContext.startActivity(
-                                                                    Intent(
-                                                                        Intent.ACTION_VIEW,
-                                                                        playStoreListingUrl.toUri(),
-                                                                    ),
-                                                                )
-                                                            }
-                                                        },
-                                                        onLongClick = {
-                                                            copyAboutLinkToClipboard(playStoreListingUrl)
-                                                        },
-                                                        role = Role.Button,
-                                                    ),
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(ButtonDefaults.ContentPadding),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.Center,
-                                            ) {
-                                                AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primary)
-                                                Spacer(Modifier.width(8.dp))
-                                                Text(
-                                                    text = stringResource(R.string.settings_rate_on_play_store),
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                )
-                                            }
-                                        }
-                                        if (githubRepoForSourceLink.isNotEmpty()) {
-                                            Spacer(Modifier.width(12.dp))
+                                                    .size(84.dp)
+                                                    .clip(RoundedCornerShape(percent = 25))
+                                                    .tapSoundClickable(onClick = onOpenIntro),
+                                        )
+                                        Spacer(Modifier.width(20.dp))
+                                        AboutAuthorPhoto(
+                                            modifier =
+                                                Modifier
+                                                    .size(84.dp)
+                                                    .clip(RoundedCornerShape(16.dp))
+                                                    .tapSoundClickable {
+                                                        runCatching {
+                                                            aboutContext.startActivity(
+                                                                Intent(Intent.ACTION_VIEW, authorGithubProfileUrl.toUri()),
+                                                            )
+                                                        }
+                                                    },
+                                        )
+                                    }
+                                    Spacer(Modifier.height(20.dp))
+                                    Text(
+                                        text = stringResource(R.string.settings_byline),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                    Spacer(Modifier.height(24.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        val hostActivity = context as? ComponentActivity
+                                        val aboutPillShape = pillShape
+                                        if (BuildConfig.FLAVOR == "github") {
                                             Surface(
                                                 shape = aboutPillShape,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                                                modifier =
-                                                    Modifier
-                                                        .clip(aboutPillShape)
-                                                        .tapSoundCombinedClickable(
-                                                            onClick = {
-                                                                val repoUrl = "https://github.com/$githubRepoForSourceLink"
-                                                                runCatching {
-                                                                    aboutContext.startActivity(
-                                                                        Intent(Intent.ACTION_VIEW, repoUrl.toUri()),
-                                                                    )
-                                                                }
-                                                            },
-                                                            onLongClick = {
-                                                                copyAboutLinkToClipboard(
-                                                                    "https://github.com/$githubRepoForSourceLink",
-                                                                )
-                                                            },
-                                                            role = Role.Button,
-                                                        ),
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(ButtonDefaults.ContentPadding),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.Center,
-                                                ) {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.ic_github_mark),
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(20.dp),
-                                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                                    )
-                                                    Spacer(Modifier.width(8.dp))
-                                                    Text(
-                                                        text = stringResource(R.string.settings_star_on_github),
-                                                        style = MaterialTheme.typography.labelLarge,
-                                                        color = MaterialTheme.colorScheme.onPrimary,
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        if (playStoreAboutUsesListingOnly) {
-                                            Surface(
-                                                shape = aboutPillShape,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                                color = Color.Transparent,
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                                                 modifier =
                                                     Modifier
                                                         .clip(aboutPillShape)
@@ -1791,107 +1929,194 @@ fun SettingsScreen(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.Center,
                                                 ) {
-                                                    AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primaryContainer)
+                                                    AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primary)
                                                     Spacer(Modifier.width(8.dp))
                                                     Text(
                                                         text = stringResource(R.string.settings_rate_on_play_store),
-                                                        style = MaterialTheme.typography.labelLarge,
-                                                        color = MaterialTheme.colorScheme.onPrimary,
-                                                    )
-                                                }
-                                            }
-                                        } else {
-                                            Surface(
-                                                shape = aboutPillShape,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                                                modifier =
-                                                    Modifier
-                                                        .clip(aboutPillShape)
-                                                        .tapSoundCombinedClickable(
-                                                            onClick = {
-                                                                if (hostActivity != null) {
-                                                                    viewModel.launchPlayInAppReviewFromSettings(
-                                                                        hostActivity,
-                                                                    ) {
-                                                                        playStoreAboutUsesListingOnly = true
-                                                                    }
-                                                                }
-                                                            },
-                                                            onLongClick = {
-                                                                copyAboutLinkToClipboard(playStoreListingUrl)
-                                                            },
-                                                            role = Role.Button,
-                                                        ),
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(ButtonDefaults.ContentPadding),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.Center,
-                                                ) {
-                                                    AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primaryContainer)
-                                                    Spacer(Modifier.width(8.dp))
-                                                    Text(
-                                                        text = stringResource(R.string.settings_rate_on_play_store),
-                                                        style = MaterialTheme.typography.labelLarge,
-                                                        color = MaterialTheme.colorScheme.onPrimary,
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        if (githubRepoForSourceLink.isNotEmpty()) {
-                                            Spacer(Modifier.width(12.dp))
-                                            Surface(
-                                                shape = aboutPillShape,
-                                                color = Color.Transparent,
-                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                                                modifier =
-                                                    Modifier
-                                                        .clip(aboutPillShape)
-                                                        .tapSoundCombinedClickable(
-                                                            onClick = {
-                                                                val repoUrl = "https://github.com/$githubRepoForSourceLink"
-                                                                runCatching {
-                                                                    aboutContext.startActivity(
-                                                                        Intent(Intent.ACTION_VIEW, repoUrl.toUri()),
-                                                                    )
-                                                                }
-                                                            },
-                                                            onLongClick = {
-                                                                copyAboutLinkToClipboard(
-                                                                    "https://github.com/$githubRepoForSourceLink",
-                                                                )
-                                                            },
-                                                            role = Role.Button,
-                                                        ),
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(ButtonDefaults.ContentPadding),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.Center,
-                                                ) {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.ic_github_mark),
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(20.dp),
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                    )
-                                                    Spacer(Modifier.width(8.dp))
-                                                    Text(
-                                                        text = stringResource(R.string.settings_star_on_github),
                                                         style = MaterialTheme.typography.labelLarge,
                                                         color = MaterialTheme.colorScheme.primary,
                                                     )
                                                 }
                                             }
+                                            if (githubRepoForSourceLink.isNotEmpty()) {
+                                                Spacer(Modifier.width(12.dp))
+                                                Surface(
+                                                    shape = aboutPillShape,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                                    modifier =
+                                                        Modifier
+                                                            .clip(aboutPillShape)
+                                                            .tapSoundCombinedClickable(
+                                                                onClick = {
+                                                                    val repoUrl = "https://github.com/$githubRepoForSourceLink"
+                                                                    runCatching {
+                                                                        aboutContext.startActivity(
+                                                                            Intent(Intent.ACTION_VIEW, repoUrl.toUri()),
+                                                                        )
+                                                                    }
+                                                                },
+                                                                onLongClick = {
+                                                                    copyAboutLinkToClipboard(
+                                                                        "https://github.com/$githubRepoForSourceLink",
+                                                                    )
+                                                                },
+                                                                role = Role.Button,
+                                                            ),
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.Center,
+                                                    ) {
+                                                        Icon(
+                                                            painter = painterResource(R.drawable.ic_github_mark),
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(20.dp),
+                                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                                        )
+                                                        Spacer(Modifier.width(8.dp))
+                                                        Text(
+                                                            text = stringResource(R.string.settings_star_on_github),
+                                                            style = MaterialTheme.typography.labelLarge,
+                                                            color = MaterialTheme.colorScheme.onPrimary,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            if (playStoreAboutUsesListingOnly) {
+                                                Surface(
+                                                    shape = aboutPillShape,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                                    modifier =
+                                                        Modifier
+                                                            .clip(aboutPillShape)
+                                                            .tapSoundCombinedClickable(
+                                                                onClick = {
+                                                                    runCatching {
+                                                                        aboutContext.startActivity(
+                                                                            Intent(
+                                                                                Intent.ACTION_VIEW,
+                                                                                playStoreListingUrl.toUri(),
+                                                                            ),
+                                                                        )
+                                                                    }
+                                                                },
+                                                                onLongClick = {
+                                                                    copyAboutLinkToClipboard(playStoreListingUrl)
+                                                                },
+                                                                role = Role.Button,
+                                                            ),
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.Center,
+                                                    ) {
+                                                        AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primaryContainer)
+                                                        Spacer(Modifier.width(8.dp))
+                                                        Text(
+                                                            text = stringResource(R.string.settings_rate_on_play_store),
+                                                            style = MaterialTheme.typography.labelLarge,
+                                                            color = MaterialTheme.colorScheme.onPrimary,
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                Surface(
+                                                    shape = aboutPillShape,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                                    modifier =
+                                                        Modifier
+                                                            .clip(aboutPillShape)
+                                                            .tapSoundCombinedClickable(
+                                                                onClick = {
+                                                                    if (hostActivity != null) {
+                                                                        viewModel.launchPlayInAppReviewFromSettings(
+                                                                            hostActivity,
+                                                                        ) {
+                                                                            playStoreAboutUsesListingOnly = true
+                                                                        }
+                                                                    }
+                                                                },
+                                                                onLongClick = {
+                                                                    copyAboutLinkToClipboard(playStoreListingUrl)
+                                                                },
+                                                                role = Role.Button,
+                                                            ),
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.Center,
+                                                    ) {
+                                                        AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primaryContainer)
+                                                        Spacer(Modifier.width(8.dp))
+                                                        Text(
+                                                            text = stringResource(R.string.settings_rate_on_play_store),
+                                                            style = MaterialTheme.typography.labelLarge,
+                                                            color = MaterialTheme.colorScheme.onPrimary,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            if (githubRepoForSourceLink.isNotEmpty()) {
+                                                Spacer(Modifier.width(12.dp))
+                                                Surface(
+                                                    shape = aboutPillShape,
+                                                    color = Color.Transparent,
+                                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                                    modifier =
+                                                        Modifier
+                                                            .clip(aboutPillShape)
+                                                            .tapSoundCombinedClickable(
+                                                                onClick = {
+                                                                    val repoUrl = "https://github.com/$githubRepoForSourceLink"
+                                                                    runCatching {
+                                                                        aboutContext.startActivity(
+                                                                            Intent(Intent.ACTION_VIEW, repoUrl.toUri()),
+                                                                        )
+                                                                    }
+                                                                },
+                                                                onLongClick = {
+                                                                    copyAboutLinkToClipboard(
+                                                                        "https://github.com/$githubRepoForSourceLink",
+                                                                    )
+                                                                },
+                                                                role = Role.Button,
+                                                            ),
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.Center,
+                                                    ) {
+                                                        Icon(
+                                                            painter = painterResource(R.drawable.ic_github_mark),
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(20.dp),
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                        )
+                                                        Spacer(Modifier.width(8.dp))
+                                                        Text(
+                                                            text = stringResource(R.string.settings_star_on_github),
+                                                            style = MaterialTheme.typography.labelLarge,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
+                                    Spacer(Modifier.height(24.dp))
+                                    AboutOtherAppsAndLinks(
+                                        context = aboutContext,
+                                        copyLinkToClipboard = copyAboutLinkToClipboard,
+                                    )
                                 }
-                                Spacer(Modifier.height(24.dp))
-                                AboutOtherAppsAndLinks(
-                                    context = aboutContext,
-                                    copyLinkToClipboard = copyAboutLinkToClipboard,
-                                )
                             }
                         }
                     }
@@ -2714,42 +2939,50 @@ private fun SettingsExpandableSection(
     collapsedSectionKeys: Set<String>,
     onCollapsedSectionKeysChange: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
+    showHeader: Boolean = true,
+    forceExpanded: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val collapsed = sectionKey in collapsedSectionKeys
+    val collapsed = !forceExpanded && sectionKey in collapsedSectionKeys
     val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<IntSize>())
     val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     Column(modifier = modifier) {
-        SettingsExpandableSectionHeader(
-            iconName = iconName,
-            title = title,
-            collapsed = collapsed,
-            onToggle = {
-                onCollapsedSectionKeysChange(
-                    if (collapsed) {
-                        collapsedSectionKeys - sectionKey
-                    } else {
-                        collapsedSectionKeys + sectionKey
-                    },
-                )
-            },
-        )
-        AnimatedVisibility(
-            visible = !collapsed,
-            enter =
-                expandVertically(
-                    animationSpec = spatialSpec,
-                    expandFrom = Alignment.Top,
-                ) + fadeIn(fadeInSpec),
-            exit =
-                shrinkVertically(
-                    animationSpec = spatialSpec,
-                    shrinkTowards = Alignment.Top,
-                ) + fadeOut(fadeOutSpec),
-        ) {
+        if (showHeader) {
+            SettingsExpandableSectionHeader(
+                iconName = iconName,
+                title = title,
+                collapsed = collapsed,
+                onToggle = {
+                    onCollapsedSectionKeysChange(
+                        if (collapsed) {
+                            collapsedSectionKeys - sectionKey
+                        } else {
+                            collapsedSectionKeys + sectionKey
+                        },
+                    )
+                },
+            )
+            AnimatedVisibility(
+                visible = !collapsed,
+                enter =
+                    expandVertically(
+                        animationSpec = spatialSpec,
+                        expandFrom = Alignment.Top,
+                    ) + fadeIn(fadeInSpec),
+                exit =
+                    shrinkVertically(
+                        animationSpec = spatialSpec,
+                        shrinkTowards = Alignment.Top,
+                    ) + fadeOut(fadeOutSpec),
+            ) {
+                Column {
+                    Spacer(Modifier.height(8.dp))
+                    content()
+                }
+            }
+        } else {
             Column {
-                Spacer(Modifier.height(8.dp))
                 content()
             }
         }
