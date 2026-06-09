@@ -1495,18 +1495,21 @@ fun RuleDetailScreen(
                     ) {
                         val schedule = state.schedule
                         if (schedule != null) {
-                            val isSystem24Hour = android.text.format.DateFormat.is24HourFormat(context)
-                            val timeStr = if (isSystem24Hour) {
-                                "%02d:%02d".format(schedule.hour, schedule.minute)
-                            } else {
-                                val hour12 =
-                                    when (val hourMod = schedule.hour % 12) {
-                                        0 -> 12
-                                        else -> hourMod
-                                    }
-                                val amPm = if (schedule.hour < 12) "AM" else "PM"
-                                "%d:%02d %s".format(hour12, schedule.minute, amPm)
-                            }
+                            val isSystem24Hour =
+                                android.text.format.DateFormat
+                                    .is24HourFormat(context)
+                            val timeStr =
+                                if (isSystem24Hour) {
+                                    "%02d:%02d".format(schedule.hour, schedule.minute)
+                                } else {
+                                    val hour12 =
+                                        when (val hourMod = schedule.hour % 12) {
+                                            0 -> 12
+                                            else -> hourMod
+                                        }
+                                    val amPm = if (schedule.hour < 12) "AM" else "PM"
+                                    "%d:%02d %s".format(hour12, schedule.minute, amPm)
+                                }
                             val scheduleText =
                                 when (schedule.type) {
                                     ScheduleType.DAILY -> {

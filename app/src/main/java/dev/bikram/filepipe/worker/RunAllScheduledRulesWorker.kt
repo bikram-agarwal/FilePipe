@@ -121,6 +121,7 @@ class RunAllScheduledRulesWorker
                         )
                     }
                 }
+                clearProgressNotification()
                 Result.success()
             } catch (e: CancellationException) {
                 throw e
@@ -328,6 +329,10 @@ class RunAllScheduledRulesWorker
             }
 
             notificationManager.notify(NOTIFICATION_ID, builder.build())
+        }
+
+        private fun clearProgressNotification() {
+            notificationManager.cancel(NOTIFICATION_ID)
         }
 
         private fun createForegroundInfo(ruleCount: Int): ForegroundInfo {

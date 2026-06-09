@@ -107,6 +107,7 @@ class FileOrganizerWorker
                         )
                     }
                     postSummaryNotification(rule.name, result.totalMoved, result.totalFailed, rule.operationMode, result.historyId, movedFileNames)
+                    clearProgressNotification()
                 }
                 Result.success()
             } catch (e: CancellationException) {
@@ -268,6 +269,10 @@ class FileOrganizerWorker
             }
 
             notificationManager.notify(progressNotificationId, builder.build())
+        }
+
+        private fun clearProgressNotification() {
+            notificationManager.cancel(progressNotificationId)
         }
 
         private fun createForegroundInfo(ruleName: String): ForegroundInfo {

@@ -205,11 +205,16 @@ fun StatusChip(
     }
 }
 
-fun formatTime(context: android.content.Context, millis: Long): String {
+fun formatTime(
+    context: android.content.Context,
+    millis: Long,
+): String {
     val now = System.currentTimeMillis()
     val diff = now - millis
     val locale = Locale.getDefault()
-    val isSystem24Hour = android.text.format.DateFormat.is24HourFormat(context)
+    val isSystem24Hour =
+        android.text.format.DateFormat
+            .is24HourFormat(context)
     val timePattern = if (isSystem24Hour) "HH:mm" else "h:mm a"
     val dateTimePattern = if (isSystem24Hour) "MMM d, HH:mm" else "MMM d, h:mm a"
     val pattern = if (diff < 24 * 60 * 60 * 1000L) timePattern else dateTimePattern
