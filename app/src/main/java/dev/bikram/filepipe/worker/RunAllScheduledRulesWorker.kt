@@ -121,7 +121,6 @@ class RunAllScheduledRulesWorker
                         )
                     }
                 }
-                clearProgressNotification()
                 Result.success()
             } catch (e: CancellationException) {
                 throw e
@@ -132,6 +131,8 @@ class RunAllScheduledRulesWorker
                     e,
                 )
                 if (runAttemptCount < 2) Result.retry() else Result.failure()
+            } finally {
+                clearProgressNotification()
             }
         }
 

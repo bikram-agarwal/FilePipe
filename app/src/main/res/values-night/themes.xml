@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Dark window background prevents a white flash between splash screen exit and Compose first draw. -->
+    <style name="Theme.FilePipe" parent="android:Theme.Material.NoActionBar">
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
     <style name="Theme.FilePipe.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#0B1E36</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>

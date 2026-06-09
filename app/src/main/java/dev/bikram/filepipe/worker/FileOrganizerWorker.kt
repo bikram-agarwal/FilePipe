@@ -107,7 +107,6 @@ class FileOrganizerWorker
                         )
                     }
                     postSummaryNotification(rule.name, result.totalMoved, result.totalFailed, rule.operationMode, result.historyId, movedFileNames)
-                    clearProgressNotification()
                 }
                 Result.success()
             } catch (e: CancellationException) {
@@ -119,6 +118,8 @@ class FileOrganizerWorker
                     e,
                 )
                 if (runAttemptCount < 2) Result.retry() else Result.failure()
+            } finally {
+                clearProgressNotification()
             }
         }
 

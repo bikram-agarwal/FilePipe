@@ -2,15 +2,15 @@ package dev.bikram.filepipe
 
 import android.content.Intent
 import android.os.Bundle
+import android.graphics.Color as AndroidColor
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -20,7 +20,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.filepipe.data.preferences.AppPreferences
-import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.shortcuts.AppShortcutsManager
@@ -52,7 +51,10 @@ class MainActivity : ComponentActivity() {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         splashScreen.setKeepOnScreenCondition { !isReady }
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+        )
         handleShortcutIntent(intent)
         handleOpenHistoryIntent(intent)
         handleOpenHistoryDetailIntent(intent)
@@ -69,18 +71,6 @@ class MainActivity : ComponentActivity() {
 
             if (preferencesState != null) {
                 isReady = true
-            }
-
-            SideEffect {
-                preferencesState?.let { prefs ->
-                    val nightMode =
-                        when (prefs.themeMode) {
-                            AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
-                            AppThemeMode.DARK, AppThemeMode.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
-                            AppThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-                        }
-                    AppCompatDelegate.setDefaultNightMode(nightMode)
-                }
             }
 
             val preferences = preferencesState ?: AppPreferences.DEFAULT

@@ -59,6 +59,13 @@
                 android:name="androidx.work.WorkManagerInitializer"
                 android:value="androidx.startup"
                 tools:node="remove" />
+            <!-- EmojiCompatInitializer can start a font-download foreground service when the
+                 process is created via BOOT_COMPLETED, which Android 15 prohibits for dataSync
+                 service types. System emoji (API 31+) covers all FilePipe needs. -->
+            <meta-data
+                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
         </provider>
 
         <receiver

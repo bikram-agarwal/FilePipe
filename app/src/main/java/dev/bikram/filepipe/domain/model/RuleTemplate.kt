@@ -52,7 +52,7 @@ data class RuleTemplate(
                 ),
                 RuleTemplate(
                     name = "Videos",
-                    extensions = listOf(".mp4", ".mov", ".mkv", ".avi"),
+                    extensions = listOf(".mp4", ".mov", ".mkv", ".avi", ".webm"),
                     suggestedIcon = RuleIcon.VIDEO,
                 ),
             )
