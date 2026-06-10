@@ -432,7 +432,16 @@ fun SettingsScreen(
     showTopBar: Boolean = true,
     showSectionHeaders: Boolean = true,
 ) {
-    val preferences by viewModel.preferencesFlow.collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
+    val preferencesOrNull by viewModel.preferencesState.collectAsStateWithLifecycle()
+    val preferences =
+        preferencesOrNull ?: run {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+            )
+            return
+        }
     val developerOptionsEnabled by viewModel.developerOptionsEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
@@ -479,7 +488,6 @@ fun SettingsScreen(
             Modifier.progressiveBlurScrollableList(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
         } ?: Modifier
 
-    var collapsedSettingsSectionKeys by rememberSaveable { mutableStateOf(emptySet<String>()) }
     val settingsExpandableSectionKeys =
         remember {
             buildSet {
@@ -492,6 +500,17 @@ fun SettingsScreen(
                 if (BuildConfig.SHOW_UPDATES) add("updates")
             }
         }
+    val collapsedSettingsSectionKeys =
+        remember(preferences.settingsCollapsedSectionKeys, settingsExpandableSectionKeys) {
+            preferences.settingsCollapsedSectionKeys
+                .filter { sectionKey -> sectionKey in settingsExpandableSectionKeys }
+                .toSet()
+        }
+
+    fun updateCollapsedSettingsSectionKeys(sectionKeys: Set<String>) {
+        viewModel.setSettingsCollapsedSectionKeys(sectionKeys.filter { sectionKey -> sectionKey in settingsExpandableSectionKeys })
+    }
+
     val allSettingsSectionsCollapsed =
         settingsExpandableSectionKeys.all { sectionKey ->
             sectionKey in collapsedSettingsSectionKeys
@@ -509,7 +528,7 @@ fun SettingsScreen(
                 else -> key
             }
         val wasCollapsed = settingsSectionKey in collapsedSettingsSectionKeys
-        collapsedSettingsSectionKeys = collapsedSettingsSectionKeys - settingsSectionKey
+        updateCollapsedSettingsSectionKeys(collapsedSettingsSectionKeys - settingsSectionKey)
         if (wasCollapsed) delay(SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS)
         val targetIndex =
             when (key) {
@@ -925,12 +944,13 @@ fun SettingsScreen(
                                 )
                             FilePipeFilledTonalIconButton(
                                 onClick = {
-                                    collapsedSettingsSectionKeys =
+                                    updateCollapsedSettingsSectionKeys(
                                         if (allSettingsSectionsCollapsed) {
                                             collapsedSettingsSectionKeys - settingsExpandableSectionKeys
                                         } else {
                                             collapsedSettingsSectionKeys + settingsExpandableSectionKeys
-                                        }
+                                        },
+                                    )
                                 },
                                 modifier = Modifier.semantics { contentDescription = expandCollapseAllLabel },
                             ) {
@@ -974,7 +994,7 @@ fun SettingsScreen(
                         iconName = SettingsSectionKey.Appearance.iconName,
                         title = stringResource(R.string.settings_appearance_section),
                         collapsedSectionKeys = collapsedSettingsSectionKeys,
-                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                        onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                         showHeader = showSectionHeaders,
                         forceExpanded = forceExpandedSections,
                     ) {
@@ -1031,7 +1051,7 @@ fun SettingsScreen(
                             iconName = SettingsSectionKey.FolderAccess.iconName,
                             title = stringResource(R.string.settings_folder_access_section),
                             collapsedSectionKeys = collapsedSettingsSectionKeys,
-                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                            onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                             showHeader = showSectionHeaders,
                             forceExpanded = forceExpandedSections,
                         ) {
@@ -1188,7 +1208,7 @@ fun SettingsScreen(
                             iconName = SettingsSectionKey.Schedule.iconName,
                             title = stringResource(R.string.settings_schedule_section),
                             collapsedSectionKeys = collapsedSettingsSectionKeys,
-                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                            onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                             showHeader = showSectionHeaders,
                             forceExpanded = forceExpandedSections,
                         ) {
@@ -1321,7 +1341,7 @@ fun SettingsScreen(
                         iconName = SettingsSectionKey.TouchSound.iconName,
                         title = stringResource(R.string.settings_touch_sound_section),
                         collapsedSectionKeys = collapsedSettingsSectionKeys,
-                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                        onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                         showHeader = showSectionHeaders,
                         forceExpanded = forceExpandedSections,
                     ) {
@@ -1348,7 +1368,7 @@ fun SettingsScreen(
                         iconName = SettingsSectionKey.SwipeActions.iconName,
                         title = stringResource(R.string.settings_swipe_gestures_section),
                         collapsedSectionKeys = collapsedSettingsSectionKeys,
-                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                        onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                         showHeader = showSectionHeaders,
                         forceExpanded = forceExpandedSections,
                     ) {
@@ -1376,7 +1396,7 @@ fun SettingsScreen(
                         iconName = SettingsSectionKey.Backup.iconName,
                         title = stringResource(R.string.settings_backup_section),
                         collapsedSectionKeys = collapsedSettingsSectionKeys,
-                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                        onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                         showHeader = showSectionHeaders,
                         forceExpanded = forceExpandedSections,
                     ) {
@@ -1573,7 +1593,7 @@ fun SettingsScreen(
                             iconName = SettingsSectionKey.Updates.iconName,
                             title = stringResource(R.string.settings_updates_section),
                             collapsedSectionKeys = collapsedSettingsSectionKeys,
-                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                            onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                             showHeader = showSectionHeaders,
                             forceExpanded = forceExpandedSections,
                         ) {
@@ -3432,7 +3452,7 @@ private fun LogRetentionDropdown(
 @Composable
 private fun swipeActionLabel(action: SwipeAction): String =
     when (action) {
-        SwipeAction.EDIT -> stringResource(R.string.action_edit)
+        SwipeAction.EDIT -> stringResource(R.string.action_expand_collapse)
         SwipeAction.DELETE -> stringResource(R.string.settings_swipe_action_trash)
         SwipeAction.DUPLICATE -> stringResource(R.string.action_duplicate)
         SwipeAction.PREVIEW -> stringResource(R.string.preview_title)

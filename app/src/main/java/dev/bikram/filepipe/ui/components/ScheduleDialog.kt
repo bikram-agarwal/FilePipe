@@ -363,7 +363,7 @@ private fun ScheduleTimePickerDialog(
                 tonalElevation = 6.dp,
                 modifier =
                     Modifier
-                        .widthIn(max = 400.dp)
+                        .widthIn(max = 560.dp)
                         .padding(16.dp),
             ) {
                 Column(

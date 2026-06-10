@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -63,6 +64,7 @@ import androidx.compose.material3.adaptive.layout.PaneExpansionAnchor
 import androidx.compose.material3.adaptive.layout.PaneExpansionState
 import androidx.compose.material3.adaptive.layout.PaneExpansionStateKey
 import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.rememberPaneExpansionState
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
@@ -73,7 +75,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -87,6 +88,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
@@ -116,8 +118,10 @@ import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFloatingActionButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
+import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyHistoryIllustration
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyTrashIllustration
@@ -132,6 +136,7 @@ import dev.bikram.filepipe.ui.screens.onboarding.OnboardingPermissionsScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingRuleWizardScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingTitleScreen
 import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
+import dev.bikram.filepipe.ui.screens.rules.ManualRunCancelAnchor
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
 import dev.bikram.filepipe.ui.screens.rules.RulesViewModel
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
@@ -221,13 +226,16 @@ fun AppNavigation(
         bottomNavItems.any {
             currentDestination?.hierarchy?.any { destination -> destination.route == it.screen.route } == true
         }
+    val windowAdaptiveInfo = currentWindowAdaptiveInfo()
     val navigationSuiteType =
-        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
-    val listDetailPaneNavigator = rememberListDetailPaneScaffoldNavigator<Any>()
+        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
+    // Derive the pane directive directly instead of allocating a throwaway navigator (each
+    // two-pane route creates its own). Matches the navigator's default directive.
+    val paneScaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
     val canUseListDetailPanes = navigationSuiteType != NavigationSuiteType.NavigationBar
     val useListDetailPanes =
         canUseListDetailPanes &&
-            listDetailPaneNavigator.scaffoldDirective.maxHorizontalPartitions > 1
+            paneScaffoldDirective.maxHorizontalPartitions > 1
     val useNavigationSuiteScaffold = useListDetailPanes
     val showFloatingBottomBar = showBottomBar && !useNavigationSuiteScaffold
 
@@ -247,6 +255,13 @@ fun AppNavigation(
         currentDestination?.hierarchy?.any { destination ->
             destination.route == Screen.DevOptions.route
         } == true
+    val isOnboardingRoute =
+        currentDestination?.hierarchy?.any { destination ->
+            destination.route == Screen.OnboardingTitle.route ||
+                destination.route == Screen.OnboardingPermissions.route ||
+                destination.route == Screen.OnboardingRuleWizard.route
+        } == true
+    val showNavigationSuiteScaffold = useNavigationSuiteScaffold && !isOnboardingRoute
 
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -335,9 +350,18 @@ fun AppNavigation(
     val bottomBlurHeightDp =
         when {
             isFaqRoute -> 0.dp
+
+            // Two-pane (tablet/landscape) has no floating bottom bar to fade content under, so a
+            // tall bottom blur is purely decorative and was obscuring the bottom of detail-pane
+            // content. Fade only under the system navigation bar here.
+            useNavigationSuiteScaffold -> navBarInset
+
             showFloatingBottomBar -> scrimHeight
+
             showBottomBar -> navBarInset + 96.dp
+
             isRuleDetailRoute -> fullScreenBottomBlurRuleEdit
+
             else -> fullScreenBottomBlurShort
         }
     val primaryTabContentPadding =
@@ -1107,7 +1131,7 @@ fun AppNavigation(
                 )
             }
         }
-        if (useNavigationSuiteScaffold) {
+        if (showNavigationSuiteScaffold) {
             NavigationSuiteScaffold(
                 layoutType = navigationSuiteType,
                 containerColor = Color.Transparent,
@@ -1251,6 +1275,14 @@ private fun RulesTwoPaneRoute(
     var activeRuleId by rememberSaveable { mutableStateOf<Long?>(null) }
     var pendingSavedRuleId by rememberSaveable { mutableStateOf<Long?>(null) }
     var previousRuleIdBeforeNew by rememberSaveable { mutableStateOf<Long?>(null) }
+    var pendingDeleteSelected by remember { mutableStateOf(false) }
+
+    // The detail pane has no FAB, so the list-pane FAB clearance in contentPadding would be
+    // dead space here. Use a plain navigation-bar inset for detail-pane content instead.
+    val detailPaneContentPadding =
+        PaddingValues(
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
+        )
 
     fun showRuleInDetailPane(ruleId: Long) {
         if (ruleId == Screen.RuleDetail.NEW_RULE_ID && activeRuleId != Screen.RuleDetail.NEW_RULE_ID) {
@@ -1321,7 +1353,13 @@ private fun RulesTwoPaneRoute(
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    LaunchedEffect(uiState.selectedRuleIds) {
+        if (uiState.selectedRuleIds.isEmpty()) {
+            pendingDeleteSelected = false
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
         val balancedPaneExpansionState =
             rememberFlatScreenBalancedPaneExpansionState(
                 directive = navigator.scaffoldDirective,
@@ -1362,8 +1400,15 @@ private fun RulesTwoPaneRoute(
                                 } else {
                                     null
                                 },
+                            onActivateRuleForRunInDetailPane =
+                                if (showPaneSelectionState) {
+                                    { ruleId -> showRuleInDetailPane(ruleId) }
+                                } else {
+                                    null
+                                },
                             showPendingNewRuleInDetailPane =
                                 showPaneSelectionState && activeRuleId == Screen.RuleDetail.NEW_RULE_ID,
+                            showSelectionActionBar = false,
                             viewModel = viewModel,
                         )
                     }
@@ -1372,9 +1417,27 @@ private fun RulesTwoPaneRoute(
             detailPane = {
                 AnimatedPane {
                     val selectedRuleId = activeRuleId
-                    if (selectedRuleId == null) {
+                    if (uiState.selectedRuleIds.isNotEmpty()) {
+                        RulesSelectionActionPane(
+                            selectedCount = uiState.selectedRuleIds.size,
+                            totalRuleCount = uiState.rules.size,
+                            enabledSelectedCount =
+                                uiState.rules.count { rule ->
+                                    rule.id in uiState.selectedRuleIds && rule.isEnabled
+                                },
+                            isRunning = uiState.isRunning,
+                            showRunCancel = uiState.manualRunCancelAnchor == ManualRunCancelAnchor.RunSelectedBar,
+                            onSelectAll = viewModel::selectAll,
+                            onClearSelection = viewModel::clearSelection,
+                            onPreviewSelected = viewModel::startPreviewSelected,
+                            onDeleteSelected = { pendingDeleteSelected = true },
+                            onRunSelected = viewModel::runSelected,
+                            onCancelRun = viewModel::cancelManualRun,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else if (selectedRuleId == null) {
                         SettingsScreen(
-                            contentPadding = contentPadding,
+                            contentPadding = detailPaneContentPadding,
                             onOpenHelp = onOpenFaq,
                             viewModel = settingsViewModel,
                             selectedSectionKey = SettingsSectionKey.About,
@@ -1411,6 +1474,187 @@ private fun RulesTwoPaneRoute(
             },
             modifier = Modifier.fillMaxSize(),
             paneExpansionState = balancedPaneExpansionState,
+        )
+    }
+
+    if (pendingDeleteSelected) {
+        val count = uiState.selectedRuleIds.size
+        AlertDialog(
+            onDismissRequest = { pendingDeleteSelected = false },
+            title = {
+                Text(
+                    pluralStringResource(
+                        R.plurals.rules_move_to_trash_confirm_title,
+                        count,
+                        count,
+                    ),
+                )
+            },
+            text = { Text(stringResource(R.string.rules_move_to_trash_confirm_message)) },
+            confirmButton = {
+                FilePipeTextButton(onClick = {
+                    viewModel.deleteSelected()
+                    pendingDeleteSelected = false
+                }) {
+                    Text(
+                        text = stringResource(R.string.move_to_trash),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                FilePipeTextButton(onClick = {
+                    pendingDeleteSelected = false
+                }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun RulesSelectionActionPane(
+    selectedCount: Int,
+    totalRuleCount: Int,
+    enabledSelectedCount: Int,
+    isRunning: Boolean,
+    showRunCancel: Boolean,
+    onSelectAll: () -> Unit,
+    onClearSelection: () -> Unit,
+    onPreviewSelected: () -> Unit,
+    onDeleteSelected: () -> Unit,
+    onRunSelected: () -> Unit,
+    onCancelRun: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text =
+                    pluralStringResource(
+                        R.plurals.rules_selection_count,
+                        selectedCount,
+                        selectedCount,
+                    ),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+
+            if (showRunCancel) {
+                FilePipeOutlinedButton(
+                    onClick = onCancelRun,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "close",
+                        label = stringResource(R.string.cancel),
+                    )
+                }
+            } else {
+                FilePipeFilledTonalButton(
+                    onClick = onSelectAll,
+                    enabled = !isRunning && selectedCount < totalRuleCount,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "select_all",
+                        label = stringResource(R.string.run_select_all),
+                    )
+                }
+                FilePipeOutlinedButton(
+                    onClick = onClearSelection,
+                    enabled = !isRunning,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "close",
+                        label = stringResource(R.string.run_cancel_selection),
+                    )
+                }
+                FilePipeFilledTonalButton(
+                    onClick = onPreviewSelected,
+                    enabled = !isRunning,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "visibility",
+                        label = stringResource(R.string.preview_selected_rules),
+                    )
+                }
+                FilePipeButton(
+                    onClick = onRunSelected,
+                    enabled = !isRunning && enabledSelectedCount > 0,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "play_arrow",
+                        label = stringResource(R.string.run_button),
+                    )
+                }
+                FilePipeButton(
+                    onClick = onDeleteSelected,
+                    enabled = !isRunning,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "delete",
+                        label = stringResource(R.string.delete),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RulesSelectionActionContent(
+    iconName: String,
+    label: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilePipeMaterialRoundedSymbol(
+            name = iconName,
+            contentDescription = null,
+            size = 20.dp,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
         )
     }
 }
@@ -1478,7 +1722,7 @@ private fun HistoryTwoPaneRoute(
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize()) {
         val balancedPaneExpansionState =
             rememberFlatScreenBalancedPaneExpansionState(
                 directive = navigator.scaffoldDirective,
@@ -1556,6 +1800,14 @@ private fun SettingsTwoPaneRoute(
             top = statusBarPadding,
             bottom = contentPadding.calculateBottomPadding(),
         )
+    // The detail pane has no FAB/bottom bar, so the list-pane FAB clearance baked into
+    // contentPadding would just be dead space at the bottom. Use a plain navigation-bar
+    // inset (plus a little breathing room) instead.
+    val detailPaneContentPadding =
+        PaddingValues(
+            top = statusBarPadding,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
+        )
     val scope = rememberCoroutineScope()
     var selectedSectionKey by rememberSaveable { mutableStateOf(SettingsSectionKey.Appearance) }
     val showDetailNavigateBack = navigator.scaffoldDirective.maxHorizontalPartitions <= 1
@@ -1601,7 +1853,7 @@ private fun SettingsTwoPaneRoute(
         return
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize()) {
         val balancedPaneExpansionState =
             rememberFlatScreenBalancedPaneExpansionState(
                 directive = navigator.scaffoldDirective,
@@ -1627,14 +1879,14 @@ private fun SettingsTwoPaneRoute(
                 AnimatedPane {
                     if (selectedSectionKey == SettingsSectionKey.DeveloperOptions) {
                         DevOptionsScreen(
-                            contentPadding = paneContentPadding,
+                            contentPadding = detailPaneContentPadding,
                             onNavigateBack = { showSettingsSection(SettingsSectionKey.About) },
                             settingsViewModel = viewModel,
                             showNavigateBack = showDetailNavigateBack,
                         )
                     } else {
                         SettingsScreen(
-                            contentPadding = paneContentPadding,
+                            contentPadding = detailPaneContentPadding,
                             onOpenIntro = onOpenIntro,
                             onOpenFaqStorageSection = onOpenFaqStorageSection,
                             onOpenHelp = onOpenHelp,
@@ -1679,7 +1931,7 @@ private fun rememberFlatScreenBalancedPaneExpansionState(
             key = PaneExpansionStateKey.Default,
             anchors = paneExpansionAnchors,
         )
-    SideEffect {
+    LaunchedEffect(paneExpansionState, targetFirstPaneProportion) {
         if (targetFirstPaneProportion == null) {
             paneExpansionState.clear()
         } else {
@@ -1726,6 +1978,7 @@ private fun RuleDetailPaneHost(
                     onOpenFaq = onOpenFaq,
                     onSavedRule = onSavedRule,
                     showNavigateBack = showNavigateBack,
+                    allowInitialRuleNameFocus = false,
                 )
             }
         }

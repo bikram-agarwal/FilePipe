@@ -1,7 +1,7 @@
 package dev.bikram.filepipe.ui.screens.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -43,17 +45,8 @@ fun OnboardingRuleWizardScreen(
     onStartBlank: () -> Unit,
     onSkip: () -> Unit,
 ) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .systemBarsPadding(),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            Spacer(Modifier.height(28.dp))
-
+    val header: @Composable () -> Unit = {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = stringResource(R.string.onboarding_wizard_title),
                 style = MaterialTheme.typography.headlineSmall,
@@ -76,33 +69,12 @@ fun OnboardingRuleWizardScreen(
                         .padding(horizontal = 24.dp),
                 textAlign = TextAlign.Center,
             )
-            Spacer(Modifier.height(28.dp))
-
-            LazyColumn(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                itemsIndexed(RuleTemplate.ALL) { index, template ->
-                    TemplateCard(
-                        template = template,
-                        onUseTemplate = { onUseTemplate(index) },
-                    )
-                }
-                item {
-                    StartBlankCard(onStartBlank = onStartBlank)
-                }
-            }
         }
+    }
+
+    val actionButtons: @Composable () -> Unit = {
         Row(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -160,6 +132,84 @@ fun OnboardingRuleWizardScreen(
                         modifier = Modifier.size(24.dp),
                     )
                 }
+            }
+        }
+    }
+
+    BoxWithConstraints(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .systemBarsPadding(),
+    ) {
+        val templateColumns = if (maxWidth >= 600.dp) 2 else 1
+        if (maxHeight < 560.dp) {
+            // Short screens (e.g. landscape): scroll the header, templates and actions together.
+            // A pinned header/footer would overlap the grid, and the translucent action buttons
+            // would let template cards show through them.
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(templateColumns),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column {
+                        header()
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
+                itemsIndexed(RuleTemplate.ALL) { index, template ->
+                    TemplateCard(
+                        template = template,
+                        onUseTemplate = { onUseTemplate(index) },
+                    )
+                }
+                item {
+                    StartBlankCard(onStartBlank = onStartBlank)
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    OnboardingBottomActions(modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)) {
+                        actionButtons()
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Spacer(Modifier.height(28.dp))
+                header()
+                Spacer(Modifier.height(28.dp))
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(templateColumns),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    itemsIndexed(RuleTemplate.ALL) { index, template ->
+                        TemplateCard(
+                            template = template,
+                            onUseTemplate = { onUseTemplate(index) },
+                        )
+                    }
+                    item {
+                        StartBlankCard(onStartBlank = onStartBlank)
+                    }
+                }
+            }
+            OnboardingBottomActions(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 40.dp),
+            ) {
+                actionButtons()
             }
         }
     }

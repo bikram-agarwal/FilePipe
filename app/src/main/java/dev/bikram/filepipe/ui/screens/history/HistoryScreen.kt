@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -553,6 +555,8 @@ fun HistoryScreen(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .wrapContentWidth(Alignment.CenterHorizontally)
+                            .widthIn(max = 720.dp)
                             .then(scrollBlurModifier),
                     contentPadding =
                         PaddingValues(
@@ -600,6 +604,8 @@ fun HistoryScreen(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .wrapContentWidth(Alignment.CenterHorizontally)
+                            .widthIn(max = 720.dp)
                             .then(scrollBlurModifier),
                     contentPadding =
                         PaddingValues(
@@ -667,6 +673,8 @@ fun HistoryScreen(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .wrapContentWidth(Alignment.CenterHorizontally)
+                            .widthIn(max = 720.dp)
                             .then(scrollBlurModifier),
                     contentPadding =
                         PaddingValues(

@@ -1,21 +1,27 @@
-## v3.7.9 - Improved theming, better schedules
+## v3.8.0 - Landscape layouts, Improved theming, better schedules
 
 ### 🚀 New Features
 
+- Added a new two-panel and landscape layouts for phones, foldables and large tablets.
 - Added a Surface shading slider so you can fine-tune how much color tint appears in app backgrounds and surfaces.
 - Added separate custom color controls for primary, secondary, and tertiary theme colors.
 - Custom themes can now show and save multi-color accent palettes.
 
 ### ✨ Improved Features
 
+- Rules, History & Settings screens remember sort order and expanded/collapsed state after restart.
+- Those preferences are now included in backup and restore.
+- Tapping a rule card now opens it for editing. The `Edit` swipe action is replaced with `Expand / Collapse`.
+- Video templates now include `.webm`.
 - Play Store version now asks for alarm permission, so that scheduled rules can run more reliably.
   - GitHub version automatically gets exact alarm permission. 
 - Scheduled rules are restored after reboot, app update, time change, or timezone change.
+- Progress notifications are cleared when background rule runs finish.
 - App now follows system time format (12 hours / 24 hours)
 
-### 📦 Others
+### 🐛 Bug Fixes
 
-- For scheduled runs, the "Finishing" notification gets auto-dismissed so that each run doesn't cause 2 notifications. 
+- Fixed a possible Android 15 boot/startup issue related to EmojiCompat initialization.
 
 ---
 

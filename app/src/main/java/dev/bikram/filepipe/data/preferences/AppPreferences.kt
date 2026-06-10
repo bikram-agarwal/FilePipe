@@ -1,5 +1,8 @@
 package dev.bikram.filepipe.data.preferences
 
+import dev.bikram.filepipe.domain.model.HistorySortDirection
+import dev.bikram.filepipe.domain.model.HistorySortKey
+
 enum class SwipeAction {
     EDIT,
     DELETE,
@@ -10,7 +13,7 @@ enum class SwipeAction {
 
 fun SwipeAction.materialSymbolName(): String =
     when (this) {
-        SwipeAction.EDIT -> "edit"
+        SwipeAction.EDIT -> "unfold_more"
         SwipeAction.DELETE -> "delete"
         SwipeAction.DUPLICATE -> "content_copy"
         SwipeAction.PREVIEW -> "visibility"
@@ -32,6 +35,12 @@ data class AppPreferences(
     val logRetentionDays: Int = 30,
     val swipeStartToEnd: SwipeAction = SwipeAction.EDIT,
     val swipeEndToStart: SwipeAction = SwipeAction.DELETE,
+    val rulesSortKey: HistorySortKey = HistorySortKey.LAST_RAN,
+    val rulesSortDirection: HistorySortDirection = HistorySortDirection.DESCENDING,
+    val rulesCompactMode: Boolean = false,
+    val historySortKey: HistorySortKey = HistorySortKey.LAST_RAN,
+    val historySortDirection: HistorySortDirection = HistorySortDirection.DESCENDING,
+    val settingsCollapsedSectionKeys: List<String> = emptyList(),
     val bookmarkedFolders: List<String> = emptyList(),
     val hasSeenIntro: Boolean = false,
     val hapticFeedbackEnabled: Boolean = true,

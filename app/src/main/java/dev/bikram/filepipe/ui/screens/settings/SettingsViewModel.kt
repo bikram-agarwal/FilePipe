@@ -20,6 +20,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
+import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
@@ -60,6 +61,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -107,6 +109,10 @@ class SettingsViewModel
         private var devReleasePlayBannerMockSequenceJob: Job? = null
 
         val preferencesFlow = userPreferencesRepository.preferencesFlow
+        val preferencesState: StateFlow<AppPreferences?> =
+            preferencesFlow
+                .map<AppPreferences, AppPreferences?> { preferences -> preferences }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, null)
         val developerOptionsEnabledFlow = userPreferencesRepository.developerOptionsEnabledFlow
 
         private val _userMessage = MutableStateFlow<String?>(null)
@@ -257,6 +263,11 @@ class SettingsViewModel
         fun setThemePaletteStyle(style: ThemePaletteStyle) =
             viewModelScope.launch {
                 userPreferencesRepository.setThemePaletteStyle(style)
+            }
+
+        fun setSettingsCollapsedSectionKeys(sectionKeys: Collection<String>) =
+            viewModelScope.launch {
+                userPreferencesRepository.setSettingsCollapsedSectionKeys(sectionKeys)
             }
 
         fun setExportFolderUri(uriString: String) =

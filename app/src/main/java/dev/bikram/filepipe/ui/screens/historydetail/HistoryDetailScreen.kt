@@ -53,7 +53,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -185,24 +184,8 @@ fun HistoryDetailScreen(
                     .fillMaxSize()
                     .then(fullBleedBlurModifier),
         ) {
-            val scheme = MaterialTheme.colorScheme
-            if (LocalUseGradientBackground.current) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(scheme.surface)
-                        .background(
-                            Brush.verticalGradient(
-                                colorStops =
-                                    arrayOf(
-                                        0f to scheme.primaryContainer.copy(alpha = 0.45f),
-                                        0.55f to scheme.surface.copy(alpha = 0f),
-                                    ),
-                            ),
-                        ),
-                )
-            } else {
-                Box(Modifier.fillMaxSize().background(scheme.background))
+            if (!LocalUseGradientBackground.current) {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
             }
             LazyColumn(
                 state = listState,
@@ -212,7 +195,9 @@ fun HistoryDetailScreen(
                         start = 16.dp,
                         end = 16.dp,
                         top = topListPadding + 8.dp,
-                        bottom = 32.dp,
+                        // Clear the system nav bar + bottom blur band so the last row isn't
+                        // hidden behind the scrim (esp. in the two-pane detail pane).
+                        bottom = navBottom + 56.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {

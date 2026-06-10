@@ -14,6 +14,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.domain.export.SettingsBackupDto
+import dev.bikram.filepipe.domain.model.HistorySortDirection
+import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -57,6 +59,12 @@ private object PrefKeys {
     val LOG_RETENTION_DAYS = intPreferencesKey("log_retention_days")
     val SWIPE_START_TO_END = stringPreferencesKey("swipe_start_to_end")
     val SWIPE_END_TO_START = stringPreferencesKey("swipe_end_to_start")
+    val RULES_SORT_KEY = stringPreferencesKey("rules_sort_key")
+    val RULES_SORT_DIRECTION = stringPreferencesKey("rules_sort_direction")
+    val RULES_COMPACT_MODE = booleanPreferencesKey("rules_compact_mode")
+    val HISTORY_SORT_KEY = stringPreferencesKey("history_sort_key")
+    val HISTORY_SORT_DIRECTION = stringPreferencesKey("history_sort_direction")
+    val SETTINGS_COLLAPSED_SECTION_KEYS = stringPreferencesKey("settings_collapsed_section_keys")
     val BOOKMARKED_FOLDERS = stringPreferencesKey("bookmarked_folders")
     val HAS_SEEN_INTRO = booleanPreferencesKey("has_seen_intro")
     val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback_enabled")
@@ -197,6 +205,28 @@ class UserPreferencesRepository
                         prefs[PrefKeys.SWIPE_END_TO_START]
                             ?.let { runCatching { SwipeAction.valueOf(it) }.getOrNull() }
                             ?: SwipeAction.DELETE,
+                    rulesSortKey =
+                        prefs[PrefKeys.RULES_SORT_KEY]
+                            ?.let { runCatching { HistorySortKey.valueOf(it) }.getOrNull() }
+                            ?: HistorySortKey.LAST_RAN,
+                    rulesSortDirection =
+                        prefs[PrefKeys.RULES_SORT_DIRECTION]
+                            ?.let { runCatching { HistorySortDirection.valueOf(it) }.getOrNull() }
+                            ?: HistorySortDirection.DESCENDING,
+                    rulesCompactMode = prefs[PrefKeys.RULES_COMPACT_MODE] ?: false,
+                    historySortKey =
+                        prefs[PrefKeys.HISTORY_SORT_KEY]
+                            ?.let { runCatching { HistorySortKey.valueOf(it) }.getOrNull() }
+                            ?: HistorySortKey.LAST_RAN,
+                    historySortDirection =
+                        prefs[PrefKeys.HISTORY_SORT_DIRECTION]
+                            ?.let { runCatching { HistorySortDirection.valueOf(it) }.getOrNull() }
+                            ?: HistorySortDirection.DESCENDING,
+                    settingsCollapsedSectionKeys =
+                        prefs[PrefKeys.SETTINGS_COLLAPSED_SECTION_KEYS]
+                            ?.split("|")
+                            ?.filter { it.isNotBlank() }
+                            ?: emptyList(),
                     bookmarkedFolders =
                         prefs[PrefKeys.BOOKMARKED_FOLDERS]
                             ?.split("|")
@@ -280,6 +310,42 @@ class UserPreferencesRepository
 
         suspend fun setSwipeEndToStart(action: SwipeAction) {
             dataStore.edit { it[PrefKeys.SWIPE_END_TO_START] = action.name }
+        }
+
+        suspend fun setRulesSort(
+            key: HistorySortKey,
+            direction: HistorySortDirection,
+        ) {
+            dataStore.edit { prefs ->
+                prefs[PrefKeys.RULES_SORT_KEY] = key.name
+                prefs[PrefKeys.RULES_SORT_DIRECTION] = direction.name
+            }
+        }
+
+        suspend fun setRulesCompactMode(compact: Boolean) {
+            dataStore.edit { prefs ->
+                prefs[PrefKeys.RULES_COMPACT_MODE] = compact
+            }
+        }
+
+        suspend fun setHistorySort(
+            key: HistorySortKey,
+            direction: HistorySortDirection,
+        ) {
+            dataStore.edit { prefs ->
+                prefs[PrefKeys.HISTORY_SORT_KEY] = key.name
+                prefs[PrefKeys.HISTORY_SORT_DIRECTION] = direction.name
+            }
+        }
+
+        suspend fun setSettingsCollapsedSectionKeys(sectionKeys: Collection<String>) {
+            dataStore.edit { prefs ->
+                prefs[PrefKeys.SETTINGS_COLLAPSED_SECTION_KEYS] =
+                    sectionKeys
+                        .filter { it.isNotBlank() }
+                        .distinct()
+                        .joinToString("|")
+            }
         }
 
         suspend fun addBookmark(path: String) {
@@ -650,6 +716,32 @@ class UserPreferencesRepository
                 runCatching { SwipeAction.valueOf(dto.swipeEndToStart) }.getOrNull()?.let { action ->
                     prefs[PrefKeys.SWIPE_END_TO_START] = action.name
                 }
+                dto.rulesSortKey?.let { raw ->
+                    runCatching { HistorySortKey.valueOf(raw) }.getOrNull()?.let { key ->
+                        prefs[PrefKeys.RULES_SORT_KEY] = key.name
+                    }
+                }
+                dto.rulesSortDirection?.let { raw ->
+                    runCatching { HistorySortDirection.valueOf(raw) }.getOrNull()?.let { direction ->
+                        prefs[PrefKeys.RULES_SORT_DIRECTION] = direction.name
+                    }
+                }
+                prefs[PrefKeys.RULES_COMPACT_MODE] = dto.rulesCompactMode
+                dto.historySortKey?.let { raw ->
+                    runCatching { HistorySortKey.valueOf(raw) }.getOrNull()?.let { key ->
+                        prefs[PrefKeys.HISTORY_SORT_KEY] = key.name
+                    }
+                }
+                dto.historySortDirection?.let { raw ->
+                    runCatching { HistorySortDirection.valueOf(raw) }.getOrNull()?.let { direction ->
+                        prefs[PrefKeys.HISTORY_SORT_DIRECTION] = direction.name
+                    }
+                }
+                prefs[PrefKeys.SETTINGS_COLLAPSED_SECTION_KEYS] =
+                    dto.settingsCollapsedSectionKeys
+                        .filter { it.isNotBlank() }
+                        .distinct()
+                        .joinToString("|")
 
                 prefs[PrefKeys.BOOKMARKED_FOLDERS] =
                     dto.bookmarkedFolders.filter { it.isNotBlank() }.joinToString("|")

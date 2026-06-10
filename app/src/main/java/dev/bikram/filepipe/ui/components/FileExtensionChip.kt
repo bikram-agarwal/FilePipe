@@ -4,11 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -18,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -34,6 +39,8 @@ fun FileExtensionChips(
     modifier: Modifier = Modifier,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    val addTypeLabel = stringResource(R.string.file_type_add_type)
+    val useTemplateLabel = stringResource(R.string.file_type_use_template)
 
     FlowRow(
         modifier = modifier,
@@ -56,41 +63,35 @@ fun FileExtensionChips(
                 trailingIcon = {
                     FilePipeMaterialRoundedSymbol(
                         name = "close",
-                        contentDescription = "Remove $ext",
+                        contentDescription = stringResource(R.string.file_type_remove_content_description, ext),
                         size = InputChipDefaults.AvatarSize,
                         modifier = Modifier.size(InputChipDefaults.AvatarSize),
                     )
                 },
             )
         }
-        FilePipeFilterChip(
-            selected = false,
+        FilePipeOutlinedButton(
             onClick = {
                 showAddDialog = true
             },
-            label = { Text("Add type") },
-            leadingIcon = {
-                FilePipeMaterialRoundedSymbol(
-                    name = "add",
-                    contentDescription = "Add file type",
-                    size = InputChipDefaults.AvatarSize,
-                    modifier = Modifier.size(InputChipDefaults.AvatarSize),
-                )
-            },
-        )
-        FilePipeFilterChip(
-            selected = false,
+            shape = FilterChipDefaults.shape,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            FileTypeActionButtonContent(
+                iconName = "add",
+                text = addTypeLabel,
+            )
+        }
+        FilePipeOutlinedButton(
             onClick = onUseTemplate,
-            label = { Text("Use template") },
-            leadingIcon = {
-                FilePipeMaterialRoundedSymbol(
-                    name = "auto_awesome",
-                    contentDescription = "Use template",
-                    size = InputChipDefaults.AvatarSize,
-                    modifier = Modifier.size(InputChipDefaults.AvatarSize),
-                )
-            },
-        )
+            shape = FilterChipDefaults.shape,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            FileTypeActionButtonContent(
+                iconName = "auto_awesome",
+                text = useTemplateLabel,
+            )
+        }
     }
 
     if (showAddDialog) {
@@ -101,6 +102,25 @@ fun FileExtensionChips(
                 showAddDialog = false
             },
         )
+    }
+}
+
+@Composable
+private fun FileTypeActionButtonContent(
+    iconName: String,
+    text: String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilePipeMaterialRoundedSymbol(
+            name = iconName,
+            contentDescription = null,
+            size = 18.dp,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text)
     }
 }
 
@@ -152,9 +172,7 @@ private fun AddExtensionDialog(
             }
         },
         dismissButton = {
-            FilePipeTextButton(onClick = {
-                onDismiss()
-            }) {
+            FilePipeTextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.cancel))
             }
         },

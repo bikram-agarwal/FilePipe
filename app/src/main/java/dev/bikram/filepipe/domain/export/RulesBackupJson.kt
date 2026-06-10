@@ -22,7 +22,7 @@ import kotlinx.serialization.json.JsonNames
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
  * (`@Database`); Room KSP does not allow that annotation to reference this constant.
  */
-const val APP_DATABASE_SCHEMA_VERSION = 7
+const val APP_DATABASE_SCHEMA_VERSION = 8
 
 /**
  * Root object for `filepipe_backup_*.json`.
@@ -51,6 +51,7 @@ data class RuleBackupDto(
     val fileExtensions: List<String>,
     val isEnabled: Boolean = true,
     val sortOrder: Int = 0,
+    val cardModeOverride: Boolean = false,
     val schedule: ScheduleBackupDto? = null,
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
@@ -124,6 +125,12 @@ data class SettingsBackupDto(
     val logRetentionDays: Int = 30,
     val swipeStartToEnd: String = SwipeAction.EDIT.name,
     val swipeEndToStart: String = SwipeAction.DELETE.name,
+    val rulesSortKey: String? = null,
+    val rulesSortDirection: String? = null,
+    val rulesCompactMode: Boolean = false,
+    val historySortKey: String? = null,
+    val historySortDirection: String? = null,
+    val settingsCollapsedSectionKeys: List<String> = emptyList(),
     val bookmarkedFolders: List<String> = emptyList(),
     val hasSeenIntro: Boolean = false,
     val hapticFeedbackEnabled: Boolean = true,
@@ -159,6 +166,7 @@ fun Rule.toBackupDto(): RuleBackupDto =
         fileExtensions = fileExtensions,
         isEnabled = isEnabled,
         sortOrder = sortOrder,
+        cardModeOverride = cardModeOverride,
         schedule = schedule?.toBackupDto(),
         conflictPolicy = conflictPolicy.name,
         operationMode = operationMode.name,
@@ -231,6 +239,12 @@ fun AppPreferences.toBackupDto(): SettingsBackupDto =
         logRetentionDays = logRetentionDays,
         swipeStartToEnd = swipeStartToEnd.name,
         swipeEndToStart = swipeEndToStart.name,
+        rulesSortKey = rulesSortKey.name,
+        rulesSortDirection = rulesSortDirection.name,
+        rulesCompactMode = rulesCompactMode,
+        historySortKey = historySortKey.name,
+        historySortDirection = historySortDirection.name,
+        settingsCollapsedSectionKeys = settingsCollapsedSectionKeys,
         bookmarkedFolders = bookmarkedFolders,
         hasSeenIntro = hasSeenIntro,
         hapticFeedbackEnabled = hapticFeedbackEnabled,
@@ -257,6 +271,7 @@ fun RuleBackupDto.toDomain(): Rule =
         fileExtensions = fileExtensions,
         isEnabled = isEnabled,
         sortOrder = sortOrder,
+        cardModeOverride = cardModeOverride,
         schedule = schedule?.toDomain(),
         conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
         operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),

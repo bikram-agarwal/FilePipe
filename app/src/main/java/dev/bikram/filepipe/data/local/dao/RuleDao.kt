@@ -72,6 +72,15 @@ interface RuleDao {
         restoredAt: Long,
     )
 
+    @Query("UPDATE rules SET cardModeOverride = :override WHERE id = :id")
+    suspend fun updateCardModeOverride(
+        id: Long,
+        override: Boolean,
+    )
+
+    @Query("UPDATE rules SET cardModeOverride = 0")
+    suspend fun clearCardModeOverrides()
+
     @Query("DELETE FROM rules WHERE trashedAt IS NOT NULL AND trashedAt < :cutoff")
     suspend fun deleteTrashedRulesOlderThan(cutoff: Long)
 

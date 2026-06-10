@@ -122,6 +122,9 @@
     <string name="move_to_trash">Move to Trash</string>
     <string name="undo">Undo</string>
     <string name="action_edit">Edit</string>
+    <string name="action_expand">Expand</string>
+    <string name="action_collapse">Collapse</string>
+    <string name="action_expand_collapse">Expand / collapse</string>
     <string name="action_duplicate">Duplicate</string>
     <string name="nav_back">Back</string>
     <string name="delete_rule">Delete rule</string>
@@ -182,6 +185,10 @@
     <plurals name="rules_move_to_trash_confirm_title">
         <item quantity="one">Move %1$d rule to Trash?</item>
         <item quantity="other">Move %1$d rules to Trash?</item>
+    </plurals>
+    <plurals name="rules_selection_count">
+        <item quantity="one">%1$d selected rule</item>
+        <item quantity="other">%1$d selected rules</item>
     </plurals>
     <string name="rules_move_to_trash_confirm_message">Scheduled runs for the selected rules will be paused. You can restore them from History -&gt; Trash within 30 days.</string>
     <string name="history_triggered_manual">Manual</string>
@@ -896,4 +903,7 @@
     <string name="file_type_dialog_placeholder">jpg, png, mp3</string>
     <string name="file_type_dialog_supporting_text">Separate extensions with commas</string>
     <string name="file_type_dialog_add">Add</string>
+    <string name="file_type_add_type">Add type</string>
+    <string name="file_type_use_template">Use template</string>
+    <string name="file_type_remove_content_description">Remove %1$s</string>
 </resources>

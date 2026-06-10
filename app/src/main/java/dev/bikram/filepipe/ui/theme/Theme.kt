@@ -330,7 +330,7 @@ fun FilePipeTheme(
                     .boostContainersForSeedThemes(darkTheme = darkTheme)
             }
         }.let { scheme ->
-            if (effectiveUseGradientBackground) {
+            if (effectiveUseGradientBackground || black) {
                 scheme
             } else {
                 scheme.copy(

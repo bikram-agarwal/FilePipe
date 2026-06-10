@@ -938,7 +938,11 @@ private fun ExpandedContent(
                                     size = 20.dp,
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                Text(text = stringResource(R.string.run_now))
+                                Text(
+                                    text = stringResource(R.string.run_now),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
                             }
                         }
                     }

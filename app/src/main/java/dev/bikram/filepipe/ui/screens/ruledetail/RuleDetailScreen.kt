@@ -85,9 +85,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -585,6 +586,7 @@ fun RuleDetailScreen(
     onOpenFaq: () -> Unit,
     onSavedRule: ((Long) -> Unit)? = null,
     showNavigateBack: Boolean = true,
+    allowInitialRuleNameFocus: Boolean = true,
     viewModel: RuleDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -601,6 +603,7 @@ fun RuleDetailScreen(
         )
     val bookmarkedFolders by viewModel.bookmarkedFolders.collectAsStateWithLifecycle()
     var advancedExpanded by remember { mutableStateOf(false) }
+    var ruleNameCanFocus by remember(allowInitialRuleNameFocus) { mutableStateOf(allowInitialRuleNameFocus) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -702,6 +705,13 @@ fun RuleDetailScreen(
             } else {
                 onNavigateBack()
             }
+        }
+    }
+
+    LaunchedEffect(allowInitialRuleNameFocus) {
+        if (!allowInitialRuleNameFocus) {
+            withFrameNanos { }
+            ruleNameCanFocus = true
         }
     }
 
@@ -816,9 +826,11 @@ fun RuleDetailScreen(
         if (bottomBarMessages.isEmpty()) dismissedBottomBarKey = null
     }
     val showBottomBar = bottomBarMessages.isNotEmpty() && dismissedBottomBarKey != bottomBarKey
+    val showBottomActions = isDirty
     val validationErrorOverlayExtraPadding = if (showBottomBar) 72.dp else 0.dp
-    val bottomActionOverlayPadding = 88.dp + validationErrorOverlayExtraPadding
-    val bottomContentPadding = navBottom + bottomActionOverlayPadding
+    val bottomActionOverlayPadding = if (showBottomActions) 88.dp else 0.dp
+    val bottomOverlayPadding = bottomActionOverlayPadding + validationErrorOverlayExtraPadding
+    val bottomContentPadding = navBottom + bottomOverlayPadding
     val density = LocalDensity.current
     val topAlphaMultiplier by remember(scrollState) {
         derivedStateOf {
@@ -895,24 +907,8 @@ fun RuleDetailScreen(
                         .fillMaxSize()
                         .then(fullBleedBlurModifier),
             ) {
-                val scheme = MaterialTheme.colorScheme
-                if (LocalUseGradientBackground.current) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(scheme.surface)
-                            .background(
-                                Brush.verticalGradient(
-                                    colorStops =
-                                        arrayOf(
-                                            0f to scheme.primaryContainer.copy(alpha = 0.45f),
-                                            0.55f to scheme.surface.copy(alpha = 0f),
-                                        ),
-                                ),
-                            ),
-                    )
-                } else {
-                    Box(Modifier.fillMaxSize().background(scheme.background))
+                if (!LocalUseGradientBackground.current) {
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
                 }
                 Column(
                     modifier =
@@ -969,7 +965,12 @@ fun RuleDetailScreen(
                             placeholder = { Text(stringResource(R.string.rule_name_placeholder)) },
                             singleLine = true,
                             isError = nameHasError,
-                            modifier = Modifier.weight(1f),
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .focusProperties {
+                                        canFocus = ruleNameCanFocus
+                                    },
                         )
                     }
 
@@ -1809,7 +1810,7 @@ fun RuleDetailScreen(
             colors = gradientOverlayTopAppBarColors(),
         )
 
-        if (!state.isLoading) {
+        if (!state.isLoading && (showBottomBar || showBottomActions)) {
             Surface(
                 modifier =
                     Modifier
@@ -1861,26 +1862,46 @@ fun RuleDetailScreen(
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    AnimatedVisibility(
+                        visible = showBottomActions,
+                        enter =
+                            reducedMotionEnterTransition(
+                                fadeIn(animationSpec = bottomBarFadeInSpec) +
+                                    expandVertically(
+                                        animationSpec = bottomBarSpatialSpec,
+                                        clip = false,
+                                    ),
+                            ),
+                        exit =
+                            reducedMotionExitTransition(
+                                fadeOut(animationSpec = bottomBarFadeOutSpec) +
+                                    shrinkVertically(
+                                        animationSpec = bottomBarSpatialSpec,
+                                        clip = false,
+                                    ),
+                            ),
                     ) {
-                        FilePipeOutlinedButton(
-                            onClick = { tryNavigateBack() },
-                            modifier = Modifier.weight(1f),
-                            shape = pillShape,
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                        FilePipeButton(
-                            onClick = {
-                                if (state.errors.isNotEmpty()) dismissedBottomBarKey = null
-                                viewModel.save()
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = pillShape,
-                        ) {
-                            Text(stringResource(R.string.save))
+                            FilePipeOutlinedButton(
+                                onClick = { tryNavigateBack() },
+                                modifier = Modifier.weight(1f),
+                                shape = pillShape,
+                            ) {
+                                Text(stringResource(R.string.cancel))
+                            }
+                            FilePipeButton(
+                                onClick = {
+                                    if (state.errors.isNotEmpty()) dismissedBottomBarKey = null
+                                    viewModel.save()
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = pillShape,
+                            ) {
+                                Text(stringResource(R.string.save))
+                            }
                         }
                     }
                 }
@@ -1897,7 +1918,7 @@ fun RuleDetailScreen(
                             if (state.isLoading) {
                                 navBottom + 16.dp
                             } else {
-                                navBottom + bottomActionOverlayPadding
+                                navBottom + bottomOverlayPadding
                             },
                     ),
         )
@@ -1955,6 +1976,7 @@ fun RuleDetailScreen(
                 FilePipeTextButton(
                     onClick = {
                         showDiscardDialog = false
+                        viewModel.discardChanges()
                         onNavigateBack()
                     },
                 ) {

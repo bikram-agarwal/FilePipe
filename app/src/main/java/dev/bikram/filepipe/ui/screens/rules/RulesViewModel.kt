@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
@@ -146,11 +147,25 @@ class RulesViewModel
         private val _selectedRuleIds = MutableStateFlow<Set<Long>>(emptySet())
         private val _progressMap = MutableStateFlow<Map<Long, RunProgress>>(emptyMap())
         private val _previewState = MutableStateFlow<PreviewState?>(null)
-        private val _isCompactMode = MutableStateFlow(false)
-        private val _cardModeOverrides = MutableStateFlow<Set<Long>>(emptySet())
-        private val _sortKey = MutableStateFlow(HistorySortKey.LAST_RAN)
-        private val _sortDirection = MutableStateFlow(HistorySortDirection.DESCENDING)
         private val _manualRunCancelAnchor = MutableStateFlow<ManualRunCancelAnchor>(ManualRunCancelAnchor.None)
+
+        private val rulesCompactModeFlow =
+            userPreferencesRepository.preferencesFlow
+                .map { prefs -> prefs.rulesCompactMode }
+                .stateIn(
+                    viewModelScope,
+                    SharingStarted.Eagerly,
+                    AppPreferences.DEFAULT.rulesCompactMode,
+                )
+
+        private val rulesSortPreferencesFlow =
+            userPreferencesRepository.preferencesFlow
+                .map { prefs -> prefs.rulesSortKey to prefs.rulesSortDirection }
+                .stateIn(
+                    viewModelScope,
+                    SharingStarted.Eagerly,
+                    AppPreferences.DEFAULT.rulesSortKey to AppPreferences.DEFAULT.rulesSortDirection,
+                )
 
         private val lastRunStartedAtByRuleId: StateFlow<Map<Long, Long>> =
             runHistoryRepository
@@ -160,16 +175,11 @@ class RulesViewModel
         private val sortedRulesFlow =
             combine(
                 _rules,
-                _sortKey,
-                _sortDirection,
+                rulesSortPreferencesFlow,
                 lastRunStartedAtByRuleId,
-            ) { rules, sortKey, sortDirection, lastRunMap ->
+            ) { rules, sortParams, lastRunMap ->
+                val (sortKey, sortDirection) = sortParams
                 sortRulesList(rules, sortKey, sortDirection, lastRunMap)
-            }
-
-        private val sortParamsFlow =
-            combine(_sortKey, _sortDirection) { sortKey, sortDirection ->
-                sortKey to sortDirection
             }
 
         val uiState: StateFlow<RulesUiState> =
@@ -178,7 +188,7 @@ class RulesViewModel
                 _staleRuleIssues,
                 userPreferencesRepository.preferencesFlow,
                 _selectedRuleIds,
-                sortParamsFlow,
+                rulesSortPreferencesFlow,
             ) { sortedRules, staleIssues, prefs, selected, sortParams ->
                 val (sortKey, sortDirection) = sortParams
                 val staleWarningIds =
@@ -203,12 +213,19 @@ class RulesViewModel
             }.combine(_progressMap) { state, progress ->
                 state.copy(progressMap = progress, isRunning = progress.values.any { !it.isComplete })
             }.combine(_previewState) { state, preview -> state.copy(previewState = preview) }
-                .combine(_isCompactMode) { state, compact -> state.copy(isCompactMode = compact) }
-                .combine(_cardModeOverrides) { state, overrides -> state.copy(cardModeOverrides = overrides) }
-                .combine(_manualRunCancelAnchor) { state, anchor -> state.copy(manualRunCancelAnchor = anchor) }
-                // Eagerly: WhileSubscribed stops collecting when RuleDetail is shown (RulesScreen leaves
-                // composition), so Room updates would not refresh the list until the ViewModel was recreated.
-                .stateIn(viewModelScope, SharingStarted.Eagerly, RulesUiState())
+                .combine(rulesCompactModeFlow) { state, compact ->
+                    state.copy(isCompactMode = compact)
+                }.combine(_rules) { state, rules ->
+                    state.copy(
+                        cardModeOverrides =
+                            rules
+                                .filter { rule -> rule.cardModeOverride }
+                                .map { rule -> rule.id }
+                                .toSet(),
+                    )
+                }.combine(_manualRunCancelAnchor) { state, anchor ->
+                    state.copy(manualRunCancelAnchor = anchor)
+                }.stateIn(viewModelScope, SharingStarted.Eagerly, RulesUiState())
 
         private val _navigateAfterRun = MutableSharedFlow<RulesRunNavigation>(extraBufferCapacity = 1)
         val navigateAfterRun = _navigateAfterRun.asSharedFlow()
@@ -405,12 +422,17 @@ class RulesViewModel
         ): Boolean = if (compact) ruleId in overrides else ruleId !in overrides
 
         fun toggleCardExpansion(ruleId: Long) {
-            _cardModeOverrides.update { if (ruleId in it) it - ruleId else it + ruleId }
+            viewModelScope.launch {
+                val rule = _rules.value.firstOrNull { it.id == ruleId } ?: return@launch
+                ruleRepository.updateCardModeOverride(ruleId, !rule.cardModeOverride)
+            }
         }
 
         fun toggleGlobalViewMode() {
-            _isCompactMode.update { !it }
-            _cardModeOverrides.value = emptySet()
+            viewModelScope.launch {
+                userPreferencesRepository.setRulesCompactMode(!rulesCompactModeFlow.value)
+                ruleRepository.clearCardModeOverrides()
+            }
         }
 
         fun toggleSelection(ruleId: Long) {
@@ -430,9 +452,8 @@ class RulesViewModel
         fun setSort(
             sortKey: HistorySortKey,
             sortDirection: HistorySortDirection,
-        ) {
-            _sortKey.value = sortKey
-            _sortDirection.value = sortDirection
+        ) = viewModelScope.launch {
+            userPreferencesRepository.setRulesSort(sortKey, sortDirection)
         }
 
         fun deleteSelected() =
@@ -888,10 +909,10 @@ class RulesViewModel
             persistSortOrderIndices(ordered)
             rulesAutoExportTrigger.maybeExportAfterRuleChange()
             if (alsoSwitchSortToMyOrder) {
-                withContext(Dispatchers.Main.immediate) {
-                    _sortKey.value = HistorySortKey.MY_ORDER
-                    _sortDirection.value = HistorySortDirection.ASCENDING
-                }
+                userPreferencesRepository.setRulesSort(
+                    HistorySortKey.MY_ORDER,
+                    HistorySortDirection.ASCENDING,
+                )
             }
         }
 

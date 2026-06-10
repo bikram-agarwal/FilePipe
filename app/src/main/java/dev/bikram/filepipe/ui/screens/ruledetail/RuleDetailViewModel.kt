@@ -133,6 +133,33 @@ private fun RuleDetailUiState.toSnapshot(): RuleSnapshot =
         excludePatternsText = excludePatternsText,
     )
 
+private fun RuleDetailUiState.withSnapshot(snapshot: RuleSnapshot): RuleDetailUiState =
+    copy(
+        name = snapshot.name,
+        sourceFolderPaths = snapshot.sourceFolderPaths,
+        destinationFolderPath = snapshot.destinationFolderPath,
+        fileExtensions = snapshot.fileExtensions,
+        schedule = snapshot.schedule,
+        conflictPolicy = snapshot.conflictPolicy,
+        operationMode = snapshot.operationMode,
+        scanSubdirectories = snapshot.scanSubdirectories,
+        recreateDestinationSubfolders = snapshot.recreateDestinationSubfolders,
+        suppressMissingSourceFolderCardWarning = snapshot.suppressMissingSourceFolderCardWarning,
+        icon = snapshot.icon,
+        iconEmoji = snapshot.iconEmoji,
+        filenamePattern = snapshot.filenamePattern,
+        minFileSizeMb = snapshot.minFileSizeMb,
+        maxFileSizeMb = snapshot.maxFileSizeMb,
+        minAgeDays = snapshot.minAgeDays,
+        maxAgeDays = snapshot.maxAgeDays,
+        excludePatternsText = snapshot.excludePatternsText,
+        errors = emptyList(),
+        previewFiles = null,
+        isPreviewLoading = false,
+        removedRedundantFolders = emptyList(),
+        isSaved = false,
+    )
+
 @HiltViewModel
 class RuleDetailViewModel
     @Inject
@@ -501,6 +528,12 @@ class RuleDetailViewModel
         }
 
         fun dismissPreview() = _uiState.update { it.copy(previewFiles = null) }
+
+        fun discardChanges() {
+            val baseline = _baseline.value ?: return
+            _uiState.update { state -> state.withSnapshot(baseline) }
+            scheduleFolderAccessRecompute()
+        }
 
         fun loadPreview() =
             viewModelScope.launch {

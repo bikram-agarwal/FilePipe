@@ -59,6 +59,13 @@ object DatabaseModule {
             }
         }
 
+    private val migration7To8 =
+        object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE rules ADD COLUMN cardModeOverride INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -67,7 +74,7 @@ object DatabaseModule {
         migrateLegacyDatabaseNameIfNeeded(context)
         return Room
             .databaseBuilder(context, AppDatabase::class.java, APP_DATABASE_NAME)
-            .addMigrations(migration2To3, migration5To6, migration6To7)
+            .addMigrations(migration2To3, migration5To6, migration6To7, migration7To8)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }

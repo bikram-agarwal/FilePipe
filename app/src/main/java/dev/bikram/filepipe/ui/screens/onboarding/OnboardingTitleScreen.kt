@@ -6,6 +6,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,8 +17,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -79,15 +82,9 @@ fun OnboardingTitleScreen(
             fadeIn(animationSpec = enterFadeSpec) +
                 slideInVertically(animationSpec = enterSpatialSpec) { fullHeight -> fullHeight / 2 }
         }
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .systemBarsPadding(),
-    ) {
+    val iconBlock: @Composable () -> Unit = {
         AnimatedVisibility(
             visible = iconVisible,
-            modifier = Modifier.align(Alignment.Center),
             enter = reducedMotionEnterTransition(iconEnter),
         ) {
             Column(
@@ -123,10 +120,11 @@ fun OnboardingTitleScreen(
                 }
             }
         }
+    }
 
+    val bylinePill: @Composable () -> Unit = {
         AnimatedVisibility(
             visible = bylineVisible,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp),
             enter = reducedMotionEnterTransition(blockEnter),
         ) {
             Surface(
@@ -156,14 +154,11 @@ fun OnboardingTitleScreen(
                 }
             }
         }
+    }
 
+    val beginButton: @Composable () -> Unit = {
         AnimatedVisibility(
             visible = buttonVisible,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
             enter = reducedMotionEnterTransition(blockEnter),
         ) {
             FilePipeButton(
@@ -187,6 +182,54 @@ fun OnboardingTitleScreen(
                     contentDescription = null,
                     autoMirror = true,
                 )
+            }
+        }
+    }
+
+    BoxWithConstraints(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .systemBarsPadding(),
+    ) {
+        // On short screens (e.g. phones in landscape) the absolute splash layout would
+        // overlap the centered logo with the bottom byline/button, so fall back to a
+        // scrollable stack. Tall screens keep the original splash arrangement.
+        if (maxHeight < 560.dp) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 32.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                iconBlock()
+                bylinePill()
+                OnboardingBottomActions {
+                    beginButton()
+                }
+            }
+        } else {
+            Box(modifier = Modifier.align(Alignment.Center)) {
+                iconBlock()
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 120.dp),
+            ) {
+                bylinePill()
+            }
+            OnboardingBottomActions(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 40.dp),
+            ) {
+                beginButton()
             }
         }
     }

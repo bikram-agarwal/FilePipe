@@ -11,6 +11,8 @@ import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.HistorySortDirection
@@ -99,6 +101,7 @@ class HistoryViewModel
         private val scheduleRulesUseCase: ScheduleRulesUseCase,
         private val rulesAutoExportTrigger: RulesAutoExportTrigger,
         private val undoRunUseCase: UndoRunUseCase,
+        private val userPreferencesRepository: UserPreferencesRepository,
         @param:ApplicationContext private val appContext: Context,
     ) : ViewModel() {
         val filterRuleId: Long? =
@@ -115,18 +118,25 @@ class HistoryViewModel
 
         private val _statusFilter = MutableStateFlow(HistoryStatusFilter.ALL)
         private val _viewMode = MutableStateFlow(HistoryViewMode.BY_DATE)
-        private val _sortKey = MutableStateFlow(HistorySortKey.LAST_RAN)
-        private val _sortDirection = MutableStateFlow(HistorySortDirection.DESCENDING)
         private val _section = MutableStateFlow(HistorySection.RUNS)
         val section: StateFlow<HistorySection> = _section.asStateFlow()
+
+        private val historySortPreferencesFlow =
+            userPreferencesRepository.preferencesFlow
+                .map { prefs -> prefs.historySortKey to prefs.historySortDirection }
+                .stateIn(
+                    viewModelScope,
+                    SharingStarted.Eagerly,
+                    AppPreferences.DEFAULT.historySortKey to AppPreferences.DEFAULT.historySortDirection,
+                )
 
         val uiState: StateFlow<HistoryUiState> =
             combine(
                 _statusFilter,
                 _viewMode,
-                _sortKey,
-                _sortDirection,
-            ) { status, mode, sortKey, sortDir ->
+                historySortPreferencesFlow,
+            ) { status, mode, sortParams ->
+                val (sortKey, sortDir) = sortParams
                 HistoryUiState(
                     statusFilter = status,
                     viewMode = mode,
@@ -170,10 +180,7 @@ class HistoryViewModel
                 )
 
         val historyPagingFlow: Flow<PagingData<HistoryItem>> =
-            combine(
-                _sortKey,
-                _sortDirection,
-            ) { sortKey, sortDir -> sortKey to sortDir }
+            historySortPreferencesFlow
                 .flatMapLatest { (sortKey, sortDir) ->
                     val baseFlow =
                         if (filterRuleId != null) {
@@ -201,9 +208,9 @@ class HistoryViewModel
                 historySourceFlow,
                 _statusFilter,
                 _viewMode,
-                _sortKey,
-                _sortDirection,
-            ) { all, status, mode, sortKey, sortDir ->
+                historySortPreferencesFlow,
+            ) { all, status, mode, sortParams ->
+                val (sortKey, sortDir) = sortParams
                 val filtered = all.filter { history -> history.matchesHistoryStatusFilter(status) }
                 val sorted = sortHistories(filtered, sortKey, sortDir)
                 when (mode) {
@@ -217,10 +224,10 @@ class HistoryViewModel
             combine(
                 historySourceFlow,
                 _statusFilter,
-                _sortKey,
-                _sortDirection,
                 _section,
-            ) { all, status, sortKey, sortDir, section ->
+                historySortPreferencesFlow,
+            ) { all, status, section, sortParams ->
+                val (sortKey, sortDir) = sortParams
                 if (section == HistorySection.TRASH) {
                     emptyList()
                 } else {
@@ -250,9 +257,8 @@ class HistoryViewModel
         fun setSort(
             key: HistorySortKey,
             direction: HistorySortDirection,
-        ) {
-            _sortKey.value = key
-            _sortDirection.value = direction
+        ) = viewModelScope.launch {
+            userPreferencesRepository.setHistorySort(key, direction)
         }
 
         fun setSection(section: HistorySection) {

@@ -55,6 +55,13 @@ class RuleRepository
 
         suspend fun restoreRuleFromTrash(ruleId: Long) = ruleDao.restoreRuleFromTrash(ruleId, System.currentTimeMillis())
 
+        suspend fun updateCardModeOverride(
+            ruleId: Long,
+            override: Boolean,
+        ) = ruleDao.updateCardModeOverride(ruleId, override)
+
+        suspend fun clearCardModeOverrides() = ruleDao.clearCardModeOverrides()
+
         suspend fun deleteRuleForever(ruleId: Long) = ruleDao.deleteRuleById(ruleId)
 
         suspend fun autoEmptyTrashOlderThan(cutoffMillis: Long) = ruleDao.deleteTrashedRulesOlderThan(cutoffMillis)

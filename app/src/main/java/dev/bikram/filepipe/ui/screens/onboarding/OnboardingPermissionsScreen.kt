@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -205,12 +206,20 @@ fun OnboardingPermissionsScreen(
     ) {
         val baseDensity = LocalDensity.current
         val baselineHeight = 980.dp
+        // Only downscale to fit on genuinely small (compact-width) phones. Wider screens
+        // (tablets, foldables, landscape) have room to spare, so keep full size — better for
+        // text legibility/accessibility — and rely on the scroll + centered width-capped
+        // column below instead of shrinking the whole UI.
         val responsiveScale =
-            minOf(
-                1f,
-                maxWidth / 390.dp,
-                maxHeight / baselineHeight,
-            ).coerceAtLeast(0.76f)
+            if (maxWidth < 600.dp) {
+                minOf(
+                    1f,
+                    maxWidth / 390.dp,
+                    maxHeight / baselineHeight,
+                ).coerceAtLeast(0.76f)
+            } else {
+                1f
+            }
         val responsiveDensity =
             remember(baseDensity, responsiveScale) {
                 Density(
@@ -218,83 +227,65 @@ fun OnboardingPermissionsScreen(
                     fontScale = baseDensity.fontScale,
                 )
             }
+        val compactHeight = maxHeight < 560.dp
 
         CompositionLocalProvider(LocalDensity provides responsiveDensity) {
-            Box(Modifier.fillMaxSize()) {
-                Column(
+            val scrollContent: @Composable () -> Unit = {
+                PermissionsHeroIllustration(
                     modifier =
                         Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp)
-                            .padding(top = 12.dp, bottom = 8.dp),
+                            .fillMaxWidth()
+                            .height(232.dp),
+                )
+                Spacer(Modifier.height(52.dp))
+                AccessModeSwitcher(
+                    selected = selected,
+                    onSelectAllFiles = {
+                        viewModel.setOnboardingFolderAccessSelection(FolderAccessMode.ALL_FILES_PREFERRED)
+                        resetGrantFlowUi()
+                    },
+                    onSelectSelective = {
+                        viewModel.setOnboardingFolderAccessSelection(FolderAccessMode.SAF_ONLY)
+                        resetGrantFlowUi()
+                    },
+                )
+                Spacer(Modifier.height(32.dp))
+                if (selected == FolderAccessMode.SAF_ONLY) {
+                    SelectiveAccessPitch(onLearnMore = onOpenStorageAccessFaq)
+                } else {
+                    AllFilesAccessPitch(onLearnMore = onOpenStorageAccessFaq)
+                }
+                AnimatedVisibility(
+                    visible = grantPanelVisible,
+                    enter = reducedMotionEnterTransition(fadeIn(animationSpec = visibilityFadeInSpec)),
+                    exit = reducedMotionExitTransition(fadeOut(animationSpec = visibilityFadeOutSpec)),
                 ) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState()),
-                    ) {
-                        PermissionsHeroIllustration(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(232.dp),
-                        )
-                        Spacer(Modifier.height(52.dp))
-                        AccessModeSwitcher(
-                            selected = selected,
-                            onSelectAllFiles = {
-                                viewModel.setOnboardingFolderAccessSelection(FolderAccessMode.ALL_FILES_PREFERRED)
-                                resetGrantFlowUi()
-                            },
-                            onSelectSelective = {
-                                viewModel.setOnboardingFolderAccessSelection(FolderAccessMode.SAF_ONLY)
-                                resetGrantFlowUi()
+                    Column(modifier = Modifier.padding(top = 32.dp)) {
+                        AllFilesInstructionPanel(
+                            showOpenSettingsButton = showOpenSettingsInPanel,
+                            showNotGrantedHint = showAccessNotGrantedHint,
+                            onOpenSettings = {
+                                awaitingSettingsReturn = true
+                                showAccessNotGrantedHint = false
+                                val manageIntent =
+                                    Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                        data = "package:${context.packageName}".toUri()
+                                    }
+                                context.startActivity(manageIntent)
                             },
                         )
-                        Spacer(Modifier.height(32.dp))
-                        if (selected == FolderAccessMode.SAF_ONLY) {
-                            SelectiveAccessPitch(onLearnMore = onOpenStorageAccessFaq)
-                        } else {
-                            AllFilesAccessPitch(onLearnMore = onOpenStorageAccessFaq)
-                        }
-                        AnimatedVisibility(
-                            visible = grantPanelVisible,
-                            enter = reducedMotionEnterTransition(fadeIn(animationSpec = visibilityFadeInSpec)),
-                            exit = reducedMotionExitTransition(fadeOut(animationSpec = visibilityFadeOutSpec)),
-                        ) {
-                            Column(modifier = Modifier.padding(top = 32.dp)) {
-                                AllFilesInstructionPanel(
-                                    showOpenSettingsButton = showOpenSettingsInPanel,
-                                    showNotGrantedHint = showAccessNotGrantedHint,
-                                    onOpenSettings = {
-                                        awaitingSettingsReturn = true
-                                        showAccessNotGrantedHint = false
-                                        val manageIntent =
-                                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                                data = "package:${context.packageName}".toUri()
-                                            }
-                                        context.startActivity(manageIntent)
-                                    },
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(120.dp))
                     }
                 }
+            }
 
+            val bottomActionsCluster: @Composable () -> Unit = {
                 AnimatedVisibility(
                     visible = !hideBottomPrimaryButton,
-                    modifier = Modifier.align(Alignment.BottomCenter),
                     enter = reducedMotionEnterTransition(fadeIn(animationSpec = visibilityFadeInSpec)),
                     exit = reducedMotionExitTransition(fadeOut(animationSpec = visibilityFadeOutSpec)),
                 ) {
                     Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         ChangeAnytimeFooter()
@@ -343,6 +334,62 @@ fun OnboardingPermissionsScreen(
                                 label = allFilesButtonLabel,
                             )
                         }
+                    }
+                }
+            }
+
+            Box(Modifier.fillMaxSize()) {
+                if (compactHeight) {
+                    // Short screens (e.g. phones in landscape): a single scroll with the actions
+                    // inline at the end. The tall layout's bottom overlay would otherwise collide
+                    // with the hero illustration and the access-mode options. Use a wider cap than
+                    // portrait so the bullet rows stay on a single line with the extra width.
+                    Column(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .widthIn(max = OnboardingMaxContentWidth)
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(top = 12.dp, bottom = 24.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+                            scrollContent()
+                        }
+                        Spacer(Modifier.height(24.dp))
+                        OnboardingBottomActions {
+                            bottomActionsCluster()
+                        }
+                    }
+                } else {
+                    Column(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .widthIn(max = OnboardingMaxContentWidth)
+                                .fillMaxSize()
+                                .padding(horizontal = 24.dp)
+                                .padding(top = 12.dp, bottom = 8.dp),
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState()),
+                        ) {
+                            scrollContent()
+                            Spacer(Modifier.height(120.dp))
+                        }
+                    }
+
+                    OnboardingBottomActions(
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 40.dp),
+                    ) {
+                        bottomActionsCluster()
                     }
                 }
             }

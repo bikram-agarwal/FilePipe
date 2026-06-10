@@ -13,6 +13,8 @@ data class Rule(
     val isEnabled: Boolean = true,
     /** Display order when sorting by [HistorySortKey.MY_ORDER]; lower first. */
     val sortOrder: Int = 0,
+    /** Overrides the global expanded/collapsed display mode for this rule card. */
+    val cardModeOverride: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val trashedAt: Long? = null,
