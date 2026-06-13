@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
@@ -17,6 +18,8 @@ import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.data.storage.isFolderPathAllFilesAccessLocationForRules
 import dev.bikram.filepipe.devtools.DevMockFileMove
+import dev.bikram.filepipe.domain.RuleFolderSeverity
+import dev.bikram.filepipe.domain.assessRuleFolderAccess
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.HistorySortDirection
@@ -36,10 +39,12 @@ import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -47,6 +52,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -136,6 +142,7 @@ class RulesViewModel
         private val fileOperationRepository: FileOperationRepository,
         private val manualRunForegroundCoordinator: ManualRunForegroundCoordinator,
         @param:ApplicationContext private val appContext: Context,
+        @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         // Eagerly so Room query starts before the UI renders, preventing an empty-state flash on cold start.
         private val _rules: StateFlow<List<Rule>> =
@@ -154,7 +161,7 @@ class RulesViewModel
                 .map { prefs -> prefs.rulesCompactMode }
                 .stateIn(
                     viewModelScope,
-                    SharingStarted.Eagerly,
+                    SharingStarted.WhileSubscribed(5_000),
                     AppPreferences.DEFAULT.rulesCompactMode,
                 )
 
@@ -163,14 +170,14 @@ class RulesViewModel
                 .map { prefs -> prefs.rulesSortKey to prefs.rulesSortDirection }
                 .stateIn(
                     viewModelScope,
-                    SharingStarted.Eagerly,
+                    SharingStarted.WhileSubscribed(5_000),
                     AppPreferences.DEFAULT.rulesSortKey to AppPreferences.DEFAULT.rulesSortDirection,
                 )
 
         private val lastRunStartedAtByRuleId: StateFlow<Map<Long, Long>> =
             runHistoryRepository
                 .observeLastRunStartedAtByRuleId()
-                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
         private val sortedRulesFlow =
             combine(
@@ -225,7 +232,7 @@ class RulesViewModel
                     )
                 }.combine(_manualRunCancelAnchor) { state, anchor ->
                     state.copy(manualRunCancelAnchor = anchor)
-                }.stateIn(viewModelScope, SharingStarted.Eagerly, RulesUiState())
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RulesUiState())
 
         private val _navigateAfterRun = MutableSharedFlow<RulesRunNavigation>(extraBufferCapacity = 1)
         val navigateAfterRun = _navigateAfterRun.asSharedFlow()
@@ -233,14 +240,16 @@ class RulesViewModel
         private val _deleteUndoEvent = MutableSharedFlow<DeleteUndoEvent>(extraBufferCapacity = 1)
         val deleteUndoEvent = _deleteUndoEvent.asSharedFlow()
 
-        private val _userMessage = MutableStateFlow<String?>(null)
-        val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
+        // One-shot snackbar messages: a Channel (not a StateFlow) so each message is delivered
+        // exactly once — no replay on rotation, and identical/rapid messages aren't conflated.
+        private val _userMessages = Channel<String>(Channel.BUFFERED)
+        val userMessages: Flow<String> = _userMessages.receiveAsFlow()
 
         private var manualRunJob: Job? = null
         private val manualRunJobLock = Any()
 
-        fun clearUserMessage() {
-            _userMessage.value = null
+        private fun postUserMessage(message: String) {
+            _userMessages.trySend(message)
         }
 
         /**
@@ -249,7 +258,7 @@ class RulesViewModel
          * [folderPathsSignature] does not change when only permissions change.
          */
         fun refreshStaleFolderAccess() {
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 fileOperationRepository.invalidateAccessCache()
                 val prefs = userPreferencesRepository.preferencesFlow.first()
                 val filesystemAccessEnabled = isFilesystemAccessEffective(prefs.folderAccessMode)
@@ -288,7 +297,7 @@ class RulesViewModel
                     if (signature != lastFolderSignature) {
                         lastFolderSignature = signature
                         _staleRuleIssues.value =
-                            withContext(Dispatchers.IO) {
+                            withContext(ioDispatcher) {
                                 computeStaleRuleIssues(ruleList, filesystemAccessEnabled)
                             }
                     }
@@ -540,7 +549,7 @@ class RulesViewModel
                         simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
                     }
                 if (rulesWithAffectedFiles.isEmpty()) {
-                    _userMessage.value = appContext.getString(R.string.history_no_files_affected)
+                    postUserMessage(appContext.getString(R.string.history_no_files_affected))
                     return@launch
                 }
                 enqueueManualRun(rulesWithAffectedFiles, anchor)
@@ -733,7 +742,7 @@ class RulesViewModel
                     )
                 ruleRepository.saveRule(copy)
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
-                _userMessage.value = "\"${copy.name}\" created"
+                postUserMessage("\"${copy.name}\" created")
             }
 
         private fun mockLargeFileNames(): List<String> =
@@ -797,57 +806,33 @@ class RulesViewModel
             filesystemAccessEnabled: Boolean,
         ): RuleFolderIssueSeverity? {
             if (DevMockFileMove.isMockRule(rule)) return null
-            var sourcePermissionDenied = false
-            var sourceHasUnavailable = false
-            var sourceHasBlockedLocation = false
-            for (path in rule.sourceFolderPaths) {
-                when (fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)) {
-                    FolderAccessResult.PermissionDenied -> {
-                        sourcePermissionDenied = true
+            val sourceIssues =
+                rule.sourceFolderPaths
+                    .mapNotNull { path ->
+                        val result = fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)
+                        if (result == FolderAccessResult.Accessible) null else path to result
+                    }.toMap()
+            val destinationIssue =
+                rule.destinationFolderPath
+                    .takeIf { it.isNotBlank() }
+                    ?.let { path ->
+                        fileOperationRepository
+                            .resolveFolderAccess(path, filesystemAccessEnabled)
+                            .takeIf { it != FolderAccessResult.Accessible }
                     }
-
-                    FolderAccessResult.Unavailable -> {
-                        when {
-                            isFolderPathAllFilesAccessLocationForRules(path) -> sourceHasBlockedLocation = true
-                            else -> sourceHasUnavailable = true
-                        }
-                    }
-
-                    FolderAccessResult.Accessible -> {}
-                }
+            val assessment =
+                assessRuleFolderAccess(
+                    sourceIssues = sourceIssues,
+                    destinationIssue = destinationIssue,
+                    isBlockedLocation = ::isFolderPathAllFilesAccessLocationForRules,
+                )
+            return when (assessment.severity) {
+                RuleFolderSeverity.ERROR -> RuleFolderIssueSeverity.ERROR
+                // Amber source warnings are the only severity the per-rule preference can hide.
+                RuleFolderSeverity.WARNING ->
+                    if (rule.suppressMissingSourceFolderCardWarning) null else RuleFolderIssueSeverity.WARNING
+                RuleFolderSeverity.NONE -> null
             }
-            val destinationPath = rule.destinationFolderPath.takeIf { it.isNotBlank() }
-            var destinationShowsStale = false
-            destinationPath?.let { path ->
-                when (fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)) {
-                    FolderAccessResult.PermissionDenied -> {
-                        return RuleFolderIssueSeverity.ERROR
-                    }
-
-                    FolderAccessResult.Unavailable -> {
-                        if (isFolderPathAllFilesAccessLocationForRules(path)) {
-                            return RuleFolderIssueSeverity.ERROR
-                        } else {
-                            destinationShowsStale = true
-                        }
-                    }
-
-                    FolderAccessResult.Accessible -> {
-                        Unit
-                    }
-                }
-            }
-            if (sourcePermissionDenied) return RuleFolderIssueSeverity.ERROR
-            if (sourceHasBlockedLocation) return RuleFolderIssueSeverity.ERROR
-            if (destinationShowsStale) return RuleFolderIssueSeverity.ERROR
-            if (sourceHasUnavailable) {
-                return if (rule.suppressMissingSourceFolderCardWarning) {
-                    null
-                } else {
-                    RuleFolderIssueSeverity.WARNING
-                }
-            }
-            return null
         }
 
         private fun sortRulesList(
@@ -893,7 +878,7 @@ class RulesViewModel
         }
 
         fun persistMyOrder(ordered: List<Rule>) =
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 persistSortOrderIndices(ordered)
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
             }
@@ -905,7 +890,7 @@ class RulesViewModel
         fun applyDraggedOrder(
             ordered: List<Rule>,
             alsoSwitchSortToMyOrder: Boolean,
-        ) = viewModelScope.launch(Dispatchers.IO) {
+        ) = viewModelScope.launch(ioDispatcher) {
             persistSortOrderIndices(ordered)
             rulesAutoExportTrigger.maybeExportAfterRuleChange()
             if (alsoSwitchSortToMyOrder) {

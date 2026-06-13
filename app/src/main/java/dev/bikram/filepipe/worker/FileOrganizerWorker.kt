@@ -1,6 +1,5 @@
 package dev.bikram.filepipe.worker
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -141,7 +140,7 @@ class FileOrganizerWorker
             historyId: Long,
             movedFileNames: List<String> = emptyList(),
         ) {
-            ensureSummaryChannel()
+            RunNotificationChannels.ensure(appContext)
             val body =
                 when {
                     failed > 0 && operationMode == OperationMode.COPY -> {
@@ -277,7 +276,7 @@ class FileOrganizerWorker
         }
 
         private fun createForegroundInfo(ruleName: String): ForegroundInfo {
-            createNotificationChannel()
+            RunNotificationChannels.ensure(appContext)
             val notification =
                 NotificationCompat
                     .Builder(appContext, CHANNEL_ID)
@@ -292,34 +291,6 @@ class FileOrganizerWorker
                 notification,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
             )
-        }
-
-        private fun createNotificationChannel() {
-            if (notificationManager.getNotificationChannel(CHANNEL_ID) == null) {
-                notificationManager.createNotificationChannel(
-                    NotificationChannel(
-                        CHANNEL_ID,
-                        appContext.getString(R.string.notification_channel_name),
-                        NotificationManager.IMPORTANCE_DEFAULT,
-                    ).apply {
-                        description = appContext.getString(R.string.notification_channel_desc)
-                    },
-                )
-            }
-        }
-
-        private fun ensureSummaryChannel() {
-            if (notificationManager.getNotificationChannel(SUMMARY_CHANNEL_ID) == null) {
-                notificationManager.createNotificationChannel(
-                    NotificationChannel(
-                        SUMMARY_CHANNEL_ID,
-                        appContext.getString(R.string.notification_summary_channel_name),
-                        NotificationManager.IMPORTANCE_DEFAULT,
-                    ).apply {
-                        description = appContext.getString(R.string.notification_summary_channel_desc)
-                    },
-                )
-            }
         }
 
         companion object {

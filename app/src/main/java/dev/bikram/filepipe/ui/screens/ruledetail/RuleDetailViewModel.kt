@@ -30,7 +30,8 @@ import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
 import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
 import dev.bikram.filepipe.domain.usecase.ValidateRuleUseCase
 import dev.bikram.filepipe.ui.navigation.Screen
-import kotlinx.coroutines.Dispatchers
+import dev.bikram.filepipe.di.IoDispatcher
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -173,6 +174,7 @@ class RuleDetailViewModel
         private val rulesAutoExportTrigger: RulesAutoExportTrigger,
         private val userPreferencesRepository: UserPreferencesRepository,
         private val fileOperationRepository: FileOperationRepository,
+        @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val ruleId: Long = savedStateHandle[Screen.RuleDetail.ARG_RULE_ID] ?: Screen.RuleDetail.NEW_RULE_ID
         private val templateIndex: Int = savedStateHandle[Screen.RuleDetail.ARG_TEMPLATE_INDEX] ?: -1
@@ -256,7 +258,7 @@ class RuleDetailViewModel
             }
 
         private fun scheduleFolderAccessRecompute() {
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 val prefs = userPreferencesRepository.preferencesFlow.first()
                 val filesystemAccessEnabled = isFilesystemAccessEffective(prefs.folderAccessMode)
                 val allFilesGranted = Environment.isExternalStorageManager()

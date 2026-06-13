@@ -17,6 +17,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.di.IoDispatcher
+import dev.bikram.filepipe.di.MainDispatcher
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
@@ -31,6 +33,7 @@ import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.treeUriFromDocumentUri
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
+import dev.bikram.filepipe.domain.backupFileTimestamp
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
@@ -49,11 +52,13 @@ import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.update.copyUpdateApkToMediaStoreDownloads
 import dev.bikram.filepipe.update.notificationDedupeKey
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +67,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -70,9 +76,6 @@ import kotlinx.coroutines.yield
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -94,6 +97,8 @@ class SettingsViewModel
         private val updateAvailableNotifier: UpdateAvailableNotifier,
         private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
         private val ruleRepository: RuleRepository,
+        @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+        @MainDispatcher private val mainDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private enum class DevReleasePlayBannerMockStage {
             OFF,
@@ -110,11 +115,17 @@ class SettingsViewModel
         val preferencesState: StateFlow<AppPreferences?> =
             preferencesFlow
                 .map<AppPreferences, AppPreferences?> { preferences -> preferences }
-                .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
         val developerOptionsEnabledFlow = userPreferencesRepository.developerOptionsEnabledFlow
 
-        private val _userMessage = MutableStateFlow<String?>(null)
-        val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
+        // One-shot snackbar messages: a Channel so each is delivered exactly once (no rotation
+        // replay, no conflation of identical/rapid messages).
+        private val _userMessages = Channel<String>(Channel.BUFFERED)
+        val userMessages: Flow<String> = _userMessages.receiveAsFlow()
+
+        private fun postUserMessage(message: String) {
+            _userMessages.trySend(message)
+        }
 
         private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
         val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
@@ -191,9 +202,6 @@ class SettingsViewModel
             }
         }
 
-        fun clearUserMessage() {
-            _userMessage.value = null
-        }
 
         fun setFolderAccessMode(mode: FolderAccessMode) {
             viewModelScope.launch {
@@ -210,7 +218,7 @@ class SettingsViewModel
          * until the user re-picks folders with the system picker.
          */
         suspend fun countRulesUsingFilesystemFolderPaths(): Int =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val rules = ruleRepository.getAllRules().first()
                 rules.count { rule -> ruleUsesFilesystemFolderPaths(rule) }
             }
@@ -317,7 +325,7 @@ class SettingsViewModel
                         prefs.cloudExportFolderUri,
                     ).filter { it.isNotBlank() }
                 if (enabled && backupDestinations.isEmpty()) {
-                    _userMessage.value = context.getString(R.string.settings_export_select_folder_first)
+                    postUserMessage(context.getString(R.string.settings_export_select_folder_first))
                     return@launch
                 }
                 userPreferencesRepository.setAutoExportOnRuleChange(enabled)
@@ -335,7 +343,7 @@ class SettingsViewModel
                         prefs.cloudExportFolderUri,
                     ).filter { it.isNotBlank() }
                 if (enabled && backupDestinations.isEmpty()) {
-                    _userMessage.value = context.getString(R.string.settings_export_select_folder_first)
+                    postUserMessage(context.getString(R.string.settings_export_select_folder_first))
                     return@launch
                 }
                 userPreferencesRepository.setScheduledExportEnabled(enabled)
@@ -491,7 +499,7 @@ class SettingsViewModel
         }
 
         fun onPlayInAppUpdateUserCanceled() {
-            _userMessage.value = context.getString(R.string.settings_play_in_app_update_canceled)
+            postUserMessage(context.getString(R.string.settings_play_in_app_update_canceled))
         }
 
         fun completePlayFlexibleUpdateIfReady(activity: Activity?) {
@@ -558,11 +566,11 @@ class SettingsViewModel
                                 userPreferencesRepository.setExportFolderUri(treeUri.toString())
                             }
                         }
-                        _userMessage.value = context.getString(R.string.settings_export_success, displayName)
+                        postUserMessage(context.getString(R.string.settings_export_success, displayName))
                     },
                     onFailure = { err ->
                         DiagnosticLog.record(context, "Manual backup export failed", err)
-                        _userMessage.value = "Export failed: ${err.message}"
+                        postUserMessage("Export failed: ${err.message}")
                     },
                 )
             }
@@ -574,20 +582,22 @@ class SettingsViewModel
                 exportRulesUseCase.exportBackupJsonToDocumentUri(targetUri).fold(
                     onSuccess = {
                         val providerName = providerDisplayName(targetUri.authority)
-                        _userMessage.value =
+                        postUserMessage(
                             if (providerName != null) {
                                 context.getString(R.string.settings_backup_export_success_to, providerName)
                             } else {
                                 context.getString(R.string.settings_backup_export_success)
-                            }
+                            },
+                        )
                     },
                     onFailure = { err ->
                         DiagnosticLog.record(context, "Cloud backup export failed", err)
-                        _userMessage.value =
+                        postUserMessage(
                             context.getString(
                                 R.string.settings_backup_export_failed,
                                 err.message.orEmpty(),
-                            )
+                            ),
+                        )
                     },
                 )
             }
@@ -619,7 +629,7 @@ class SettingsViewModel
         }
 
         private fun defaultManualExportFileName(): String {
-            val stamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+            val stamp = backupFileTimestamp()
             return "filepipe_backup_$stamp.json"
         }
 
@@ -632,7 +642,7 @@ class SettingsViewModel
                         prefs.cloudExportFolderUri,
                     ).filter { it.isNotBlank() }
                 if (backupDestinations.isEmpty()) {
-                    _userMessage.value = context.getString(R.string.settings_export_select_folder_first)
+                    postUserMessage(context.getString(R.string.settings_export_select_folder_first))
                     return@launch
                 }
                 exportRulesUseCase.exportRulesToTreeUris(backupDestinations).fold(
@@ -641,15 +651,16 @@ class SettingsViewModel
                             context,
                             "Configured backup export completed: destinations=${backupDestinations.size}, files=${fileNames.size}",
                         )
-                        _userMessage.value =
+                        postUserMessage(
                             context.resources.getQuantityString(
                                 R.plurals.settings_backup_exported_to_destinations,
                                 fileNames.size,
                                 fileNames.size,
-                            )
+                            ),
+                        )
                     },
                     onFailure = { error ->
-                        _userMessage.value = context.getString(R.string.settings_backup_export_failed, error.message.orEmpty())
+                        postUserMessage(context.getString(R.string.settings_backup_export_failed, error.message.orEmpty()))
                         DiagnosticLog.record(context, "Configured backup export failed: destinations=${backupDestinations.size}", error)
                     },
                 )
@@ -660,7 +671,7 @@ class SettingsViewModel
             action: BackupImportPickAction,
         ) = viewModelScope.launch {
             val text =
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     runCatching {
                         context.contentResolver.openInputStream(uri)?.use { stream ->
                             stream.readBytes().decodeToString()
@@ -669,24 +680,25 @@ class SettingsViewModel
                 }.onFailure { error ->
                     DiagnosticLog.record(context, "Backup file read failed for $action", error)
                 }.getOrNull() ?: run {
-                    _userMessage.value = "Could not read file"
+                    postUserMessage("Could not read file")
                     return@launch
                 }
             when (action) {
                 BackupImportPickAction.ImportMerge -> {
                     importRulesUseCase.mergeRulesFromJson(text).fold(
                         onSuccess = { result ->
-                            _userMessage.value =
+                            postUserMessage(
                                 context.resources.getQuantityString(
                                     R.plurals.settings_import_merge_success,
                                     result.rulesAdded,
                                     result.rulesAdded,
                                     result.rulesUpdated,
-                                )
+                                ),
+                            )
                         },
                         onFailure = {
                             DiagnosticLog.record(context, "Backup merge import failed", it)
-                            _userMessage.value = "Import failed: ${it.message}"
+                            postUserMessage("Import failed: ${it.message}")
                         },
                     )
                 }
@@ -702,15 +714,16 @@ class SettingsViewModel
                                     }
                                     if (result.settingsRestored) add("settings")
                                 }
-                            _userMessage.value =
+                            postUserMessage(
                                 context.getString(
                                     R.string.settings_restore_success,
                                     parts.joinToString(", "),
-                                )
+                                ),
+                            )
                         },
                         onFailure = {
                             DiagnosticLog.record(context, "Full backup restore failed", it)
-                            _userMessage.value = "Restore failed: ${it.message}"
+                            postUserMessage("Restore failed: ${it.message}")
                         },
                     )
                 }
@@ -731,7 +744,7 @@ class SettingsViewModel
                         .onFailure { error ->
                             DiagnosticLog.record(context, "Manual update check failed", error)
                             if (!silent) {
-                                _userMessage.value = error.message ?: context.getString(R.string.settings_update_check_failed)
+                                postUserMessage(error.message ?: context.getString(R.string.settings_update_check_failed))
                             }
                         }.getOrNull()
                 if (checked.isFailure) return@launch
@@ -748,9 +761,7 @@ class SettingsViewModel
                 } else {
                     _updateInfo.value = null
                     if (!silent) {
-                        _userMessage.value = null
-                        yield()
-                        _userMessage.value = context.getString(R.string.settings_up_to_date)
+                        postUserMessage(context.getString(R.string.settings_up_to_date))
                     }
                 }
             }
@@ -802,7 +813,7 @@ class SettingsViewModel
                 }
                 _updateSheetChangelog.value = ChangelogUiState.Loading
                 val loaded =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         runCatching { fetchRawChangelog() }
                     }
                 _updateSheetChangelog.value =
@@ -835,12 +846,12 @@ class SettingsViewModel
         ): Boolean {
             if (!BuildConfig.USE_PLAY_IN_APP_UPDATES) return false
             if (activity == null) {
-                _userMessage.value = context.getString(R.string.settings_play_in_app_update_failed)
+                postUserMessage(context.getString(R.string.settings_play_in_app_update_failed))
                 return false
             }
             val started = playInAppUpdateStarter.startUpdateIfPending(activity, launcher)
             if (!started) {
-                _userMessage.value = context.getString(R.string.settings_play_in_app_update_failed)
+                postUserMessage(context.getString(R.string.settings_play_in_app_update_failed))
             }
             return started
         }
@@ -850,7 +861,7 @@ class SettingsViewModel
                 val downloadUrl = updateInfo.downloadUrl
                 _downloadProgress.value = 0f
                 val result =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         runCatching {
                             val connection = URL(downloadUrl).openConnection() as HttpURLConnection
                             connection.instanceFollowRedirects = true
@@ -894,11 +905,12 @@ class SettingsViewModel
                                                 "Update APK copy to Downloads failed",
                                                 copyResult.exceptionOrNull(),
                                             )
-                                            withContext(Dispatchers.Main) {
-                                                _userMessage.value =
+                                            withContext(mainDispatcher) {
+                                                postUserMessage(
                                                     context.getString(
                                                         R.string.settings_update_apk_save_to_downloads_failed,
-                                                    )
+                                                    ),
+                                                )
                                             }
                                         } else {
                                             userPreferencesRepository.markUpdateApkDownloadsCopySucceeded()
@@ -917,7 +929,7 @@ class SettingsViewModel
                                         setDataAndType(uri, "application/vnd.android.package-archive")
                                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
                                     }
-                                withContext(Dispatchers.Main) {
+                                withContext(mainDispatcher) {
                                     context.startActivity(installIntent)
                                 }
                                 if (BuildConfig.FLAVOR == "github" && updateInfo.remoteApkAssetUpdatedAt.isNotBlank()) {
@@ -933,7 +945,7 @@ class SettingsViewModel
                     }
                 result.onFailure {
                     DiagnosticLog.record(context, "Update APK download/install failed", it)
-                    _userMessage.value = "Download failed: ${it.message}"
+                    postUserMessage("Download failed: ${it.message}")
                 }
                 _downloadProgress.value = null
             }

@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.domain.formatTimeOfDay
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
@@ -265,21 +266,7 @@ fun ScheduleDialog(
                             style = MaterialTheme.typography.labelMedium,
                         )
                         val dialogContext = androidx.compose.ui.platform.LocalContext.current
-                        val isSystem24Hour =
-                            android.text.format.DateFormat
-                                .is24HourFormat(dialogContext)
-                        val timeStr =
-                            if (isSystem24Hour) {
-                                "%02d:%02d".format(hour, minute)
-                            } else {
-                                val hour12 =
-                                    when (val hourMod = hour % 12) {
-                                        0 -> 12
-                                        else -> hourMod
-                                    }
-                                val amPm = if (hour < 12) "AM" else "PM"
-                                "%d:%02d %s".format(hour12, minute, amPm)
-                            }
+                        val timeStr = formatTimeOfDay(dialogContext, hour, minute)
                         FilePipeOutlinedButton(
                             onClick = { showTimePicker = true },
                             modifier = Modifier.fillMaxWidth(),

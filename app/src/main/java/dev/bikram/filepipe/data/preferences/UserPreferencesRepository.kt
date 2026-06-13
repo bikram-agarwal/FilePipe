@@ -105,14 +105,6 @@ private enum class ShadingIntensity {
     INTENSE,
 }
 
-private fun shadingIntensityToLegacyEnum(intensity: Float): ShadingIntensity =
-    when {
-        intensity <= 0.2f -> ShadingIntensity.NONE
-        intensity <= 0.7f -> ShadingIntensity.SUBTLE
-        intensity <= 1.4f -> ShadingIntensity.MEDIUM
-        else -> ShadingIntensity.INTENSE
-    }
-
 private fun legacyShadingEnumToFactor(intensity: ShadingIntensity): Float =
     when (intensity) {
         ShadingIntensity.NONE -> 0.0f
@@ -126,11 +118,13 @@ private fun readShadingIntensity(prefs: Preferences): Float =
         ?: runCatching {
             legacyShadingEnumToFactor(ShadingIntensity.valueOf(prefs[PrefKeys.SHADING_INTENSITY] ?: ""))
         }.getOrElse {
-            val legacySkipTint =
-                prefs[PrefKeys.ENHANCED_SHADING]
-                    ?: prefs[PrefKeys.ENHANCED_SHADING_LEGACY]
-                    ?: true
-            if (legacySkipTint) 0.0f else 1.0f
+            // Honor an explicit legacy on/off bool from older installs (true == "skip tint" == off);
+            // fall back to the medium default only when nothing was ever stored (fresh install).
+            when (prefs[PrefKeys.ENHANCED_SHADING] ?: prefs[PrefKeys.ENHANCED_SHADING_LEGACY]) {
+                true -> 0.0f
+                false -> 1.0f
+                null -> DEFAULT_SHADING_INTENSITY
+            }
         }
 
 @Singleton
@@ -469,9 +463,12 @@ class UserPreferencesRepository
 
         suspend fun setShadingIntensity(intensity: Float) {
             dataStore.edit { prefs ->
+                // Single source of truth. Drop the legacy mirror keys so the value can't drift
+                // across the three representations; readShadingIntensity() still migrates them
+                // for installs that predate the factor key.
                 prefs[PrefKeys.SHADING_INTENSITY_FACTOR] = intensity
-                prefs[PrefKeys.SHADING_INTENSITY] = shadingIntensityToLegacyEnum(intensity).name
-                prefs[PrefKeys.ENHANCED_SHADING] = intensity <= 0.0f
+                prefs.remove(PrefKeys.SHADING_INTENSITY)
+                prefs.remove(PrefKeys.ENHANCED_SHADING)
                 prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
             }
         }
@@ -770,10 +767,11 @@ class UserPreferencesRepository
                 prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] = dto.saveUpdateApkToDownloads
                 prefs.remove(PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED)
                 prefs[PrefKeys.USE_GRADIENT_BACKGROUND] = dto.useGradientBackground
-                val shadingIntensity = dto.shadingIntensity ?: if (dto.useEnhancedShading) 0.0f else 1.0f
+                // Older backups carry only the useEnhancedShading bool (true == shading on).
+                val shadingIntensity = dto.shadingIntensity ?: if (dto.useEnhancedShading) 1.0f else 0.0f
                 prefs[PrefKeys.SHADING_INTENSITY_FACTOR] = shadingIntensity
-                prefs[PrefKeys.SHADING_INTENSITY] = shadingIntensityToLegacyEnum(shadingIntensity).name
-                prefs[PrefKeys.ENHANCED_SHADING] = shadingIntensity <= 0.0f
+                prefs.remove(PrefKeys.SHADING_INTENSITY)
+                prefs.remove(PrefKeys.ENHANCED_SHADING)
                 prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
 
                 dto.folderAccessMode?.let { raw ->

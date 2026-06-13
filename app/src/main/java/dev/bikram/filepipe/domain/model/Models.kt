@@ -2,6 +2,7 @@ package dev.bikram.filepipe.domain.model
 
 import android.content.Context
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.domain.formatTimeOfDay
 import java.util.Calendar
 
 enum class ConflictPolicy { SKIP, OVERWRITE, RENAME_SUFFIX }
@@ -57,21 +58,7 @@ data class RuleSchedule(
     val usesStartTime: Boolean = true,
 ) {
     fun toReadableString(context: Context): String {
-        val isSystem24Hour =
-            android.text.format.DateFormat
-                .is24HourFormat(context)
-        val timeStr =
-            if (isSystem24Hour) {
-                "%02d:%02d".format(hour, minute)
-            } else {
-                val hour12 =
-                    when (val hourMod = hour % 12) {
-                        0 -> 12
-                        else -> hourMod
-                    }
-                val amPm = if (hour < 12) "AM" else "PM"
-                "%d:%02d %s".format(hour12, minute, amPm)
-            }
+        val timeStr = formatTimeOfDay(context, hour, minute)
         val interval = repeatInterval ?: DEFAULT_REPEAT_INTERVAL
         return when (type) {
             ScheduleType.EVERY_N_HOURS -> {

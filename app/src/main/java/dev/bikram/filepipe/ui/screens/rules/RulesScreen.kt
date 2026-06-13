@@ -31,7 +31,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -95,6 +94,7 @@ import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
+import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.RuleCard
 import dev.bikram.filepipe.ui.components.RuleCardAction
@@ -154,7 +154,6 @@ fun RulesScreen(
     val staleRuleWarningIds = uiState.staleRuleWarningIds
     val staleRuleErrorIds = uiState.staleRuleErrorIds
     val previewState = uiState.previewState
-    val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val resources = LocalResources.current
 
@@ -267,15 +266,12 @@ fun RulesScreen(
         }
     }
 
-    LaunchedEffect(userMessage) {
-        val msg = userMessage ?: return@LaunchedEffect
-        try {
+    LaunchedEffect(Unit) {
+        viewModel.userMessages.collect { msg ->
             snackbarHostState.showSnackbar(
                 message = msg,
                 duration = SnackbarDuration.Short,
             )
-        } finally {
-            viewModel.clearUserMessage()
         }
     }
 
@@ -687,29 +683,16 @@ fun RulesScreen(
 
     if (pendingDeleteSelected) {
         val count = selectedRuleIds.size
-        AlertDialog(
-            onDismissRequest = { pendingDeleteSelected = false },
-            title = {
-                Text(
-                    pluralStringResource(
-                        R.plurals.rules_move_to_trash_confirm_title,
-                        count,
-                        count,
-                    ),
-                )
+        FilePipeConfirmDialog(
+            title = pluralStringResource(R.plurals.rules_move_to_trash_confirm_title, count, count),
+            text = stringResource(R.string.rules_move_to_trash_confirm_message),
+            confirmLabel = stringResource(R.string.move_to_trash),
+            onConfirm = {
+                viewModel.deleteSelected()
+                pendingDeleteSelected = false
             },
-            text = { Text(stringResource(R.string.rules_move_to_trash_confirm_message)) },
-            confirmButton = {
-                FilePipeTextButton(onClick = {
-                    viewModel.deleteSelected()
-                    pendingDeleteSelected = false
-                }) { Text(stringResource(R.string.move_to_trash), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                FilePipeTextButton(onClick = {
-                    pendingDeleteSelected = false
-                }) { Text(stringResource(R.string.cancel)) }
-            },
+            onDismiss = { pendingDeleteSelected = false },
+            destructive = true,
         )
     }
 

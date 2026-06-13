@@ -39,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,6 +47,7 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathAllowedForRules
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.isLandscape
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -392,7 +392,7 @@ fun FilesystemFolderPickerSheetContent(
         }
         Spacer(Modifier.height(8.dp))
         val fontScale = LocalDensity.current.fontScale
-        val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val isLandscape = isLandscape()
         val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
         val isTwoPane = calculatePaneScaffoldDirective(windowAdaptiveInfo).maxHorizontalPartitions > 1
         if (fontScale > 1.15f) {
@@ -478,7 +478,11 @@ fun FilesystemFolderPickerSheetContent(
                                 .fillMaxWidth()
                                 .heightIn(min = ButtonDefaults.MinHeight),
                     ) {
-                        Text(stringResource(R.string.filesystem_folder_picker_use_folder))
+                        Text(
+                            text = stringResource(R.string.filesystem_folder_picker_use_folder),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
                     }
                     FilePipeOutlinedButton(
                         onClick = {
@@ -492,7 +496,11 @@ fun FilesystemFolderPickerSheetContent(
                                 .fillMaxWidth()
                                 .heightIn(min = ButtonDefaults.MinHeight),
                     ) {
-                        Text(stringResource(R.string.filesystem_folder_picker_new_folder))
+                        Text(
+                            text = stringResource(R.string.filesystem_folder_picker_new_folder),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
                     }
                     FilePipeTextButton(
                         onClick = onDismiss,
@@ -519,7 +527,6 @@ fun FilesystemFolderPickerSheetContent(
                 }
                 Spacer(Modifier.weight(1f))
                 Row(
-                    modifier = Modifier.width(IntrinsicSize.Max),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -530,13 +537,13 @@ fun FilesystemFolderPickerSheetContent(
                             showNewFolderDialog = true
                         },
                         enabled = canCreateSubfolder,
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .heightIn(min = ButtonDefaults.MinHeight),
+                        modifier = Modifier.heightIn(min = ButtonDefaults.MinHeight),
                     ) {
-                        Text(stringResource(R.string.filesystem_folder_picker_new_folder))
+                        Text(
+                            text = stringResource(R.string.filesystem_folder_picker_new_folder),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
                     }
                     FilePipeButton(
                         onClick = {
@@ -549,13 +556,13 @@ fun FilesystemFolderPickerSheetContent(
                             }
                         },
                         enabled = canConfirmSelection,
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .heightIn(min = ButtonDefaults.MinHeight),
+                        modifier = Modifier.heightIn(min = ButtonDefaults.MinHeight),
                     ) {
-                        Text(stringResource(R.string.filesystem_folder_picker_use_folder))
+                        Text(
+                            text = stringResource(R.string.filesystem_folder_picker_use_folder),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
                     }
                 }
             }

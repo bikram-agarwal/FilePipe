@@ -69,7 +69,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -149,6 +148,8 @@ import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.ui.common.AppBottomSheet
+import dev.bikram.filepipe.ui.common.isLandscape
+import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.AboutAuthorPhoto
 import dev.bikram.filepipe.ui.components.AppIconImage
@@ -158,6 +159,7 @@ import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
+import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
@@ -450,7 +452,6 @@ fun SettingsScreen(
             return
         }
     val developerOptionsEnabled by viewModel.developerOptionsEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
-    val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
     val playInAppUpdateBannerUiState by viewModel.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsStateWithLifecycle()
@@ -673,8 +674,8 @@ fun SettingsScreen(
     val openUpdateSheetFromNotification by viewModel.openUpdateSheetFromNotification.collectAsStateWithLifecycle()
     var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val isLandscape = isLandscape()
+    val isSmallLandscape = isSmallLandscape()
     val heightFraction = if (isLandscape) 0.95f else 0.85f
     val maxUpdateSheetHeight = (configuration.screenHeightDp * heightFraction).dp
     val settingsScrollEnabled =
@@ -684,15 +685,12 @@ fun SettingsScreen(
             ignoredBottomPadding = 24.dp,
         )
 
-    LaunchedEffect(userMessage) {
-        val message = userMessage ?: return@LaunchedEffect
-        try {
+    LaunchedEffect(Unit) {
+        viewModel.userMessages.collect { message ->
             snackbarHostState.showSnackbar(
                 message = message,
                 duration = SnackbarDuration.Short,
             )
-        } finally {
-            viewModel.clearUserMessage()
         }
     }
 
@@ -878,45 +876,39 @@ fun SettingsScreen(
     }
 
     pendingFolderAccessSwitch?.let { targetMode ->
-        AlertDialog(
-            onDismissRequest = { pendingFolderAccessSwitch = null },
-            title = { Text(stringResource(R.string.settings_folder_access_switch_to_saf_title)) },
-            text = { Text(stringResource(R.string.settings_folder_access_switch_to_saf_body)) },
-            confirmButton = {
-                FilePipeTextButton(onClick = {
-                    val confirmedTarget = targetMode
-                    pendingFolderAccessSwitch = null
-                    coroutineScope.launch {
-                        val affectedRuleCount = viewModel.countRulesUsingFilesystemFolderPaths()
-                        viewModel.setFolderAccessModeNow(confirmedTarget)
-                        val message =
-                            when {
-                                affectedRuleCount <= 0 -> {
-                                    resources.getString(R.string.settings_folder_access_switched_selective_zero_rules)
-                                }
-
-                                else -> {
-                                    resources.getQuantityString(
-                                        R.plurals.settings_folder_access_switched_selective_snackbar,
-                                        affectedRuleCount,
-                                        affectedRuleCount,
-                                    )
-                                }
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.settings_folder_access_switch_to_saf_title),
+            text = stringResource(R.string.settings_folder_access_switch_to_saf_body),
+            confirmLabel = stringResource(R.string.settings_folder_access_switch_confirm),
+            onConfirm = {
+                val confirmedTarget = targetMode
+                pendingFolderAccessSwitch = null
+                coroutineScope.launch {
+                    val affectedRuleCount = viewModel.countRulesUsingFilesystemFolderPaths()
+                    viewModel.setFolderAccessModeNow(confirmedTarget)
+                    val message =
+                        when {
+                            affectedRuleCount <= 0 -> {
+                                resources.getString(R.string.settings_folder_access_switched_selective_zero_rules)
                             }
-                        snackbarHostState.showSnackbar(
-                            message = message,
-                            duration = SnackbarDuration.Long,
-                        )
-                    }
-                }) {
-                    Text(stringResource(R.string.settings_folder_access_switch_confirm))
+
+                            else -> {
+                                resources.getQuantityString(
+                                    R.plurals.settings_folder_access_switched_selective_snackbar,
+                                    affectedRuleCount,
+                                    affectedRuleCount,
+                                )
+                            }
+                        }
+                    snackbarHostState.showSnackbar(
+                        message = message,
+                        duration = SnackbarDuration.Long,
+                    )
                 }
             },
-            dismissButton = {
-                FilePipeTextButton(onClick = { pendingFolderAccessSwitch = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { pendingFolderAccessSwitch = null },
+            // Switching modes can revoke access to folders rules depend on, so don't push it.
+            destructive = true,
         )
     }
 
@@ -2569,7 +2561,7 @@ private fun UpdateCheckBottomSheetContent(
     val sheetScroll = rememberScrollState()
     val pagerCoroutineScope = rememberCoroutineScope()
     val scheme = MaterialTheme.colorScheme
-    val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = isLandscape()
     val isChangelogReady = changelogState is ChangelogUiState.Ready
     val outerScrollable = sheetScroll.maxValue > 0 && sheetScroll.maxValue != Int.MAX_VALUE
     val outerModifier =

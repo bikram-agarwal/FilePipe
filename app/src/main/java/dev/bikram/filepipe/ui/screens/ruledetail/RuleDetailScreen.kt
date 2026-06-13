@@ -129,6 +129,8 @@ import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.isFolderPathAllFilesAccessLocationForRules
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.data.storage.safTreeUriToPath
+import dev.bikram.filepipe.domain.RuleFolderSeverity
+import dev.bikram.filepipe.domain.assessRuleFolderAccess
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -140,6 +142,7 @@ import dev.bikram.filepipe.domain.model.materialSymbolName
 import dev.bikram.filepipe.ui.common.AppBottomSheet
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.FilePipePredictiveBackHandler
+import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.components.CenteredTooltipText
 import dev.bikram.filepipe.ui.components.FileExtensionChips
 import dev.bikram.filepipe.ui.components.FilePipeButton
@@ -151,6 +154,7 @@ import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeSurface
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
+import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.FilePipeToggleButton
 import dev.bikram.filepipe.ui.components.FilesystemFolderPickerSheetContent
@@ -221,24 +225,6 @@ private data class RuleAlertColors(
     val content: Color,
     val accent: Color,
 )
-
-private fun isSuppressibleSourceUnavailable(path: String): Boolean = !isFolderPathAllFilesAccessLocationForRules(path)
-
-private fun isSuppressibleSourceIssue(
-    path: String,
-    result: FolderAccessResult,
-): Boolean = result == FolderAccessResult.Unavailable && isSuppressibleSourceUnavailable(path)
-
-private fun hasOnlySuppressibleSourceIssues(sourceIssues: Map<String, FolderAccessResult>): Boolean =
-    sourceIssues.isNotEmpty() &&
-        sourceIssues.all { (path, result) -> isSuppressibleSourceIssue(path, result) }
-
-private fun hasBlockedSourceIssues(sourceIssues: Map<String, FolderAccessResult>): Boolean = sourceIssues.any { (path, result) -> result != FolderAccessResult.Unavailable || !isSuppressibleSourceUnavailable(path) }
-
-private fun isSuppressibleMissingSourceWarning(
-    sourceIssues: Map<String, FolderAccessResult>,
-    destinationIssue: FolderAccessResult?,
-): Boolean = destinationIssue == null && hasOnlySuppressibleSourceIssues(sourceIssues)
 
 @Composable
 private fun ruleAlertColors(isErrorSeverity: Boolean): RuleAlertColors {
@@ -762,12 +748,14 @@ fun RuleDetailScreen(
     val showValidationErrors = state.errors.isNotEmpty()
     val folderAccessIssues =
         state.inaccessibleSourceIssues.isNotEmpty() || state.destinationFolderAccessIssue != null
-    val hasSuppressibleMissingSourceWarning =
-        isSuppressibleMissingSourceWarning(
+    val folderAccessAssessment =
+        assessRuleFolderAccess(
             sourceIssues = state.inaccessibleSourceIssues,
             destinationIssue = state.destinationFolderAccessIssue,
+            isBlockedLocation = ::isFolderPathAllFilesAccessLocationForRules,
         )
-    val hasOperationalFolderError = folderAccessIssues && !hasSuppressibleMissingSourceWarning
+    val hasSuppressibleMissingSourceWarning = folderAccessAssessment.onlySuppressibleSourceWarnings
+    val hasOperationalFolderError = folderAccessAssessment.severity == RuleFolderSeverity.ERROR
     val alertIsErrorSeverity = showValidationErrors || hasOperationalFolderError
     val anySourcePermission =
         state.inaccessibleSourceIssues.values.any { it == FolderAccessResult.PermissionDenied }
@@ -875,7 +863,7 @@ fun RuleDetailScreen(
         showValidationErrors && (state.sourceFolderPaths.isEmpty() || sourceAndDestinationSame)
     val destinationFolderHasBlockingError =
         showValidationErrors && (state.destinationFolderPath.isBlank() || sourceAndDestinationSame)
-    val sourceFolderAccessIsWarningOnly = hasOnlySuppressibleSourceIssues(state.inaccessibleSourceIssues)
+    val sourceFolderAccessIsWarningOnly = folderAccessAssessment.sourceIssuesAllSuppressible
     val sourceFolderAccessHighlightColor =
         if (sourceFolderAccessIsWarningOnly) {
             warningHighlightColor
@@ -2047,32 +2035,16 @@ fun RuleDetailScreen(
     }
 
     if (showDeleteForeverConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteForeverConfirm = false },
-            title = { Text(stringResource(R.string.history_trash_delete_forever_confirm_title)) },
-            text = {
-                Text(
-                    stringResource(
-                        R.string.history_trash_delete_forever_confirm_message,
-                        state.name,
-                    ),
-                )
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.history_trash_delete_forever_confirm_title),
+            text = stringResource(R.string.history_trash_delete_forever_confirm_message, state.name),
+            confirmLabel = stringResource(R.string.delete_forever),
+            onConfirm = {
+                showDeleteForeverConfirm = false
+                viewModel.deleteRuleForever()
             },
-            confirmButton = {
-                FilePipeTextButton(
-                    onClick = {
-                        showDeleteForeverConfirm = false
-                        viewModel.deleteRuleForever()
-                    },
-                ) {
-                    Text(stringResource(R.string.delete_forever))
-                }
-            },
-            dismissButton = {
-                FilePipeTextButton(onClick = { showDeleteForeverConfirm = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { showDeleteForeverConfirm = false },
+            destructive = true,
         )
     }
 
@@ -2088,7 +2060,7 @@ fun RuleDetailScreen(
             folderPickerSheetState.expand()
         }
         val fontScale = LocalDensity.current.fontScale
-        val showTitle = fontScale <= 1.15f
+        val showTitle = fontScale <= 1.15f && !isSmallLandscape()
         AppBottomSheet(
             title = stringResource(R.string.filesystem_folder_picker_title),
             showTitleBar = showTitle,
@@ -2139,28 +2111,7 @@ fun RuleDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
-                    FilePipeTextButton(onClick = { showDiscardDialog = false }) {
-                        Text(
-                            text = stringResource(R.string.keep_editing),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            softWrap = false,
-                        )
-                    }
-                    FilePipeTextButton(
-                        onClick = {
-                            showDiscardDialog = false
-                            if (state.errors.isNotEmpty()) dismissedBottomBarKey = null
-                            viewModel.save()
-                        },
-                    ) {
-                        Text(
-                            text = stringResource(R.string.save_and_exit),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            softWrap = false,
-                        )
-                    }
+                    // Destructive: low-emphasis, error-colored, kept leftmost — farthest from Save.
                     FilePipeTextButton(
                         onClick = {
                             showDiscardDialog = false
@@ -2170,6 +2121,31 @@ fun RuleDetailScreen(
                     ) {
                         Text(
                             text = stringResource(R.string.discard_changes),
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
+                    }
+                    FilePipeTextButton(onClick = { showDiscardDialog = false }) {
+                        Text(
+                            text = stringResource(R.string.keep_editing),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
+                    }
+                    // Recommended, non-destructive action: filled emphasis, rightmost.
+                    FilePipeButton(
+                        onClick = {
+                            showDiscardDialog = false
+                            if (state.errors.isNotEmpty()) dismissedBottomBarKey = null
+                            viewModel.save()
+                        },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.save_and_exit),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             softWrap = false,

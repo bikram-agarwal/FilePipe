@@ -8,15 +8,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
+import dev.bikram.filepipe.di.IoDispatcher
+import dev.bikram.filepipe.domain.backupFileTimestamp
 import dev.bikram.filepipe.domain.export.buildAppBackupJson
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import javax.inject.Inject
 
 class ExportRulesUseCase
@@ -26,9 +25,10 @@ class ExportRulesUseCase
         private val ruleRepository: RuleRepository,
         private val runHistoryRepository: RunHistoryRepository,
         private val userPreferencesRepository: UserPreferencesRepository,
+        @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) {
         suspend fun exportRulesToTreeUri(folderPath: String): Result<String> =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 if (folderPath.isBlank()) return@withContext Result.failure(IllegalStateException("No export folder"))
 
                 val exportResult = exportRulesToTreeUris(listOf(folderPath))
@@ -39,7 +39,7 @@ class ExportRulesUseCase
             }
 
         suspend fun exportRulesToTreeUris(folderPaths: List<String>): Result<List<String>> =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val destinations = folderPaths.map { it.trim() }.filter { it.isNotBlank() }.distinct()
                 if (destinations.isEmpty()) return@withContext Result.failure(IllegalStateException("No export folder"))
 
@@ -52,7 +52,7 @@ class ExportRulesUseCase
                 val settings = userPreferencesRepository.getPreferencesSnapshot()
 
                 val json = buildAppBackupJson(rules, historyWithFiles, settings)
-                val stamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+                val stamp = backupFileTimestamp()
                 val fileName = "filepipe_backup_$stamp.json"
 
                 val failures = mutableListOf<Throwable>()
@@ -81,7 +81,7 @@ class ExportRulesUseCase
          * Writes the same backup JSON as [exportRulesToTreeUri] to a URI from [androidx.activity.result.contract.ActivityResultContracts.CreateDocument].
          */
         suspend fun exportBackupJsonToDocumentUri(targetUri: Uri): Result<String> =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val rules = ruleRepository.getAllRules().first()
                 val allHistory = runHistoryRepository.getAllHistoryOnce()
                 val historyWithFiles =

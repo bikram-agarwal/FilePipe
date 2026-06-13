@@ -41,7 +41,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -55,6 +54,7 @@ import androidx.compose.ui.unit.isSpecified
 import androidx.graphics.shapes.Morph
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.theme.MorphPolygonShape
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import kotlin.math.roundToInt
@@ -94,9 +94,7 @@ fun AlertFloatingFab(
 ) {
     if (summary.count <= 0) return
 
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val isSmallLandscape = isSmallLandscape()
 
     val label = stringResource(R.string.main_alert_fab_label)
     val scheme = MaterialTheme.colorScheme
@@ -260,9 +258,7 @@ fun AlertFloatingActionButtonMenu(
     // must extend left of the FAB, which is impossible inside that clip. The FAB anchors
     // a plain Box instead, and the bars render as an unclipped sibling placed above it.
     BackHandler(enabled = expanded) { onExpandedChange(false) }
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val isSmallLandscape = isSmallLandscape()
     val barIconSize = if (isSmallLandscape) rememberResponsiveActionButtonSize() else 44.dp
     val barContentScale = if (isSmallLandscape) barIconSize.value / 44f else 1f
     val density = LocalDensity.current

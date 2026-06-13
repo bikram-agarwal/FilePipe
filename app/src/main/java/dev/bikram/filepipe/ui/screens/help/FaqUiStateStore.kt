@@ -2,6 +2,7 @@ package dev.bikram.filepipe.ui.screens.help
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,8 +18,8 @@ class FaqUiStateStore
         private val expandedItemIdsMutable = MutableStateFlow<Set<String>>(emptySet())
         private val scrollPositionMutable = MutableStateFlow(FaqScrollPosition())
 
-        val expandedItemIds: StateFlow<Set<String>> = expandedItemIdsMutable
-        val scrollPosition: StateFlow<FaqScrollPosition> = scrollPositionMutable
+        val expandedItemIds: StateFlow<Set<String>> = expandedItemIdsMutable.asStateFlow()
+        val scrollPosition: StateFlow<FaqScrollPosition> = scrollPositionMutable.asStateFlow()
 
         fun setItemExpanded(
             itemId: String,

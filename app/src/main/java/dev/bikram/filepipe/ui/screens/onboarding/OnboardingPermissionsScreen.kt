@@ -99,6 +99,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.isLandscape
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeToggleButton
@@ -237,7 +238,7 @@ fun OnboardingPermissionsScreen(
                 )
             }
         val compactHeight = maxHeight < 560.dp
-        val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val isLandscape = isLandscape()
 
         CompositionLocalProvider(LocalDensity provides responsiveDensity) {
             val isSmallLandscape = isLandscape && screenHeight < 480.dp
