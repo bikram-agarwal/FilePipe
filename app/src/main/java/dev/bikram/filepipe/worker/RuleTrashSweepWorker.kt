@@ -18,8 +18,12 @@ class RuleTrashSweepWorker
     ) : CoroutineWorker(appContext, workerParams) {
         override suspend fun doWork(): Result {
             val cutoff = System.currentTimeMillis() - RuleRepository.TRASH_RETENTION_MILLIS
-            ruleRepository.autoEmptyTrashOlderThan(cutoff)
-            return Result.success()
+            return runCatching {
+                ruleRepository.autoEmptyTrashOlderThan(cutoff)
+            }.fold(
+                onSuccess = { Result.success() },
+                onFailure = { Result.retry() },
+            )
         }
 
         companion object {

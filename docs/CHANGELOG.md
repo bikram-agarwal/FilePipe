@@ -1,32 +1,29 @@
-## v3.8.3 Adaptive layout, richer schedule, alert FAB
+## v3.8.4 Adaptive layout, richer schedule, alert FAB
 
 ### ✨ New Features
-
 - **Alerts button** near the navigation bar replaces the old update button. Tap it to expand update status (available, downloading, ready to install).
 - **Richer schedules**: set "every N hours/days/weeks", pick multiple weekdays, and choose a start time.
 
 ### 🛠 Improved Features
-
 - Better layouts in **landscape**, on **tablets**, and on **large text/display** devices. The app now adapts dynamically when your device uses extra-large font or display size settings.
 - Trashed rules can now be opened to view their details.
+- **More consistent confirmation dialogs** throughout the app, with destructive actions clearly marked.
 
 ### 🐛 Bug Fixes
-
 - Fixed update alert dismissal and re-show behavior after manual update checks.
+- Automatic trash emptying now retries if it hits an error instead of quietly skipping.
 
 ---
 
 ## v3.8.0 - Landscape layouts, improved theming, better schedules
 
 ### ✨ New Features
-
 - Added a new two-panel and landscape layouts for phones, foldables and large tablets.
 - Added a Surface shading slider so you can fine-tune how much color tint appears in app backgrounds and surfaces.
 - Added separate custom color controls for primary, secondary, and tertiary theme colors.
 - Custom themes can now show and save multi-color accent palettes.
 
 ### 🛠 Improved Features
-
 - Rules, History & Settings screens remember sort order and expanded/collapsed state after restart.
 - Those preferences are now included in backup and restore.
 - Tapping a rule card now opens it for editing. The `Edit` swipe action is replaced with `Expand / Collapse`.
@@ -38,7 +35,6 @@
 - App now follows system time format (12 hours / 24 hours)
 
 ### 🐛 Bug Fixes
-
 - Fixed a possible Android 15 boot/startup issue related to EmojiCompat initialization.
 
 ---
@@ -46,7 +42,6 @@
 ## v3.7.0 - Rule trash, color slider, expressive refresh
 
 ### ✨ New Features
-
 - **Rule Trash** - Deleted rules go to Trash first. Restore them from History → Trash within 30 days, or delete forever.
 - **Preview multiple rules** - Select several rules and preview matching files for each before batch running.
 - **Richer run details** - History run pages show file thumbnails where possible, with open/share actions.
@@ -57,7 +52,6 @@
 - **More from Bikram** - About section now showcases my other apps.
 
 ### 🛠 Improved Features
-
 - **Flexible Extension Input** - Add multiple file extensions at once. Separate them with commas, semicolons, or spaces, and enter them with or without a leading dot (e.g. `jpg, png, .mp3`).
 - **Subfolder controls** - "Scan subfolders" and "Mirror subfolders to destination" are now separate toggles.
 - **Auto-export** - More reliable backup-on-exit; writes to all configured folders and retries after a failed export.
@@ -69,11 +63,9 @@
 - **Animations** - Smoother transitions; respects Android reduced-motion setting.
 
 ### 🐛 Bug Fixes
-
 - Fixed long-press on a rule's action buttons accidentally entering multi-select.
 
 ### 📦 Others
-
 - Requires Android 12+ (minimum SDK raised).
 - Targets Android API 37.
 
@@ -82,7 +74,6 @@
 ## v3.1.1 UI consistency
 
 ### 🛠 Improved Features
-
 - In Play Store flavor, tapping `check update` in banner won't open double bottom sheets.
 - Update and install banner layout made consistent.
 - Updated rule error banner layout to be similar to update banner layout.
@@ -95,20 +86,17 @@
 ## v3.1.0 In-App Updates, Review, Share
 
 ### ✨ New Features
-
 - **Update nudge**: When a new version is available, an update banner appears at top of screen so you never miss an update.
 - **Seamless updates (Play Store)**: FilePipe can now download and install updates from Google Play without leaving the app. A banner shows download progress and lets you restart to apply the update when it's ready.
 - **Rate/Review the app**: You can now rate/review FilePipe directly from Settings.
 - **Share FilePipe**: Share a link to FilePipe with friends from the Settings screen.
 
 ### 🛠 Improved Features
-
 - **Help always one tap away**: A new  ❔ button in the Settings header takes you straight to the FAQ and help section.
 - Adjusted how the app works with **edge-to-edge** on newer Android versions.
 - Tweaked colors on onboarding title screen and permissions screen. 
 
 ### 🐛 Bug Fixes
-
 - Fixed a bug where a newly duplicated rule wouldn't appear on the list.
 
 ---
@@ -116,18 +104,15 @@
 ## v3.0.0: You control access
 
 ### ✨ New Features
-
 - **All Files Access mode**: a new access option that lets FilePipe work with any folder, including `Download`, SD card root, and internal storage root, folders that are restricted by Android in "Selective Access" mode. Now you can add folders without extra prompts per folder. Choose between `All Files Access` and `Selective Access` during setup or in Settings at any time.
 - **Help & FAQs**: a searchable help/FAQ section covering common questions about rules, storage access, scheduling, privacy, and backup. Accessible from Settings and from rule error banners.
 
 ### 🛠 Improved Features
-
 - **Onboarding permissions screen** — You now choose between `Selective Access` and `All Files Access` with a clear side-by-side explanation. It walks you through granting required access.
 - **Folder access indicators** — the rule editor now distinguishes between a folder that's completely inaccessible in your current mode (🚫) and one that's allowed but may have a permission issue (⚠️).
 - **Settings deep-links from Help**: tapping a quick action in the FAQ scrolls Settings to the right section and briefly highlights it so you know exactly where to look.
 
 ### 🐛 Bug Fixes
-
 - **Undo after copy**: undoing a rule that copied files now correctly reports success for files that were already manually deleted at the destination, instead of counting them as failures.
 - **APK update cache**: the downloaded update APK is no longer deleted from the app cache before the copy to your Downloads folder has finished.
 - **Backup restore**: run history is now correctly linked to the right rules after a restore, even if rule names aren't unique.
@@ -137,14 +122,12 @@
 ## v2.2.0: Smart updates, Import & Restore
 
 ### ✨ New features
-
 - **Import and Restore**: Now in addition to `restore` that wipes everything before restoring the backup, you can choose `import`, which adds new rules from the backup and updates matching ones.
 - **Smart updates**: Update checks now compare asset timestamps. This ensures you get hotfixes even when the version number hasn't changed.
 - **Scheduled update checks**: Added scheduled update checks (At startup/Daily/Weekly) with optional push notifications, so you stay current without manual refreshing.
 - **Save apks**: Added support for saving update APKs to Downloads folder.
 
 ### 🛠 Improvements
-
 - Clearer alerts about folder issues. Different alerts for missing folder vs lost permission
 - New option to suppress missing source folder alerts
 - Long explanations of some features are now shown as tooltips, instead of inline subtitles
@@ -156,21 +139,18 @@
 ## v2.1.0: Custom colors, Custom rule order, Granular history & sorting
 
 ### ✨ New features
-
 - **Cancel a running job**: A Cancel button now appears inline on whichever rule is running. Tap it to stop the operation mid-batch; the partial result (including a count of files that were queued but not touched) is saved to history.
 - **Custom rule order**: A new "My Order" sort option lets you drag and drop rules into any order you like. Long-press and drag a card to reorder; long-press and hold (without dragging) to enter multi-select.
 - **Custom accent colors**: You can now add your own accent color using any hex code, alongside the built-in presets.
 - **Fixed card colors**: New toggle in Appearance settings: use neutral grey card surfaces instead of accent-tinted ones.
 
 ### 🛠 Improvements
-
 - **History: Cancelled and Undone filters**: Two new filter chips in the History screen to show only cancelled or undone runs.
 - **Maintain subdirectory structure**: When a rule scans subfolders, the destination now mirrors the source folder structure instead of flattening everything into one folder.
 - **Sort menus**: Sort and group menus on both the Rules and History screens now show which option is currently selected.
 - **Runs survive leaving the app**: Starting a manual run and switching to another app no longer risks the operation being cut short. FilePipe now keeps the run alive in the background until it finishes or you cancel it.
  
 ### 🐛 Bug fixes
-
 - **Accurate "Last ran" sort**: The "Last ran" sort on the Rules screen now reflects actual run history rather than the rule's last-edited timestamp.
 - **Undo copy runs**: Undoing a copy rule now correctly removes the copied files from the destination, instead of "moving them back" to source folders. If the run created new folders at the destination, those are cleaned up too.
 - **Folder access refresh**: Returning to the Rules screen after granting folder access in the system picker now immediately clears the amber access-warning banner, without needing to restart the app.
@@ -181,7 +161,6 @@
 ## v2.0.0: Onboarding, more themes, advance filters
 
 ### ✨ New Features
-
 - **Onboarding**: a short first-launch flow: welcome screen with the title card, then a template picker to get your first rule started effortlessly.
 - **Advanced rule filters**: narrow down which files a rule touches with filename patterns, file size/age limits, and exclude patterns. All tucked under an
   expandable "Advanced" section when editing a rule.
@@ -205,7 +184,6 @@
 - **Empty states**: friendly illustrated empty states on the Rules and History screens.
 
 ### 🐛 Other Changes
-
 - Various performance improvements to rule execution and history loading.
 - Improved handling of edge cases when undoing a run involving nested folders.
 
@@ -214,7 +192,6 @@
 ## v1.0.0: Launch of **FilePipe**
 
 ### ✨ Features
-
 - **Rules**: Create rules with multiple source folders, file extensions, and a destination. Folders scanned recursively.
 - **Templates**: Start fast with presets (screenshots, images, video, music, downloads, documents etc.).
 - **Move or copy**: Per-rule operation mode, plus conflict handling (skip, overwrite, or rename with a suffix).
