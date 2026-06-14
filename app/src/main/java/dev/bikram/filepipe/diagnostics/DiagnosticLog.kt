@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
@@ -130,6 +131,7 @@ object DiagnosticLog {
         appendLine(context.getString(R.string.diagnostics_timezone_format, TimeZone.getDefault().id))
         appendLine(context.getString(R.string.diagnostics_uptime_format, SystemClock.uptimeMillis()))
         appendLine(context.getString(R.string.diagnostics_elapsed_realtime_format, SystemClock.elapsedRealtime()))
+        appendDisplaySnapshot(context)
         appendLine(context.getString(R.string.diagnostics_target_sdk_format, appInfo?.targetSdkVersion?.toString() ?: unknownValue(context)))
         appendLine(
             context.getString(
@@ -144,6 +146,7 @@ object DiagnosticLog {
             ),
         )
         appendLine(context.getString(R.string.diagnostics_installer_format, installerPackageName(context)))
+        appendLine(context.getString(R.string.diagnostics_launcher_package_format, launcherPackageName(context)))
         val filesDirAllocatableBytes = allocatableBytes(context, context.filesDir)
         appendLine(
             context.resources.getQuantityString(
@@ -172,22 +175,13 @@ object DiagnosticLog {
                 powerManager.isIgnoringBatteryOptimizations(context.packageName).toString(),
             ),
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            appendLine(
-                context.getString(
-                    R.string.diagnostics_exact_alarms_allowed_format,
-                    alarmManager.canScheduleExactAlarms().toString(),
-                ),
-            )
-        } else {
-            appendLine(
-                context.getString(
-                    R.string.diagnostics_exact_alarms_allowed_format,
-                    context.getString(R.string.diagnostics_value_not_required),
-                ),
-            )
-        }
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        appendLine(
+            context.getString(
+                R.string.diagnostics_exact_alarms_allowed_format,
+                alarmManager.canScheduleExactAlarms().toString(),
+            ),
+        )
         appendPersistedUriPermissions(context)
         appendLine()
         appendNotificationChannels(context)
@@ -266,6 +260,29 @@ object DiagnosticLog {
         }
     }
 
+    private fun StringBuilder.appendDisplaySnapshot(context: Context) {
+        val configuration = context.resources.configuration
+        val displayMetrics = context.resources.displayMetrics
+        appendLine(context.getString(R.string.diagnostics_font_scale_format, configuration.fontScale))
+        appendLine(
+            context.getString(
+                R.string.diagnostics_screen_dp_format,
+                configuration.screenWidthDp,
+                configuration.screenHeightDp,
+                configuration.smallestScreenWidthDp,
+            ),
+        )
+        appendLine(context.getString(R.string.diagnostics_display_pixels_format, displayMetrics.widthPixels, displayMetrics.heightPixels))
+        appendLine(
+            context.getString(
+                R.string.diagnostics_display_density_format,
+                displayMetrics.density,
+                displayMetrics.density * configuration.fontScale,
+                displayMetrics.densityDpi,
+            ),
+        )
+    }
+
     private fun allocatableBytes(
         context: Context,
         directory: File,
@@ -293,6 +310,18 @@ object DiagnosticLog {
             context.packageManager
                 .getInstallSourceInfo(context.packageName)
                 .installingPackageName
+                .orEmpty()
+                .ifBlank { unknownValue(context) }
+        }.getOrDefault(unknownValue(context))
+
+    private fun launcherPackageName(context: Context): String =
+        runCatching {
+            context.packageManager
+                .resolveActivity(
+                    Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+                    PackageManager.MATCH_DEFAULT_ONLY,
+                )?.activityInfo
+                ?.packageName
                 .orEmpty()
                 .ifBlank { unknownValue(context) }
         }.getOrDefault(unknownValue(context))

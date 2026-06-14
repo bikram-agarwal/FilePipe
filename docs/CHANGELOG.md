@@ -13,6 +13,9 @@
 - Fixed update alert dismissal and re-show behavior after manual update checks.
 - Automatic trash emptying now retries if it hits an error instead of quietly skipping.
 
+### 📦 Others
+- GitHub releases are now build-attested using GitHub Actions, for better supply chain security and your peace of mind.
+
 ---
 
 ## v3.8.0 - Landscape layouts, improved theming, better schedules

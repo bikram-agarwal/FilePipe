@@ -61,34 +61,34 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 <table>
 <tr>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/1_rules.png" alt="Home Page: Rules" width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/1_rules.jpg" alt="Home Page: Rules" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/2_multiselect.png" alt="Light & Dark themes." width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/2_multiselect.jpg" alt="Light & Dark themes." width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/8_settings.png" alt="Extensive theming options. Make it your own." width="300" /><br />
-</td>
-</tr>
-
-<tr>
-<td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/3_templates.png" alt="Rule creation templates" width="300" /><br />
-</td>
-<td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/4_edit.png" alt="Rule editing" width="300" /><br />
-</td>
-<td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/5_icons.png" alt="Set icons or your choice of emoji" width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/8_settings.jpg" alt="Extensive theming options. Make it your own." width="300" /><br />
 </td>
 </tr>
 
 <tr>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/6_history.png" alt="All runs saved in history." width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/3_templates.jpg" alt="Rule creation templates" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/7_history.png" alt="Per file list. Option to undo." width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/4_edit.jpg" alt="Rule editing" width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/5_icons.jpg" alt="Set icons or your choice of emoji" width="300" /><br />
+</td>
+</tr>
+
+<tr>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/6_history.jpg" alt="All runs saved in history." width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/7_history.jpg" alt="Per file list. Option to undo." width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
 <video src="https://github.com/user-attachments/assets/99e8bd81-65b2-4961-908d-1d8a5a79b981" controls alt="FilePipe Intro." width="300" /><br />

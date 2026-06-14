@@ -689,10 +689,15 @@
     <string name="diagnostics_timezone_format">Timezone: %1$s</string>
     <string name="diagnostics_uptime_format">Uptime: %1$d ms</string>
     <string name="diagnostics_elapsed_realtime_format">Elapsed realtime: %1$d ms</string>
+    <string name="diagnostics_font_scale_format">Font scale: %1$.2f</string>
+    <string name="diagnostics_screen_dp_format">Screen dp: %1$d x %2$d, smallest=%3$d</string>
+    <string name="diagnostics_display_pixels_format">Display pixels: %1$d x %2$d</string>
+    <string name="diagnostics_display_density_format">Display density: density=%1$.2f, scaledDensity=%2$.2f, dpi=%3$d</string>
     <string name="diagnostics_target_sdk_format">Target SDK: %1$s</string>
     <string name="diagnostics_first_install_format">First install: %1$s</string>
     <string name="diagnostics_last_update_format">Last update: %1$s</string>
     <string name="diagnostics_installer_format">Installer: %1$s</string>
+    <string name="diagnostics_launcher_package_format">Launcher package: %1$s</string>
     <plurals name="diagnostics_files_dir_space_format">
         <item quantity="one">Files dir usable space: %1$d byte</item>
         <item quantity="other">Files dir usable space: %1$d bytes</item>

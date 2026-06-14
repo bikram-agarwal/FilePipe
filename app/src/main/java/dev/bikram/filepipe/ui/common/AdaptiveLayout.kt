@@ -1,3 +1,5 @@
+@file:Suppress("ConfigurationScreenWidthHeight")
+
 package dev.bikram.filepipe.ui.common
 
 import android.content.res.Configuration

@@ -43,6 +43,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -164,6 +166,11 @@ jobs:
           esac
 
           ls -la "$out"
+
+      - name: Generate GitHub Artifact Attestations
+        uses: actions/attest@v4.1.0
+        with:
+          subject-path: 'release-assets/*'
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v6
