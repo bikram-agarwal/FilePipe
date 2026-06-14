@@ -10,13 +10,14 @@ import dev.bikram.filepipe.data.storage.folderPathForFilesystemAccess
 import dev.bikram.filepipe.data.storage.isCanonicalPathUnderAllowedSharedStorage
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
+import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.resolveRenameSuffixName
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -34,6 +35,7 @@ class FileOperationRepository
     @Inject
     constructor(
         @param:ApplicationContext private val context: Context,
+        @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) {
         suspend fun listMatchingFiles(
             folderUriString: String,
@@ -48,7 +50,7 @@ class FileOperationRepository
             maxDepth: Int = 5,
             filesystemAccessEnabled: Boolean = false,
         ): List<FileEntry> =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val effectiveFolderUriString =
                     folderPathForFilesystemAccess(folderUriString, filesystemAccessEnabled)
                 if (isFilesystemFolderPathString(effectiveFolderUriString)) {
@@ -243,7 +245,7 @@ class FileOperationRepository
             destFoldersCreatedCollector: MutableCollection<String>? = null,
             filesystemAccessEnabled: Boolean = false,
         ): FileMoved =
-            withContext(Dispatchers.IO + NonCancellable) {
+            withContext(ioDispatcher + NonCancellable) {
                 val effectiveDestFolder =
                     folderPathForFilesystemAccess(destFolderUriString, filesystemAccessEnabled)
                 val sourceIsFile = sourceEntry.uri.scheme == "file"
@@ -945,7 +947,7 @@ class FileOperationRepository
             conflictPolicy: ConflictPolicy,
             filesystemAccessEnabled: Boolean = false,
         ): PreviewFileResult =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val effectiveDestFolder =
                     folderPathForFilesystemAccess(destFolderUriString, filesystemAccessEnabled)
                 val simulatedRootPath =

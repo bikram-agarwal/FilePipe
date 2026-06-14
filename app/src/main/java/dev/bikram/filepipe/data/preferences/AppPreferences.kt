@@ -20,6 +20,9 @@ fun SwipeAction.materialSymbolName(): String =
         SwipeAction.VIEW_HISTORY -> "history"
     }
 
+/** Surface-shading intensity used when nothing is stored yet. 1.0 == the slider's "medium" notch. */
+const val DEFAULT_SHADING_INTENSITY = 1.0f
+
 data class AppPreferences(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val colorSource: AppColorSource = AppColorSource.MATERIAL_YOU,
@@ -57,7 +60,7 @@ data class AppPreferences(
      */
     val updateApkDownloadsCopySucceeded: Boolean = false,
     val useGradientBackground: Boolean = true,
-    val shadingIntensity: Float = 0.0f,
+    val shadingIntensity: Float = DEFAULT_SHADING_INTENSITY,
     /** SAF vs All files. Legacy [FolderAccessMode.DEFERRED] is migrated to [FolderAccessMode.SAF_ONLY]. */
     val folderAccessMode: FolderAccessMode = FolderAccessMode.SAF_ONLY,
     /**

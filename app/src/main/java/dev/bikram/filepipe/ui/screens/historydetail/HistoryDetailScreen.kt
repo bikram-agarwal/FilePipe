@@ -120,7 +120,6 @@ fun HistoryDetailScreen(
 ) {
     val history by viewModel.history.collectAsStateWithLifecycle()
     val files by viewModel.files.collectAsStateWithLifecycle()
-    val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     val density = LocalDensity.current
@@ -144,15 +143,12 @@ fun HistoryDetailScreen(
     val topListPadding = statusTop + 64.dp
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(userMessage) {
-        val msg = userMessage ?: return@LaunchedEffect
-        try {
+    LaunchedEffect(Unit) {
+        viewModel.userMessages.collect { msg ->
             snackbarHostState.showSnackbar(
                 message = msg,
                 duration = SnackbarDuration.Short,
             )
-        } finally {
-            viewModel.clearUserMessage()
         }
     }
     DisposableEffect(lifecycleOwner, snackbarHostState) {

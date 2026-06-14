@@ -28,6 +28,7 @@ import dev.bikram.filepipe.domain.usecase.UndoRunUseCase
 import dev.bikram.filepipe.ui.feedback.toUserMessage
 import dev.bikram.filepipe.ui.navigation.Screen
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -126,7 +128,7 @@ class HistoryViewModel
                 .map { prefs -> prefs.historySortKey to prefs.historySortDirection }
                 .stateIn(
                     viewModelScope,
-                    SharingStarted.Eagerly,
+                    SharingStarted.WhileSubscribed(5_000),
                     AppPreferences.DEFAULT.historySortKey to AppPreferences.DEFAULT.historySortDirection,
                 )
 
@@ -239,11 +241,13 @@ class HistoryViewModel
                 }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-        private val _userMessage = MutableStateFlow<String?>(null)
-        val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
+        // One-shot snackbar messages: a Channel so each is delivered exactly once (no rotation
+        // replay, no conflation of identical/rapid messages).
+        private val _userMessages = Channel<String>(Channel.BUFFERED)
+        val userMessages: Flow<String> = _userMessages.receiveAsFlow()
 
-        fun clearUserMessage() {
-            _userMessage.value = null
+        private fun postUserMessage(message: String) {
+            _userMessages.trySend(message)
         }
 
         fun setStatusFilter(status: HistoryStatusFilter) {
@@ -305,7 +309,7 @@ class HistoryViewModel
         fun undoRun(historyId: Long) =
             viewModelScope.launch {
                 val result = undoRunUseCase(historyId)
-                _userMessage.value = result.toUserMessage(appContext)
+                postUserMessage(result.toUserMessage(appContext))
             }
 
         private fun sortHistories(

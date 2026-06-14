@@ -203,9 +203,10 @@ fun OnboardingTitleScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(
-                    modifier = Modifier
-                        .weight(1.1f)
-                        .fillMaxHeight(),
+                    modifier =
+                        Modifier
+                            .weight(1.1f)
+                            .fillMaxHeight(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -214,9 +215,10 @@ fun OnboardingTitleScreen(
                     bylinePill()
                 }
                 Column(
-                    modifier = Modifier
-                        .weight(0.9f)
-                        .fillMaxHeight(),
+                    modifier =
+                        Modifier
+                            .weight(0.9f)
+                            .fillMaxHeight(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {

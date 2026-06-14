@@ -33,7 +33,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
@@ -59,7 +58,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -87,12 +85,13 @@ import dev.bikram.filepipe.domain.model.HistoryStatusFilter
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
+import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
 import dev.bikram.filepipe.ui.components.FilePipeFilterChip
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
-import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.FilePipeToggleButton
 import dev.bikram.filepipe.ui.components.HistoryCard
 import dev.bikram.filepipe.ui.components.RuleCard
@@ -133,10 +132,8 @@ fun HistoryScreen(
     val trashedRules by viewModel.trashedRules.collectAsStateWithLifecycle()
     val pagingItems = viewModel.historyPagingFlow.collectAsLazyPagingItems()
     val filteredItems by viewModel.filteredHistoryItems.collectAsStateWithLifecycle()
-    val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val hasAnyHistory by viewModel.hasAnyHistory.collectAsStateWithLifecycle()
-    val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && LocalConfiguration.current.screenHeightDp < 480
+    val isSmallLandscape = isSmallLandscape()
 
     var showClearConfirm by remember { mutableStateOf(false) }
     var pendingDeleteForeverRule by remember { mutableStateOf<Rule?>(null) }
@@ -167,15 +164,12 @@ fun HistoryScreen(
         )
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(userMessage) {
-        val msg = userMessage ?: return@LaunchedEffect
-        try {
+    LaunchedEffect(Unit) {
+        viewModel.userMessages.collect { msg ->
             snackbarHostState.showSnackbar(
                 message = msg,
                 duration = SnackbarDuration.Short,
             )
-        } finally {
-            viewModel.clearUserMessage()
         }
     }
     DisposableEffect(lifecycleOwner, snackbarHostState) {
@@ -201,54 +195,29 @@ fun HistoryScreen(
         )
 
     if (showClearConfirm) {
-        AlertDialog(
-            onDismissRequest = { showClearConfirm = false },
-            title = { Text(stringResource(R.string.history_clear_confirm_title)) },
-            text = { Text(stringResource(R.string.history_clear_confirm_message)) },
-            confirmButton = {
-                FilePipeTextButton(
-                    onClick = {
-                        showClearConfirm = false
-                        viewModel.clearAllHistory()
-                    },
-                ) {
-                    Text(stringResource(R.string.history_clear))
-                }
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.history_clear_confirm_title),
+            text = stringResource(R.string.history_clear_confirm_message),
+            confirmLabel = stringResource(R.string.history_clear),
+            onConfirm = {
+                showClearConfirm = false
+                viewModel.clearAllHistory()
             },
-            dismissButton = {
-                FilePipeTextButton(onClick = {
-                    showClearConfirm = false
-                }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { showClearConfirm = false },
+            destructive = true,
         )
     }
     pendingDeleteForeverRule?.let { rule ->
-        AlertDialog(
-            onDismissRequest = { pendingDeleteForeverRule = null },
-            title = { Text(stringResource(R.string.history_trash_delete_forever_confirm_title)) },
-            text = { Text(stringResource(R.string.history_trash_delete_forever_confirm_message, rule.name)) },
-            confirmButton = {
-                FilePipeTextButton(
-                    onClick = {
-                        pendingDeleteForeverRule = null
-                        viewModel.deleteRuleForever(rule.id)
-                    },
-                ) {
-                    Text(
-                        text = stringResource(R.string.delete_forever),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.history_trash_delete_forever_confirm_title),
+            text = stringResource(R.string.history_trash_delete_forever_confirm_message, rule.name),
+            confirmLabel = stringResource(R.string.delete_forever),
+            onConfirm = {
+                pendingDeleteForeverRule = null
+                viewModel.deleteRuleForever(rule.id)
             },
-            dismissButton = {
-                FilePipeTextButton(onClick = {
-                    pendingDeleteForeverRule = null
-                }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { pendingDeleteForeverRule = null },
+            destructive = true,
         )
     }
 

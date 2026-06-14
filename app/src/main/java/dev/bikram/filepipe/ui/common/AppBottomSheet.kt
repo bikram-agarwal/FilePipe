@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -21,14 +22,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.ui.components.FilePipeBottomSheetDragHandle
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,31 +48,23 @@ fun AppBottomSheet(
     subtitleSpacing: Dp = 6.dp,
     containerColor: Color = BottomSheetDefaults.ContainerColor,
     contentColor: Color = contentColorFor(containerColor),
+    subtitleContent: (@Composable () -> Unit)? = null,
     titleAccessory: (@Composable RowScope.() -> Unit)? = null,
     titleActions: (@Composable RowScope.() -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    actionsImePadding: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
-    val dismissWithAnimation: () -> Unit = {
-        scope.launch {
-            runCatching {
-                if (sheetState.isVisible) {
-                    sheetState.hide()
-                }
-            }
-            onDismiss()
-        }
-    }
+    val dismissSheet: () -> Unit = onDismiss
     ModalBottomSheet(
-        onDismissRequest = dismissWithAnimation,
+        onDismissRequest = dismissSheet,
         sheetState = sheetState,
         sheetGesturesEnabled = sheetGesturesEnabled,
         containerColor = containerColor,
         contentColor = contentColor,
         dragHandle = { FilePipeBottomSheetDragHandle() },
     ) {
-        FilePipePredictiveBackHandler(onBack = dismissWithAnimation)
+        FilePipePredictiveBackHandler(onBack = dismissSheet)
         Column(modifier = Modifier.navigationBarsPadding()) {
             if (showTitleBar) {
                 Column(
@@ -90,10 +82,16 @@ fun AppBottomSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = title,
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleLargeEmphasized,
                                 color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                            if (!subtitle.isNullOrBlank()) {
+                            if (subtitleContent != null) {
+                                Column(modifier = Modifier.padding(top = subtitleSpacing)) {
+                                    subtitleContent()
+                                }
+                            } else if (!subtitle.isNullOrBlank()) {
                                 Text(
                                     text = subtitle,
                                     style = MaterialTheme.typography.bodyMedium,
@@ -123,6 +121,7 @@ fun AppBottomSheet(
                     modifier =
                         Modifier
                             .fillMaxWidth()
+                            .let { if (actionsImePadding) it.imePadding() else it }
                             .padding(horizontal = 20.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically,

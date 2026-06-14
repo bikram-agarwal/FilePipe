@@ -3,7 +3,6 @@ package dev.bikram.filepipe.ui.screens.devoptions
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlarmManager
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -39,6 +38,7 @@ import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.devtools.DevMockFileMove
+import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -53,9 +53,10 @@ import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
 import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.worker.FileOrganizerWorker
 import dev.bikram.filepipe.worker.LogPruneWorker
+import dev.bikram.filepipe.worker.RunNotificationChannels
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
 import dev.bikram.filepipe.worker.UpdateCheckWorker
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -124,6 +125,7 @@ class DevOptionsViewModel
         private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
         private val updateAvailableNotifier: UpdateAvailableNotifier,
         private val workManager: WorkManager,
+        @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(DevOptionsUiState())
         val uiState: StateFlow<DevOptionsUiState> = _uiState.asStateFlow()
@@ -148,7 +150,7 @@ class DevOptionsViewModel
             viewModelScope.launch {
                 _uiState.update { it.copy(loading = true) }
                 val snapshot =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         buildSnapshot()
                     }
                 _uiState.value = snapshot
@@ -185,7 +187,7 @@ class DevOptionsViewModel
 
         fun syncScheduledRules() {
             viewModelScope.launch {
-                val rules = withContext(Dispatchers.IO) { ruleRepository.getAllRulesOrderedBySortOrder() }
+                val rules = withContext(ioDispatcher) { ruleRepository.getAllRulesOrderedBySortOrder() }
                 scheduleRulesUseCase.scheduleCoalesced(rules)
                 _events.emit(context.getString(R.string.dev_options_event_scheduled_rules_synced))
                 refresh()
@@ -216,7 +218,7 @@ class DevOptionsViewModel
         fun addMockLargeFileMoveRule() {
             viewModelScope.launch {
                 val existingMockRule =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         ruleRepository.getAllRulesOrderedBySortOrder().firstOrNull(DevMockFileMove::isMockRule)
                     }
                 if (existingMockRule != null) {
@@ -275,7 +277,7 @@ class DevOptionsViewModel
                         context.getString(R.string.dev_options_mock_saf_permission_lost_rule_name),
                         context.getString(R.string.dev_options_mock_saf_download_rule_name),
                     )
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     val mockRuleIds =
                         ruleRepository
                             .getAllRulesOrderedBySortOrder()
@@ -308,7 +310,7 @@ class DevOptionsViewModel
             @StringRes existsMessageRes: Int,
         ) {
             val existingRule =
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     ruleRepository.getAllRulesOrderedBySortOrder().firstOrNull { rule -> rule.name == ruleName }
                 }
             if (existingRule != null) {
@@ -428,7 +430,7 @@ class DevOptionsViewModel
         fun deleteCachedUpdateApk() {
             viewModelScope.launch {
                 val deleted =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         val file = File(context.cacheDir, FILEPIPE_UPDATE_APK_CACHE_NAME)
                         file.exists() && file.delete()
                     }
@@ -695,28 +697,7 @@ class DevOptionsViewModel
         }
 
         private fun ensureFileOperationChannels() {
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (notificationManager.getNotificationChannel(FileOrganizerWorker.CHANNEL_ID) == null) {
-                notificationManager.createNotificationChannel(
-                    NotificationChannel(
-                        FileOrganizerWorker.CHANNEL_ID,
-                        context.getString(R.string.notification_channel_name),
-                        NotificationManager.IMPORTANCE_DEFAULT,
-                    ).apply {
-                        description = context.getString(R.string.notification_channel_desc)
-                    },
-                )
-            }
-            if (notificationManager.getNotificationChannel(FileOrganizerWorker.SUMMARY_CHANNEL_ID) != null) return
-            notificationManager.createNotificationChannel(
-                NotificationChannel(
-                    FileOrganizerWorker.SUMMARY_CHANNEL_ID,
-                    context.getString(R.string.notification_summary_channel_name),
-                    NotificationManager.IMPORTANCE_DEFAULT,
-                ).apply {
-                    description = context.getString(R.string.notification_summary_channel_desc)
-                },
-            )
+            RunNotificationChannels.ensure(context)
         }
 
         private fun workerSummary(infos: List<WorkInfo>): String =

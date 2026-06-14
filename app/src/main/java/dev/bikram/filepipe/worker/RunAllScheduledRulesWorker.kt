@@ -1,6 +1,5 @@
 package dev.bikram.filepipe.worker
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -154,7 +153,7 @@ class RunAllScheduledRulesWorker
             historyId: Long,
             movedFileNames: List<String> = emptyList(),
         ) {
-            ensureSummaryChannel()
+            RunNotificationChannels.ensure(appContext)
             val body =
                 when {
                     failed > 0 && operationMode == OperationMode.COPY -> {
@@ -337,7 +336,7 @@ class RunAllScheduledRulesWorker
         }
 
         private fun createForegroundInfo(ruleCount: Int): ForegroundInfo {
-            ensureProgressChannel()
+            RunNotificationChannels.ensure(appContext)
             val notification =
                 NotificationCompat
                     .Builder(appContext, FileOrganizerWorker.CHANNEL_ID)
@@ -353,34 +352,6 @@ class RunAllScheduledRulesWorker
                     .setProgress(0, 0, true)
                     .build()
             return ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        }
-
-        private fun ensureProgressChannel() {
-            if (notificationManager.getNotificationChannel(FileOrganizerWorker.CHANNEL_ID) == null) {
-                notificationManager.createNotificationChannel(
-                    NotificationChannel(
-                        FileOrganizerWorker.CHANNEL_ID,
-                        appContext.getString(R.string.notification_channel_name),
-                        NotificationManager.IMPORTANCE_DEFAULT,
-                    ).apply {
-                        description = appContext.getString(R.string.notification_channel_desc)
-                    },
-                )
-            }
-        }
-
-        private fun ensureSummaryChannel() {
-            if (notificationManager.getNotificationChannel(FileOrganizerWorker.SUMMARY_CHANNEL_ID) == null) {
-                notificationManager.createNotificationChannel(
-                    NotificationChannel(
-                        FileOrganizerWorker.SUMMARY_CHANNEL_ID,
-                        appContext.getString(R.string.notification_summary_channel_name),
-                        NotificationManager.IMPORTANCE_DEFAULT,
-                    ).apply {
-                        description = appContext.getString(R.string.notification_summary_channel_desc)
-                    },
-                )
-            }
         }
 
         companion object {

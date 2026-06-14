@@ -25,6 +25,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
             android:enableOnBackInvokedCallback="true"
             android:exported="true"
             android:launchMode="singleTop"
@@ -59,13 +60,9 @@
                 android:name="androidx.work.WorkManagerInitializer"
                 android:value="androidx.startup"
                 tools:node="remove" />
-            <!-- EmojiCompatInitializer can start a font-download foreground service when the
-                 process is created via BOOT_COMPLETED, which Android 15 prohibits for dataSync
-                 service types. System emoji (API 31+) covers all FilePipe needs. -->
-            <meta-data
-                android:name="androidx.emoji2.text.EmojiCompatInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
+            <!-- Do NOT remove EmojiCompatInitializer to silence the Play "restricted FGS /
+                 BOOT_COMPLETED" warning — it does not fix it (Remember keeps it and is clean;
+                 the dataSync FGS is the gate). See localdocs/Dev_Runbook.md → Troubleshooting. -->
         </provider>
 
         <receiver

@@ -15,11 +15,12 @@ import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
+import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -42,9 +43,10 @@ class UndoRunUseCase
         private val fileOperationRepository: FileOperationRepository,
         private val ruleRepository: RuleRepository,
         private val userPreferencesRepository: UserPreferencesRepository,
+        @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) {
         suspend operator fun invoke(historyId: Long): UndoResult =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val history =
                     runHistoryRepository.getHistoryById(historyId)
                         ?: return@withContext UndoResult(0, 0, listOf("Run not found"))

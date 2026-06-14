@@ -89,7 +89,7 @@ class FaqViewModel
                             }
                         }
                     }
-                }.stateIn(viewModelScope, SharingStarted.Eagerly, sections)
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), sections)
 
         fun setItemExpanded(
             itemId: String,

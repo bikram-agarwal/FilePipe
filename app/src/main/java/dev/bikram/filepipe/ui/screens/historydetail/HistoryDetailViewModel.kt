@@ -12,10 +12,13 @@ import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.usecase.UndoRunUseCase
 import dev.bikram.filepipe.ui.feedback.toUserMessage
 import dev.bikram.filepipe.ui.navigation.Screen
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -39,12 +42,9 @@ class HistoryDetailViewModel
                 .getFilesForRun(historyId)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-        private val _userMessage = MutableStateFlow<String?>(null)
-        val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
-
-        fun clearUserMessage() {
-            _userMessage.value = null
-        }
+        // One-shot snackbar messages: a Channel so each is delivered exactly once.
+        private val _userMessages = Channel<String>(Channel.BUFFERED)
+        val userMessages: Flow<String> = _userMessages.receiveAsFlow()
 
         init {
             viewModelScope.launch {
@@ -55,7 +55,7 @@ class HistoryDetailViewModel
         fun undoRun() =
             viewModelScope.launch {
                 val result = undoRunUseCase(historyId)
-                _userMessage.value = result.toUserMessage(appContext)
+                _userMessages.trySend(result.toUserMessage(appContext))
                 _history.value = runHistoryRepository.getHistoryById(historyId)
             }
     }

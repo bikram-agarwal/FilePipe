@@ -52,12 +52,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.performLongPressHaptic
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
@@ -450,10 +450,7 @@ fun FilePipeFloatingActionButton(
     tooltipLabel: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val isSmallLandscape = isSmallLandscape()
     val sizeModifier =
         if (isSmallLandscape) {
             Modifier.size(rememberResponsiveActionButtonSize())

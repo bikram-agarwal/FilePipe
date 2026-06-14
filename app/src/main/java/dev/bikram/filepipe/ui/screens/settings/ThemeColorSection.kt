@@ -30,7 +30,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ColorScheme
@@ -97,11 +96,11 @@ import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.data.preferences.generateTripletForSeed
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
 import dev.bikram.filepipe.ui.components.FilePipeFilterChip
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
-import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.FilePipeToggleButton
 import dev.bikram.filepipe.ui.components.HueColorSlider
 import dev.bikram.filepipe.ui.components.colorHexFromHue
@@ -418,23 +417,16 @@ fun AppearanceSection(
 
     val hexToConfirmRemove = hexPendingRemove
     if (hexToConfirmRemove != null) {
-        AlertDialog(
-            onDismissRequest = { hexPendingRemove = null },
-            title = { Text(stringResource(R.string.settings_custom_seed_remove_title)) },
-            text = { Text(stringResource(R.string.settings_custom_seed_remove_message)) },
-            confirmButton = {
-                FilePipeTextButton(onClick = {
-                    onRemoveCustomSeedHex(hexToConfirmRemove)
-                    hexPendingRemove = null
-                }) {
-                    Text(stringResource(R.string.schedule_remove_short))
-                }
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.settings_custom_seed_remove_title),
+            text = stringResource(R.string.settings_custom_seed_remove_message),
+            confirmLabel = stringResource(R.string.schedule_remove_short),
+            onConfirm = {
+                onRemoveCustomSeedHex(hexToConfirmRemove)
+                hexPendingRemove = null
             },
-            dismissButton = {
-                FilePipeTextButton(onClick = { hexPendingRemove = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { hexPendingRemove = null },
+            destructive = true,
         )
     }
     val blackThemeEffectsDisabled = themeMode == AppThemeMode.BLACK

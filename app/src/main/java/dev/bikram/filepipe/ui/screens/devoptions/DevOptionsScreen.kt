@@ -38,7 +38,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -85,9 +84,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
-import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
-import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
@@ -192,25 +190,16 @@ fun DevOptionsScreen(
     }
 
     pendingDialog?.let { dialog ->
-        AlertDialog(
-            onDismissRequest = { pendingDialog = null },
-            title = { Text(dialog.title) },
-            text = { Text(dialog.message) },
-            confirmButton = {
-                FilePipeButton(
-                    onClick = {
-                        pendingDialog = null
-                        dialog.onConfirm()
-                    },
-                ) {
-                    Text(dialog.confirmLabel)
-                }
+        FilePipeConfirmDialog(
+            title = dialog.title,
+            text = dialog.message,
+            confirmLabel = dialog.confirmLabel,
+            onConfirm = {
+                pendingDialog = null
+                dialog.onConfirm()
             },
-            dismissButton = {
-                FilePipeTextButton(onClick = { pendingDialog = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { pendingDialog = null },
+            destructive = dialog.isDestructive,
         )
     }
 
@@ -671,6 +660,8 @@ private data class DevOptionsDialog(
     val message: String,
     val confirmLabel: String,
     val onConfirm: () -> Unit,
+    /** Dev confirmations (reset, force-crash, wipe) are destructive, so the confirm stays low-emphasis. */
+    val isDestructive: Boolean = true,
 )
 
 private object DevOptionsScreenSessionState {

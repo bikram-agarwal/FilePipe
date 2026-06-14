@@ -53,7 +53,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -109,7 +108,6 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -145,13 +143,14 @@ import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.components.AlertFloatingActionButtonMenu
 import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFloatingActionButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
-import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyHistoryIllustration
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyTrashIllustration
 import dev.bikram.filepipe.ui.components.UpdateChromeState
@@ -568,44 +567,29 @@ fun AppNavigation(
             }?.screen
 
     if (showClearHistoryDialog && hasAnyHistory) {
-        AlertDialog(
-            onDismissRequest = { showClearHistoryDialog = false },
-            title = { Text(stringResource(R.string.history_clear_confirm_title)) },
-            text = { Text(stringResource(R.string.history_clear_confirm_message)) },
-            confirmButton = {
-                FilePipeTextButton(onClick = {
-                    showClearHistoryDialog = false
-                    historyVm.clearAllHistory()
-                }) { Text(stringResource(R.string.history_clear)) }
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.history_clear_confirm_title),
+            text = stringResource(R.string.history_clear_confirm_message),
+            confirmLabel = stringResource(R.string.history_clear),
+            onConfirm = {
+                showClearHistoryDialog = false
+                historyVm.clearAllHistory()
             },
-            dismissButton = {
-                FilePipeTextButton(onClick = {
-                    showClearHistoryDialog = false
-                }) { Text(stringResource(R.string.cancel)) }
-            },
+            onDismiss = { showClearHistoryDialog = false },
+            destructive = true,
         )
     }
     if (showEmptyTrashDialog && hasAnyTrashedRules) {
-        AlertDialog(
-            onDismissRequest = { showEmptyTrashDialog = false },
-            title = { Text(stringResource(R.string.history_trash_empty_confirm_title)) },
-            text = { Text(stringResource(R.string.history_trash_empty_confirm_message)) },
-            confirmButton = {
-                FilePipeTextButton(onClick = {
-                    showEmptyTrashDialog = false
-                    historyVm.emptyTrashForever()
-                }) {
-                    Text(
-                        text = stringResource(R.string.delete_forever),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.history_trash_empty_confirm_title),
+            text = stringResource(R.string.history_trash_empty_confirm_message),
+            confirmLabel = stringResource(R.string.delete_forever),
+            onConfirm = {
+                showEmptyTrashDialog = false
+                historyVm.emptyTrashForever()
             },
-            dismissButton = {
-                FilePipeTextButton(onClick = {
-                    showEmptyTrashDialog = false
-                }) { Text(stringResource(R.string.cancel)) }
-            },
+            onDismiss = { showEmptyTrashDialog = false },
+            destructive = true,
         )
     }
 
@@ -1325,16 +1309,12 @@ private fun TwoPaneListPaneWithFab(
 }
 
 @Composable
-private fun compactLandscapeFabBottomPadding(): Dp {
-    val configuration = LocalConfiguration.current
-    val isLandscape =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    return if (isLandscape && configuration.screenHeightDp < 480) {
+private fun compactLandscapeFabBottomPadding(): Dp =
+    if (isSmallLandscape()) {
         12.dp
     } else {
         24.dp
     }
-}
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -1640,36 +1620,16 @@ private fun RulesTwoPaneRoute(
 
     if (pendingDeleteSelected) {
         val count = uiState.selectedRuleIds.size
-        AlertDialog(
-            onDismissRequest = { pendingDeleteSelected = false },
-            title = {
-                Text(
-                    pluralStringResource(
-                        R.plurals.rules_move_to_trash_confirm_title,
-                        count,
-                        count,
-                    ),
-                )
+        FilePipeConfirmDialog(
+            title = pluralStringResource(R.plurals.rules_move_to_trash_confirm_title, count, count),
+            text = stringResource(R.string.rules_move_to_trash_confirm_message),
+            confirmLabel = stringResource(R.string.move_to_trash),
+            onConfirm = {
+                viewModel.deleteSelected()
+                pendingDeleteSelected = false
             },
-            text = { Text(stringResource(R.string.rules_move_to_trash_confirm_message)) },
-            confirmButton = {
-                FilePipeTextButton(onClick = {
-                    viewModel.deleteSelected()
-                    pendingDeleteSelected = false
-                }) {
-                    Text(
-                        text = stringResource(R.string.move_to_trash),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            },
-            dismissButton = {
-                FilePipeTextButton(onClick = {
-                    pendingDeleteSelected = false
-                }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { pendingDeleteSelected = false },
+            destructive = true,
         )
     }
 }
@@ -1689,8 +1649,7 @@ private fun RulesSelectionActionPane(
     onCancelRun: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && LocalConfiguration.current.screenHeightDp < 480
+    val isSmallLandscape = isSmallLandscape()
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center,
@@ -2336,10 +2295,7 @@ private fun FloatingNavBar(
     modifier: Modifier = Modifier,
     leadingFab: (@Composable () -> Unit)? = null,
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val isSmallLandscape = isSmallLandscape()
     val fabBottomInset = if (isSmallLandscape) 8.dp else 0.dp
     CenteredPillWithSideFab(
         pill = {
@@ -2616,10 +2572,7 @@ private fun MainNavFabSlot(
                         R.string.history_clear
                     },
                 )
-            val configuration = LocalConfiguration.current
-            val isLandscape =
-                configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+            val isSmallLandscape = isSmallLandscape()
             val shouldShowFab =
                 if (isSmallLandscape) {
                     if (inTrash) hasAnyTrashedRules else hasAnyHistory
