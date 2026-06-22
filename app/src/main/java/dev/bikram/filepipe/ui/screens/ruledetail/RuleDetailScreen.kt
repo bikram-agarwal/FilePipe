@@ -155,7 +155,6 @@ import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeSurface
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
-import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.FilePipeToggleButton
 import dev.bikram.filepipe.ui.components.FilesystemFolderPickerSheetContent
@@ -1759,7 +1758,6 @@ fun RuleDetailScreen(
                                         onValueChange = viewModel::setExcludePatternsText,
                                         label = { Text(stringResource(R.string.advanced_exclude_patterns_label)) },
                                         placeholder = { Text(stringResource(R.string.advanced_exclude_placeholder)) },
-                                        supportingText = { Text(stringResource(R.string.advanced_csv_hint)) },
                                         singleLine = true,
                                         enabled = !isReadOnly,
                                         modifier = Modifier.fillMaxWidth(),

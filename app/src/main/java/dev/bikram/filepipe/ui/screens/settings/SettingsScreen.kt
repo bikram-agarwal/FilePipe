@@ -148,8 +148,6 @@ import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.ui.common.AppBottomSheet
-import dev.bikram.filepipe.ui.common.isLandscape
-import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.isLandscape
 import dev.bikram.filepipe.ui.common.isSmallLandscape
@@ -162,7 +160,6 @@ import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
-import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.containers.GroupPosition

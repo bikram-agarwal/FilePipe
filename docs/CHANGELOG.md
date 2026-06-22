@@ -1,3 +1,15 @@
+## v3.8.5 Multiple filename patterns
+
+### 🛠 Improved Features
+- **Match several filename patterns in one rule.** A rule's advanced filters now accept multiple comma-separated filename (and exclude) patterns — a file matches if any one of them matches.
+- **Smoother rotation.** The app no longer restarts its screen when you rotate the device or resize the window, so switching to landscape is seamless and keeps your place.
+- **More detailed diagnostics report**, now including display and font-scale information — handy when reporting an issue.
+
+## 📦 Others
+- GitHub releases are now build-attested for better supply-chain security and your peace of mind.
+
+---
+
 ## v3.8.4 Adaptive layout, richer schedule, alert FAB
 
 ### ✨ New Features

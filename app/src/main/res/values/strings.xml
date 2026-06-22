@@ -900,15 +900,14 @@
     <string name="advanced_section_title">Advanced filters</string>
     <string name="advanced_section_subtitle">Optional filters to narrow matching files</string>
     <string name="advanced_section_filters_active">Filters active</string>
-    <string name="advanced_filename_pattern_label">Filename pattern</string>
+    <string name="advanced_filename_pattern_label">Filename patterns, comma separated</string>
     <string name="advanced_filename_pattern_placeholder">e.g. Screenshot_*</string>
     <string name="advanced_min_size_label">Min size (MB)</string>
     <string name="advanced_max_size_label">Max size (MB)</string>
     <string name="advanced_min_age_label">Min age (days)</string>
     <string name="advanced_max_age_label">Max age (days)</string>
-    <string name="advanced_exclude_patterns_label">Exclude patterns</string>
+    <string name="advanced_exclude_patterns_label">Exclude patterns, comma separated</string>
     <string name="advanced_exclude_placeholder">e.g. .nomedia</string>
-    <string name="advanced_csv_hint">Separate multiple patterns with commas</string>
 
     <!-- Folder bookmarks -->
     <string name="bookmark_toggle_cd">Toggle bookmark</string>

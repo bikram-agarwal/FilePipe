@@ -7,7 +7,6 @@ import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.storage.folderPathForFilesystemAccess
-import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.data.storage.isCanonicalPathUnderAllowedSharedStorage
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
@@ -91,7 +90,13 @@ class FileOperationRepository
                         .map {
                             it.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
                         }.toSet()
-                val filenameRegex = filenamePattern?.takeIf { it.isNotBlank() }?.let { globToRegex(it) }
+                val filenameRegexes =
+                    filenamePattern
+                        ?.takeIf { it.isNotBlank() }
+                        ?.split(",")
+                        ?.map { it.trim() }
+                        ?.filter { it.isNotBlank() }
+                        ?.map { globToRegex(it) }
                 val excludeRegexes = excludePatterns.filter { it.isNotBlank() }.map { globToRegex(it) }
                 val now = System.currentTimeMillis()
                 val minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
@@ -113,7 +118,7 @@ class FileOperationRepository
                         .filter { (doc, _) ->
                             val ext = ".${doc.name.orEmpty().substringAfterLast('.').lowercase()}"
                             ext in lowerExtensions
-                        }.filter { (doc, _) -> filenameRegex == null || filenameRegex.matches(doc.name.orEmpty()) }
+                        }.filter { (doc, _) -> filenameRegexes == null || filenameRegexes.isEmpty() || filenameRegexes.any { it.matches(doc.name.orEmpty()) } }
                         .filter { (doc, _) -> excludeRegexes.none { it.matches(doc.name.orEmpty()) } }
                         .filter { (doc, _) -> minFileSizeBytes == null || doc.length() >= minFileSizeBytes }
                         .filter { (doc, _) -> maxFileSizeBytes == null || doc.length() <= maxFileSizeBytes }
@@ -152,7 +157,13 @@ class FileOperationRepository
                     .map {
                         it.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
                     }.toSet()
-            val filenameRegex = filenamePattern?.takeIf { it.isNotBlank() }?.let { globToRegex(it) }
+            val filenameRegexes =
+                filenamePattern
+                    ?.takeIf { it.isNotBlank() }
+                    ?.split(",")
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotBlank() }
+                    ?.map { globToRegex(it) }
             val excludeRegexes = excludePatterns.filter { it.isNotBlank() }.map { globToRegex(it) }
             val now = System.currentTimeMillis()
             val minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
@@ -169,7 +180,7 @@ class FileOperationRepository
                 .filter { (file, _) ->
                     val ext = ".${file.name.substringAfterLast('.').lowercase()}"
                     ext in lowerExtensions
-                }.filter { (file, _) -> filenameRegex == null || filenameRegex.matches(file.name) }
+                }.filter { (file, _) -> filenameRegexes == null || filenameRegexes.isEmpty() || filenameRegexes.any { it.matches(file.name) } }
                 .filter { (file, _) -> excludeRegexes.none { it.matches(file.name) } }
                 .filter { (file, _) -> minFileSizeBytes == null || file.length() >= minFileSizeBytes }
                 .filter { (file, _) -> maxFileSizeBytes == null || file.length() <= maxFileSizeBytes }

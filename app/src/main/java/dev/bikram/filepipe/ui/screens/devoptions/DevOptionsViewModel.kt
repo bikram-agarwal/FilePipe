@@ -26,7 +26,6 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.APP_DATABASE_NAME
 import dev.bikram.filepipe.AppDatabase
 import dev.bikram.filepipe.BuildConfig
@@ -53,7 +52,6 @@ import dev.bikram.filepipe.update.UpdateAvailableNotifier
 import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
 import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.worker.FileOrganizerWorker
-import dev.bikram.filepipe.worker.RunNotificationChannels
 import dev.bikram.filepipe.worker.LogPruneWorker
 import dev.bikram.filepipe.worker.RunNotificationChannels
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
