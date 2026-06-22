@@ -155,6 +155,7 @@ import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeSurface
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
+import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.FilePipeToggleButton
 import dev.bikram.filepipe.ui.components.FilesystemFolderPickerSheetContent
