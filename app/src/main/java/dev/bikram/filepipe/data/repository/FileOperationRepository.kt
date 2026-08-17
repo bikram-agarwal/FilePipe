@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.data.repository
 
 import android.content.Context
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.core.net.toUri
@@ -11,6 +12,7 @@ import dev.bikram.filepipe.data.storage.isCanonicalPathUnderAllowedSharedStorage
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.di.IoDispatcher
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FileOrientation
@@ -49,6 +51,24 @@ class FileOperationRepository
         internal val scanCache = ConcurrentHashMap<ScanCacheKey, CacheEntry>()
         private val accessCache = ConcurrentHashMap<String, Pair<FolderAccessResult, Long>>()
         private val accessCacheTtlMs = 5_000L
+
+        /**
+         * Directories touched by filesystem-mode operations, awaiting a MediaStore scan.
+         *
+         * SAF operations need no equivalent: the provider scans on our behalf (see
+         * `FileSystemProvider.moveDocument`). Raw `File` I/O notifies nobody, so without this other
+         * apps keep serving stale listings — a moved file still shown in its old folder, a deleted
+         * folder still listed. Collected per directory and flushed once per run by [flushMediaScans]
+         * rather than scanned per file, which would cost a blocking scan per file moved.
+         */
+        private val pendingMediaScanDirs = ConcurrentHashMap.newKeySet<String>()
+
+        /**
+         * Keys already reported through [recordDiagnosticOnce]. Transfer failures of the kinds we
+         * log are systemic (a whole volume or provider behaves that way), so the first occurrence
+         * carries all the diagnostic value while the thousandth would just churn the log file.
+         */
+        private val diagnosticsRecordedOnce = ConcurrentHashMap.newKeySet<String>()
 
         suspend fun listMatchingFiles(
             folderUriString: String,
@@ -118,6 +138,58 @@ class FileOperationRepository
                 scanCache.entries.removeAll { (_, entry) -> writeTime - entry.timestamp >= SCAN_CACHE_TTL_MS }
                 scanCache[cacheKey] = CacheEntry(resultList, writeTime)
                 resultList
+            }
+
+        /**
+         * [FileEntry] for the file that already exists at [uri], or null if it is gone or
+         * unreadable.
+         *
+         * Scans populate every field as they walk; this rebuilds an entry from a recorded URI —
+         * undo restoring a file to its original folder being the case that matters. Reading the
+         * real timestamp and move support here is what lets [moveFile] relocate a SAF document in
+         * place instead of stream-copying it, and a stream copy through SAF cannot carry a
+         * last-modified time at all.
+         */
+        suspend fun entryForExistingFile(
+            uri: Uri,
+            name: String,
+            relativeParentSegments: List<String> = emptyList(),
+        ): FileEntry? =
+            withContext(ioDispatcher) {
+                if (uri.scheme == "file") {
+                    val path = uri.path
+                    if (path.isNullOrBlank()) return@withContext null
+                    val file = File(path)
+                    if (!file.isFile) return@withContext null
+                    val lastModifiedMs = file.lastModified()
+                    return@withContext FileEntry(
+                        uri = uri,
+                        name = name,
+                        size = file.length(),
+                        lastModifiedMs = lastModifiedMs,
+                        lastModifiedKnown = lastModifiedMs > 0L,
+                        relativeParentSegments = relativeParentSegments,
+                    )
+                }
+
+                val document = DocumentFile.fromSingleUri(context, uri)
+                if (document == null || !document.exists()) return@withContext null
+                val metadata = queryDocumentMetadata(uri)
+                val lastModifiedMs = metadata?.lastModifiedMs ?: document.lastModified()
+                FileEntry(
+                    uri = uri,
+                    name = name,
+                    size = metadata?.size ?: document.length(),
+                    lastModifiedMs = lastModifiedMs,
+                    // Only the column tells us a size is real; DocumentFile.length() reports 0 both
+                    // for an empty file and for one whose size the provider withheld, and treating
+                    // the latter as known would fail the transfer's completeness check.
+                    sizeKnown = metadata?.size != null,
+                    lastModifiedKnown = lastModifiedMs > 0L,
+                    relativeParentSegments = relativeParentSegments,
+                    parentDocumentUri = parentDocumentUriUnderSameTree(uri),
+                    supportsMove = metadata?.supportsMove == true,
+                )
             }
 
         suspend fun moveFile(
@@ -330,6 +402,54 @@ class FileOperationRepository
         fun invalidateAccessCache() {
             accessCache.clear()
         }
+
+        /** Queues the directory containing [filePath] for a MediaStore scan. */
+        internal fun queueMediaScanForFile(filePath: String?) {
+            val parent = filePath?.let { File(it).parent } ?: return
+            pendingMediaScanDirs.add(parent)
+        }
+
+        /** Queues [directoryPath] itself, for when the directory is what changed. */
+        internal fun queueMediaScanForDirectory(directoryPath: String?) {
+            if (directoryPath.isNullOrBlank()) return
+            pendingMediaScanDirs.add(directoryPath)
+        }
+
+        /**
+         * Scans every queued directory so other apps see the run's changes, then clears the queue.
+         * Scanning a directory reconciles it, which is what drops index entries for files and
+         * folders the run removed. Best-effort: a failed scan costs freshness, not correctness.
+         */
+        suspend fun flushMediaScans() {
+            if (pendingMediaScanDirs.isEmpty()) return
+            val directories = pendingMediaScanDirs.toList()
+            pendingMediaScanDirs.removeAll(directories.toSet())
+            withContext(ioDispatcher) {
+                // MediaStore.scanFile is @SystemApi; MediaScannerConnection is the app-facing
+                // equivalent and takes the whole batch in one request.
+                runCatching {
+                    MediaScannerConnection.scanFile(context, directories.toTypedArray(), null, null)
+                }.onFailure {
+                    recordDiagnosticOnce(
+                        key = "media-scan-failed",
+                        message = "MediaStore scan request failed for ${directories.size} directories: ${it.message}",
+                    )
+                }
+            }
+        }
+
+        /**
+         * Records [message] the first time [key] is seen. Used by the transfer helpers, which run
+         * once per file and would otherwise write one diagnostic line per file in a run.
+         */
+        internal fun recordDiagnosticOnce(
+            key: String,
+            message: String,
+        ) {
+            if (diagnosticsRecordedOnce.add(key)) {
+                DiagnosticLog.record(context, message)
+            }
+        }
     }
 
 data class FileEntry(
@@ -340,6 +460,17 @@ data class FileEntry(
     val sizeKnown: Boolean = true,
     val lastModifiedKnown: Boolean = true,
     val relativeParentSegments: List<String> = emptyList(),
+    /**
+     * Containing folder, as a document URI scoped to the same tree grant as [uri]. Required by
+     * [DocumentsContract.moveDocument]; only populated for SAF entries produced by a scan.
+     */
+    val parentDocumentUri: Uri? = null,
+    /**
+     * Whether the provider advertised `FLAG_SUPPORTS_MOVE` for this document at scan time. Gates
+     * the in-provider move fast path, so an entry that never saw the flag column simply gets the
+     * stream-copy path instead of one thrown Binder exception per file.
+     */
+    val supportsMove: Boolean = false,
 )
 
 fun FileEntry.canonicalIdentity(): String {

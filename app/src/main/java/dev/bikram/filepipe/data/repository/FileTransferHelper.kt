@@ -2,6 +2,7 @@ package dev.bikram.filepipe.data.repository
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import dev.bikram.filepipe.R
@@ -21,6 +22,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import kotlin.math.abs
 
 internal fun FileOperationRepository.moveFileFilesystemToFilesystem(
     sourceEntry: FileEntry,
@@ -127,12 +129,22 @@ internal fun FileOperationRepository.moveFileFilesystemToFilesystem(
                 StandardCopyOption.REPLACE_EXISTING,
             )
         } else {
+            // Files.move needs no equivalent option: a same-volume move is a rename, and the
+            // cross-volume fallback already forces attribute copying
+            // (sun.nio.fs.UnixCopyFile.Flags.fromMoveOptions) — passing COPY_ATTRIBUTES to it
+            // would in fact throw UnsupportedOperationException.
+            val sourceLastModifiedMs = sourceFile.lastModified()
             Files.copy(
                 sourceFile.toPath(),
                 destFile.toPath(),
                 StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.COPY_ATTRIBUTES,
             )
+            // Read off the source rather than from scan data, which may predate the run.
+            preserveLastModified(destFile, sourceLastModifiedMs)
         }
+        queueMediaScanForFile(destFile.path)
+        if (operationMode == OperationMode.MOVE) queueMediaScanForFile(sourceFile.path)
         FileMoved(
             fileName = sourceEntry.name,
             sourceUri = sourceEntry.uri.toString(),
@@ -333,6 +345,8 @@ internal fun FileOperationRepository.moveFileFilesystemToDocument(
                     errorMessage = context.getString(R.string.file_operation_source_delete_failed),
                 )
             }
+            // The SAF destination is the provider's to reindex; the vacated source is ours.
+            queueMediaScanForFile(sourceFile.path)
         }
 
         FileMoved(
@@ -459,6 +473,12 @@ internal fun FileOperationRepository.moveFileDocumentToFilesystem(
             )
         }
 
+        // A stream copy has no equivalent of COPY_ATTRIBUTES, so stamp the timestamp on by hand.
+        // The scan is the only source of it here — the source is a document, not a File.
+        if (sourceEntry.lastModifiedKnown) {
+            preserveLastModified(destFile, sourceEntry.lastModifiedMs)
+        }
+
         if (operationMode == OperationMode.MOVE) {
             val sourceDeleted =
                 runCatching {
@@ -477,6 +497,7 @@ internal fun FileOperationRepository.moveFileDocumentToFilesystem(
             }
         }
 
+        queueMediaScanForFile(destFile.path)
         FileMoved(
             fileName = sourceEntry.name,
             sourceUri = sourceEntry.uri.toString(),
@@ -593,6 +614,13 @@ internal fun FileOperationRepository.moveFileDocumentToDocument(
         } else {
             sourceEntry.name
         }
+
+    tryMoveDocumentInProvider(
+        sourceEntry = sourceEntry,
+        destParent = destParent,
+        destName = destName,
+        operationMode = operationMode,
+    )?.let { return it }
 
     val mimeType =
         runCatching { context.contentResolver.getType(sourceEntry.uri) }.getOrNull()
@@ -763,6 +791,7 @@ internal fun FileOperationRepository.deleteFile(
             } catch (_: SecurityException) {
                 false
             }
+        if (deleted) queueMediaScanForFile(sourceFile.path)
         return FileMoved(
             fileName = sourceEntry.name,
             sourceUri = sourceEntry.uri.toString(),
@@ -1260,3 +1289,217 @@ internal sealed class DestParentPreview {
 
     data object BlockedByFile : DestParentPreview()
 }
+
+/**
+ * Fast path for SAF→SAF moves: let the provider relocate the document in place. That preserves the
+ * file's last-modified time, which the stream-copy fallback cannot, and moves no bytes at all.
+ *
+ * Deliberately narrow, because the fallback is only safe while the source still exists:
+ *  - requires [FileEntry.parentDocumentUri] and `FLAG_SUPPORTS_MOVE`, so providers that can't move
+ *    cost nothing rather than one thrown Binder exception per file;
+ *  - requires the destination name to be unchanged. Renaming after the move would need a second
+ *    call that can fail once the source is already gone, leaving a moved file that we report as
+ *    failed and can no longer locate. `RENAME_SUFFIX` conflicts therefore always return null and
+ *    take the copy path — no loss in practice, since AOSP's `FileSystemProvider.moveDocument`
+ *    rejects a move whose target name already exists anyway.
+ *
+ * Returns a successful [FileMoved] when the provider move lands; null means the caller should
+ * stream-copy (cross-volume moves and provider rejections leave the source untouched).
+ */
+internal fun FileOperationRepository.tryMoveDocumentInProvider(
+    sourceEntry: FileEntry,
+    destParent: DocumentFile,
+    destName: String,
+    operationMode: OperationMode,
+): FileMoved? {
+    val sourceParentUri = sourceEntry.parentDocumentUri ?: return null
+    if (!canUseInProviderMove(
+            operationMode = operationMode,
+            supportsMove = sourceEntry.supportsMove,
+            destNameUnchanged = destName == sourceEntry.name,
+        )
+    ) {
+        return null
+    }
+    val movedUri =
+        try {
+            DocumentsContract.moveDocument(
+                context.contentResolver,
+                sourceEntry.uri,
+                sourceParentUri,
+                destParent.uri,
+            )
+        } catch (e: Exception) {
+            // Cross-volume moves and providers that reject the target both land here; the
+            // source is untouched, so the stream copy below can still run.
+            recordDiagnosticOnce(
+                key = "saf-move-fast-path-unavailable",
+                message = "SAF in-provider move unavailable, copying instead: ${e.javaClass.simpleName}: ${e.message}",
+            )
+            null
+        } ?: return null
+    return FileMoved(
+        fileName = sourceEntry.name,
+        sourceUri = sourceEntry.uri.toString(),
+        destinationUri = destinationUriForMovedDocument(movedUri, destParent.uri).toString(),
+        fileSizeBytes = sourceEntry.size,
+        relativeParentSegments = sourceEntry.relativeParentSegments,
+        success = true,
+    )
+}
+
+/**
+ * Parent of [documentId], or null when it has no derivable parent.
+ *
+ * Path-shaped ids nest with `/` (`primary:DCIM/Camera/a.jpg` → `primary:DCIM/Camera`); an id
+ * directly under a volume root has only the volume prefix left (`primary:a.jpg` → `primary:`).
+ * Anything else — notably an id with no `:` at all — has no parent we can name, and guessing one
+ * would send a move to a fabricated location.
+ */
+internal fun parentDocumentIdOrNull(documentId: String): String? {
+    val clean = documentId.trimEnd('/')
+    val slashIndex = clean.lastIndexOf('/')
+    val parent =
+        if (slashIndex >= 0) {
+            clean.substring(0, slashIndex)
+        } else {
+            val colonIndex = clean.indexOf(':')
+            if (colonIndex < 0) return null
+            clean.substring(0, colonIndex + 1)
+        }
+    // A volume root reduces to itself. Answering "its own parent" would be a fixed point the
+    // callers would have to know to reject, so report no parent instead.
+    return parent.takeIf { it.isNotEmpty() && it != clean }
+}
+
+/**
+ * Filesystem timestamp granularity to tolerate when deciding whether a stamp took effect. FAT and
+ * exFAT volumes round to whole seconds or worse, so an exact comparison would read a successful
+ * write as a failure.
+ */
+private const val LAST_MODIFIED_TOLERANCE_MS = 2_000L
+
+/**
+ * Makes [destFile] carry [lastModifiedMs], if it doesn't already.
+ *
+ * Needed even after [StandardCopyOption.COPY_ATTRIBUTES]: on a copy, `sun.nio.fs.UnixCopyFile`
+ * swallows a failed `utimes()` and reports success anyway (only a *move* sets
+ * `failIfUnableToCopyBasic`), so a destination volume that rejects the timestamp silently ends up
+ * stamped with the time of the copy. Checking the result and re-stamping covers that.
+ *
+ * Best-effort by design — a volume that refuses timestamps entirely shouldn't fail an otherwise
+ * complete transfer — so it logs once instead of returning an error.
+ */
+internal fun FileOperationRepository.preserveLastModified(
+    destFile: File,
+    lastModifiedMs: Long,
+) {
+    if (lastModifiedMs <= 0L) return
+
+    fun isPreserved(): Boolean =
+        runCatching { abs(destFile.lastModified() - lastModifiedMs) <= LAST_MODIFIED_TOLERANCE_MS }
+            .getOrDefault(false)
+
+    if (isPreserved()) return
+    runCatching { destFile.setLastModified(lastModifiedMs) }
+    if (!isPreserved()) {
+        recordDiagnosticOnce(
+            key = "dest-set-last-modified-failed",
+            message = "Destination volume would not accept the source's last-modified time: ${destFile.parent}",
+        )
+    }
+}
+
+/** Trailing name of [documentId] — the component a folder or file is displayed under. */
+internal fun documentIdLastSegment(documentId: String): String = documentId.trimEnd('/').substringAfterLast('/').substringAfterLast(':')
+
+/**
+ * Walks [documentId] up one level per entry in [segments], last segment first, and returns where it
+ * lands — or null if the trailing names don't match [segments], meaning the id doesn't actually sit
+ * that deep and stripping would name an unrelated folder.
+ *
+ * Inverts the subfolder recreation that [ensureDestParentFolder] performs on the way out, which is
+ * how a transfer's destination can be turned back into the root it was resolved from.
+ */
+internal fun documentIdWithoutTrailingSegments(
+    documentId: String,
+    segments: List<String>,
+): String? {
+    var current = documentId
+    for (segment in segments.asReversed()) {
+        if (documentIdLastSegment(current) != segment) return null
+        current = parentDocumentIdOrNull(current) ?: return null
+    }
+    return current
+}
+
+/** [documentIdWithoutTrailingSegments] for filesystem paths. */
+internal fun fileWithoutTrailingSegments(
+    directory: File,
+    segments: List<String>,
+): File? {
+    var current = directory
+    for (segment in segments.asReversed()) {
+        if (current.name != segment) return null
+        current = current.parentFile ?: return null
+    }
+    return current
+}
+
+/**
+ * Containing folder of [documentUri] as a document URI carrying the same tree grant.
+ *
+ * [DocumentsContract.moveDocument] needs the source's parent and enforces write access on it, so
+ * this only answers for tree-scoped URIs — a single-document URI grants nothing on its parent.
+ * Scan results already carry [FileEntry.parentDocumentUri]; this covers entries assembled from a
+ * recorded URI instead, such as undo restoring a file to its original folder.
+ */
+internal fun parentDocumentUriUnderSameTree(documentUri: Uri): Uri? =
+    try {
+        if (!DocumentsContract.isTreeUri(documentUri)) {
+            null
+        } else {
+            val parentDocumentId = parentDocumentIdOrNull(DocumentsContract.getDocumentId(documentUri))
+            parentDocumentId?.let { DocumentsContract.buildDocumentUriUsingTree(documentUri, it) }
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+/**
+ * Whether a SAF→SAF transfer may be handed to [DocumentsContract.moveDocument] instead of being
+ * stream-copied. Each condition is load-bearing — see the call site in
+ * [tryMoveDocumentInProvider] — so relaxing one reintroduces either a thrown Binder exception per
+ * file or a file that moved successfully but is recorded as failed with no recoverable destination.
+ */
+internal fun canUseInProviderMove(
+    operationMode: OperationMode,
+    supportsMove: Boolean,
+    destNameUnchanged: Boolean,
+): Boolean = operationMode == OperationMode.MOVE && supportsMove && destNameUnchanged
+
+/**
+ * Destination URI to record for a document relocated by [DocumentsContract.moveDocument].
+ *
+ * The URI that call returns cannot be used: `DocumentsProvider` builds it from the *source*
+ * document URI (`buildDocumentUriMaybeUsingTree`), so for a tree-scoped source it names a document
+ * that is not a descendant of the tree it is scoped to. `DocumentsProvider.enforceTree` then
+ * rejects every subsequent query and open on it, which would silently break run history
+ * thumbnails, tap-to-open, and undo. Re-scope the new document id under the destination grant
+ * ([destParentUri]) instead, which is the grant that actually covers it.
+ */
+internal fun destinationUriForMovedDocument(
+    movedUri: Uri,
+    destParentUri: Uri,
+): Uri =
+    try {
+        val movedDocumentId = DocumentsContract.getDocumentId(movedUri)
+        if (DocumentsContract.isTreeUri(destParentUri)) {
+            DocumentsContract.buildDocumentUriUsingTree(destParentUri, movedDocumentId)
+        } else {
+            val authority = destParentUri.authority ?: return movedUri
+            DocumentsContract.buildDocumentUri(authority, movedDocumentId)
+        }
+    } catch (_: Exception) {
+        movedUri
+    }

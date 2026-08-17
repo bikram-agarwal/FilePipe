@@ -38,6 +38,13 @@ interface RunHistoryDao {
     @Query("SELECT COUNT(*) FROM run_history")
     fun observeHistoryCount(): Flow<Int>
 
+    /**
+     * Destination folders every recorded run of [ruleId] created. Undo sweeps folders FilePipe made
+     * and left empty, including ones an earlier run of the same rule created and this one reused.
+     */
+    @Query("SELECT copyCreatedDestFolderUris FROM run_history WHERE ruleId = :ruleId")
+    suspend fun getCreatedDestFolderUrisForRule(ruleId: Long): List<String>
+
     @Query("SELECT COUNT(*) FROM run_history")
     suspend fun countHistory(): Int
 

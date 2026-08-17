@@ -91,6 +91,7 @@
 - Some folders (like Download) can't be selected
 - You'll need to approve each folder manually
 - Can run slower than All files access on large libraries or big files
+- Copied files lose their original timestamp, and instead use the current time.
 
 ---
 

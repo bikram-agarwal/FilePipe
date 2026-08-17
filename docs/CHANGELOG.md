@@ -1,3 +1,12 @@
+## v3.9.9 Preserve file timestamp
+
+### 🛠 Improved Features
+- Moving files is now much faster, especially for large files and big batches.
+- Files now keep their original date and time when moved (SAF & All files mode) or copied (All files mode), so they stay in the right order in your gallery and file manager instead of all showing up as brand new.
+- Moved files now show up in your gallery and file manager right away.
+
+---
+
 ## v3.9.8 Misc polish
 
 ### 🛠 Improved Features

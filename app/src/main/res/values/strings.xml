@@ -348,9 +348,9 @@
     <string name="onboarding_permissions_all_files_hook_once">Set it once</string>
     <string name="onboarding_permissions_all_files_rest_once">- no permission prompts later</string>
     <string name="onboarding_permissions_all_files_hook_everywhere">Works everywhere</string>
-    <string name="onboarding_permissions_all_files_rest_everywhere">- Download, SD card, storage root, app folders</string>
-    <string name="onboarding_permissions_all_files_hook_device">Stays on this device</string>
-    <string name="onboarding_permissions_all_files_rest_device">- FilePipe never uploads your files</string>
+    <string name="onboarding_permissions_all_files_rest_everywhere">- Download, SD card &amp; storage root, app folders</string>
+    <string name="onboarding_permissions_all_files_hook_device">Preserves file timestamps</string>
+    <string name="onboarding_permissions_all_files_rest_device">- Files keep their original date and time when moved or copied</string>
     <string name="onboarding_permissions_all_files_hook_fast">Faster</string>
     <string name="onboarding_permissions_all_files_rest_fast">- quicker scans and moves, even for large libraries</string>
     <string name="onboarding_permissions_selective_pitch_title">Your choices, folder by folder</string>

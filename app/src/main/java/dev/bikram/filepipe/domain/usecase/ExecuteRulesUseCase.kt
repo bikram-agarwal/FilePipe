@@ -78,6 +78,8 @@ class ExecuteRulesUseCase
             val allFiles = mutableListOf<FileMoved>()
             var totalPlanned = 0
             var completedSuccessfulMoves = 0
+            // Destination folders this run created. Named for the persisted field, which predates
+            // moves being swept too (renaming it would change a DB column and a backup JSON key).
             val copyCreatedDestFolders: MutableSet<String> = linkedSetOf()
             val destinationFolderCache = DestinationFolderCache()
 
@@ -136,11 +138,14 @@ class ExecuteRulesUseCase
                             destFolderUriString = rule.destinationFolderPath,
                             conflictPolicy = rule.conflictPolicy,
                             operationMode = rule.operationMode,
+                            // Recorded for moves as well as copies: undoing either empties the
+                            // destination subfolders the run created, and undo can only sweep
+                            // folders it knows the run is responsible for.
                             destFoldersCreatedCollector =
-                                if (rule.operationMode == OperationMode.COPY) {
-                                    copyCreatedDestFolders
-                                } else {
+                                if (rule.operationMode == OperationMode.DELETE) {
                                     null
+                                } else {
+                                    copyCreatedDestFolders
                                 },
                             filesystemAccessEnabled = filesystemAccessEnabled,
                             requireUnchangedSource = preparedFileEntries != null,
@@ -218,6 +223,9 @@ class ExecuteRulesUseCase
                     completedAt = completedAt,
                     copyCreatedDestFolderUris = copyCreatedDestFolders.toList(),
                 )
+            // One scan request per touched directory, after the run rather than per file, so other
+            // apps see the moves. SAF transfers need none — the provider reindexes both sides itself.
+            fileOperationRepository.flushMediaScans()
             runHistoryRepository.completeRun(result)
             if (result.totalFailed > 0) {
                 DiagnosticLog.record(

@@ -50,11 +50,14 @@ internal data class SafDocEntry(
     val lastModifiedKnown: Boolean,
     val isFile: Boolean,
     val isDirectory: Boolean,
+    val parentDocumentUri: Uri? = null,
+    val supportsMove: Boolean = false,
 )
 
 internal data class DocumentMetadata(
     val size: Long?,
     val lastModifiedMs: Long?,
+    val supportsMove: Boolean = false,
 )
 
 internal suspend fun FileOperationRepository.listMatchingFilesScan(
@@ -173,6 +176,8 @@ internal suspend fun FileOperationRepository.listMatchingFilesScan(
                     sizeKnown = doc.sizeKnown,
                     lastModifiedKnown = doc.lastModifiedKnown,
                     relativeParentSegments = relativeParentSegments,
+                    parentDocumentUri = doc.parentDocumentUri,
+                    supportsMove = doc.supportsMove,
                 )
             }.toList()
     }
@@ -286,6 +291,7 @@ internal fun FileOperationRepository.querySafChildren(
     parentDocumentId: String,
 ): List<SafDocEntry> {
     val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocumentId)
+    val parentDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, parentDocumentId)
     val projection =
         arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
@@ -293,6 +299,7 @@ internal fun FileOperationRepository.querySafChildren(
             DocumentsContract.Document.COLUMN_SIZE,
             DocumentsContract.Document.COLUMN_LAST_MODIFIED,
             DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_FLAGS,
         )
     val results = mutableListOf<SafDocEntry>()
     try {
@@ -302,12 +309,14 @@ internal fun FileOperationRepository.querySafChildren(
             val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
             val modifiedIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
             val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+            val flagsIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_FLAGS)
             if (idIdx == -1) return emptyList()
             while (cursor.moveToNext()) {
                 val documentId = cursor.getString(idIdx) ?: continue
                 val mimeType = if (mimeIdx != -1) cursor.getString(mimeIdx) else null
                 val isDirectory = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
                 val isFile = !mimeType.isNullOrEmpty() && !isDirectory
+                val flags = if (flagsIdx != -1 && !cursor.isNull(flagsIdx)) cursor.getInt(flagsIdx) else 0
                 results +=
                     SafDocEntry(
                         documentId = documentId,
@@ -319,6 +328,8 @@ internal fun FileOperationRepository.querySafChildren(
                         lastModifiedKnown = modifiedIdx != -1 && !cursor.isNull(modifiedIdx),
                         isFile = isFile,
                         isDirectory = isDirectory,
+                        parentDocumentUri = parentDocUri,
+                        supportsMove = flags and DocumentsContract.Document.FLAG_SUPPORTS_MOVE != 0,
                     )
             }
         }
@@ -328,18 +339,53 @@ internal fun FileOperationRepository.querySafChildren(
     return results
 }
 
+/**
+ * True when the folder at [folderDocumentUri] has no children, false when it has some, and null
+ * when the provider could not be asked.
+ *
+ * The three-way answer is the point: a caller deleting empty folders must treat "could not tell"
+ * as "leave it alone". [folderDocumentUri] has to be tree-scoped, since a plain document URI
+ * carries no grant to enumerate children with — one that isn't reports null rather than empty.
+ *
+ * Not expressible through `DocumentFile`: a folder URI wrapped by `DocumentFile.fromSingleUri`
+ * produces a `SingleDocumentFile`, whose `listFiles()` throws `UnsupportedOperationException`
+ * unconditionally.
+ */
+internal fun FileOperationRepository.isSafFolderEmpty(folderDocumentUri: Uri): Boolean? =
+    try {
+        val childrenUri =
+            DocumentsContract.buildChildDocumentsUriUsingTree(
+                folderDocumentUri,
+                DocumentsContract.getDocumentId(folderDocumentUri),
+            )
+        context.contentResolver
+            .query(
+                childrenUri,
+                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+                null,
+                null,
+                null,
+            )?.use { cursor -> cursor.count == 0 }
+    } catch (_: Exception) {
+        null
+    }
+
 internal fun FileOperationRepository.queryDocumentMetadata(documentUri: Uri): DocumentMetadata? {
     val projection =
         arrayOf(
             DocumentsContract.Document.COLUMN_SIZE,
             DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+            DocumentsContract.Document.COLUMN_FLAGS,
         )
     return try {
         context.contentResolver.query(documentUri, projection, null, null, null)?.use { cursor ->
             if (!cursor.moveToFirst()) return@use null
             val sizeIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
             val modifiedIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+            val flagsIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_FLAGS)
+            val flags = if (flagsIndex != -1 && !cursor.isNull(flagsIndex)) cursor.getInt(flagsIndex) else 0
             DocumentMetadata(
+                supportsMove = flags and DocumentsContract.Document.FLAG_SUPPORTS_MOVE != 0,
                 size =
                     if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
                         cursor.getLong(sizeIndex)

@@ -9,12 +9,14 @@ import androidx.documentfile.provider.DocumentFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
-import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.FileOperationRepository
-import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
+import dev.bikram.filepipe.data.repository.documentIdWithoutTrailingSegments
+import dev.bikram.filepipe.data.repository.fileWithoutTrailingSegments
+import dev.bikram.filepipe.data.repository.isSafFolderEmpty
+import dev.bikram.filepipe.data.repository.normalizeDestinationParentSegments
+import dev.bikram.filepipe.data.repository.parentDocumentIdOrNull
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
-import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.devtools.DevMockFileMove
 import dev.bikram.filepipe.di.IoDispatcher
@@ -64,7 +66,6 @@ class UndoRunUseCase
         @param:ApplicationContext private val context: Context,
         private val runHistoryRepository: RunHistoryRepository,
         private val fileOperationRepository: FileOperationRepository,
-        private val ruleRepository: RuleRepository,
         private val userPreferencesRepository: UserPreferencesRepository,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) {
@@ -173,7 +174,6 @@ class UndoRunUseCase
             var reversed = 0
             var failed = 0
             val errors = mutableListOf<String>()
-            val copyDeletedDestinationUris = mutableListOf<String>()
 
             pendingFiles.forEach { fileMoved ->
                 var physicalUndoCompleted = false
@@ -208,7 +208,6 @@ class UndoRunUseCase
                     physicalUndoCompleted = outcome.physicalUndoCompleted
                     outcomeCounted = outcome.reversed || outcome.failed
                     outcome.error?.let { errors.add(it) }
-                    outcome.copyDeletedDestinationUri?.let { copyDeletedDestinationUris.add(it) }
 
                     if (outcome.reversed) {
                         runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.UNDONE)
@@ -252,19 +251,37 @@ class UndoRunUseCase
                 }
             }
 
-            if (operationMode == OperationMode.COPY && history.copyCreatedDestFolderUris.isNotEmpty()) {
-                deleteEmptyRecordedCopyFolders(history.copyCreatedDestFolderUris)
-            }
-
-            if (operationMode == OperationMode.COPY && copyDeletedDestinationUris.isNotEmpty()) {
-                val destTreeUriString =
-                    history.ruleId?.let { ruleId ->
-                        ruleRepository.getRuleById(ruleId)?.destinationFolderPath?.takeIf { it.isNotBlank() }
-                    }
-                if (destTreeUriString != null) {
-                    deleteEmptyDestSubfoldersAfterCopyUndo(destTreeUriString, copyDeletedDestinationUris)
+            // Undo removes only what the run added, and that includes folders: sweep the ones the
+            // run is recorded as having created, and nothing else. A folder the user already had is
+            // theirs even once it's empty, so it is never a candidate — which is why this works off
+            // the recorded list rather than deriving parents from the file paths. Emptiness is
+            // re-checked per folder, so a partial undo or leftover content also keeps it.
+            if (operationMode != OperationMode.DELETE) {
+                // Folders FilePipe created for this rule, across every recorded run — not just this
+                // one. A subfolder created by an earlier run and merely reused by this one is still
+                // FilePipe's to clean up once it's empty; a folder the user made is never recorded,
+                // so it is never a candidate.
+                val sweepCandidates =
+                    (
+                        history.copyCreatedDestFolderUris +
+                            (
+                                history.ruleId?.let { ruleId ->
+                                    runHistoryRepository.getCreatedDestFolderUrisForRule(ruleId)
+                                } ?: emptyList()
+                            )
+                    ).distinct()
+                if (sweepCandidates.isEmpty()) {
+                    // Distinguishes "no run created these folders" from "the sweep declined to
+                    // delete them", which look identical outside and have opposite causes.
+                    DiagnosticLog.record(context, "Undo folder sweep: no run recorded creating destination folders")
+                } else {
+                    deleteEmptyRecordedDestFolders(sweepCandidates)
                 }
             }
+
+            // Filesystem-mode undo moved and deleted through raw File I/O, which notifies nobody.
+            // Without this, other apps keep listing files and folders undo already took away.
+            fileOperationRepository.flushMediaScans()
 
             if (failed > 0) {
                 DiagnosticLog.record(
@@ -351,203 +368,74 @@ class UndoRunUseCase
         }
 
         /**
-         * After copied files are removed, deletes empty subfolders under the rule destination tree that
-         * were only holding those files. Skips non-empty dirs (e.g. pre-existing content).
+         * Removes destination folders that were created during the run, deepest first, only when
+         * still empty (so pre-existing folders or folders with leftover content stay).
          */
-        private fun deleteEmptyDestSubfoldersAfterCopyUndo(
-            destTreeUriString: String,
-            deletedFileDestinationUriStrings: List<String>,
-        ) {
-            if (isFilesystemFolderPathString(destTreeUriString)) {
-                deleteEmptyFilesystemFoldersAfterCopyUndo(destTreeUriString, deletedFileDestinationUriStrings)
-                return
-            }
-            val treeUri = destTreeUriString.toUri()
-            val authority = treeUri.authority ?: return
-            val treeDocumentId =
-                try {
-                    DocumentsContract.getTreeDocumentId(treeUri)
-                } catch (_: IllegalArgumentException) {
-                    return
-                }
-            val folderDocumentIds = mutableSetOf<String>()
-            for (fileUriString in deletedFileDestinationUriStrings) {
-                folderDocumentIds.addAll(
-                    parentFolderDocumentIdsUnderTree(treeDocumentId, fileUriString),
-                )
-            }
-            val deepestFirst =
-                folderDocumentIds.sortedByDescending { documentId ->
-                    documentId.count { segment -> segment == '/' }
-                }
-            for (folderDocumentId in deepestFirst) {
-                try {
-                    val folderUri = DocumentsContract.buildDocumentUri(authority, folderDocumentId)
-                    val folderDoc =
-                        try {
-                            DocumentFile.fromSingleUri(context, folderUri)
-                        } catch (_: Exception) {
-                            null
-                        } ?: continue
-                    val isDirectory =
-                        try {
-                            folderDoc.isDirectory
-                        } catch (_: Exception) {
-                            continue
-                        }
-                    if (!isDirectory) continue
-                    val children =
-                        try {
-                            folderDoc.listFiles()
-                        } catch (_: Exception) {
-                            null
-                        }
-                    if (children?.isEmpty() != true) continue
-                    deleteDocumentUriWithFallback(folderUri)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to delete empty dest subfolder $folderDocumentId", e)
-                }
-            }
-        }
-
-        /**
-         * Document IDs for folders strictly between the tree root and the file (i.e. parents of the
-         * file, excluding the destination root). Empty if the file lived directly under the tree root.
-         */
-        private fun parentFolderDocumentIdsUnderTree(
-            treeDocumentId: String,
-            fileDocumentUriString: String,
-        ): List<String> {
-            val fileDocumentId =
-                try {
-                    DocumentsContract.getDocumentId(fileDocumentUriString.toUri())
-                } catch (_: IllegalArgumentException) {
-                    return emptyList()
-                }
-            val treePrefix = "$treeDocumentId/"
-            if (!fileDocumentId.startsWith(treePrefix)) return emptyList()
-            val relative = fileDocumentId.removePrefix(treePrefix)
-            val segments = relative.split('/').filter { segment -> segment.isNotEmpty() }
-            if (segments.size < 2) return emptyList()
-            val volume = treeDocumentId.substringBefore(':')
-            val treePathAfterColon = treeDocumentId.substringAfter(':', "")
-            val result = mutableListOf<String>()
-            for (depth in 1 until segments.size) {
-                val underTree = segments.take(depth).joinToString("/")
-                val fullPath =
-                    if (treePathAfterColon.isEmpty()) {
-                        underTree
-                    } else {
-                        "$treePathAfterColon/$underTree"
-                    }
-                result.add("$volume:$fullPath")
-            }
-            return result
-        }
-
-        /**
-         * Removes destination folders that were created during the copy run, deepest first,
-         * only when still empty (so pre-existing folders or folders with leftover content stay).
-         */
-        private fun deleteEmptyRecordedCopyFolders(folderUriStrings: List<String>) {
+        private fun deleteEmptyRecordedDestFolders(folderUriStrings: List<String>) {
             val distinctSorted = folderUriStrings.distinct().sortedByDescending { documentPathDepth(it) }
+            var deleted = 0
+            val skipped = mutableListOf<String>()
             for (uriString in distinctSorted) {
                 try {
                     if (uriString.startsWith("file:")) {
-                        val path = uriString.toUri().path ?: continue
+                        val path = uriString.toUri().path
+                        if (path == null) {
+                            skipped += "$uriString (no path)"
+                            continue
+                        }
                         val dir = File(path)
-                        if (!dir.isDirectory) continue
-                        val listed =
-                            try {
-                                dir.list()
-                            } catch (_: Exception) {
-                                null
-                            }
-                        if (listed?.isEmpty() != true) continue
-                        try {
-                            dir.delete()
-                        } catch (_: Exception) {
+                        if (!dir.isDirectory) {
+                            skipped += "$path (not a directory)"
+                            continue
+                        }
+                        val listed = runCatching { dir.list() }.getOrNull()
+                        if (listed == null) {
+                            skipped += "$path (could not list)"
+                            continue
+                        }
+                        if (listed.isNotEmpty()) {
+                            skipped += "$path (${listed.size} entries left)"
+                            continue
+                        }
+                        if (runCatching { dir.delete() }.getOrDefault(false)) {
+                            deleted++
+                            // Scan the parent, not the folder: the row to drop is the folder itself.
+                            fileOperationRepository.queueMediaScanForFile(dir.path)
+                        } else {
+                            skipped += "$path (delete refused)"
                         }
                         continue
                     }
+                    // Recorded by ensureDestParentFolder as tree-scoped document URIs, so they can
+                    // be enumerated directly. A folder that has since been removed answers null
+                    // here, same as one we cannot inspect, and is left alone either way.
                     val folderUri = uriString.toUri()
-                    val folderDoc =
-                        try {
-                            DocumentFile.fromSingleUri(context, folderUri)
-                        } catch (_: Exception) {
-                            null
-                        } ?: continue
-                    val exists =
-                        try {
-                            folderDoc.exists()
-                        } catch (_: Exception) {
-                            continue
+                    when (fileOperationRepository.isSafFolderEmpty(folderUri)) {
+                        true -> {
+                            deleteDocumentUriWithFallback(folderUri)
+                            deleted++
                         }
-                    if (!exists) continue
-                    val isDirectory =
-                        try {
-                            folderDoc.isDirectory
-                        } catch (_: Exception) {
-                            continue
-                        }
-                    if (!isDirectory) continue
-                    val children =
-                        try {
-                            folderDoc.listFiles()
-                        } catch (_: Exception) {
-                            null
-                        }
-                    if (children?.isEmpty() != true) continue
-                    deleteDocumentUriWithFallback(folderUri)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to delete empty recorded copy folder $uriString", e)
-                }
-            }
-        }
 
-        private fun deleteEmptyFilesystemFoldersAfterCopyUndo(
-            destRootRaw: String,
-            deletedFileUriStrings: List<String>,
-        ) {
-            val destRoot = normalizeFilesystemFolderPath(destRootRaw) ?: return
-            val folderPaths = mutableSetOf<String>()
-            for (uriStr in deletedFileUriStrings) {
-                if (!uriStr.startsWith("file:")) continue
-                val filePath = uriStr.toUri().path ?: continue
-                val file = File(filePath)
-                var parent = file.parentFile ?: continue
-                while (true) {
-                    val canon =
-                        try {
-                            parent.canonicalPath
-                        } catch (_: Exception) {
-                            break
+                        false -> {
+                            skipped += "$uriString (not empty)"
                         }
-                    if (canon == destRoot) break
-                    if (!canon.startsWith(destRoot + File.separator)) break
-                    folderPaths.add(canon)
-                    parent = parent.parentFile ?: break
+
+                        null -> {
+                            skipped += "$uriString (could not inspect)"
+                        }
+                    }
+                } catch (e: Exception) {
+                    skipped += "$uriString (${e.javaClass.simpleName})"
+                    Log.w(TAG, "Failed to delete empty recorded dest folder $uriString", e)
                 }
             }
-            val deepestFirst =
-                folderPaths.sortedByDescending { folderPath ->
-                    folderPath.count { segment -> segment == '/' }
-                }
-            for (folderPath in deepestFirst) {
-                val dir = File(folderPath)
-                try {
-                    if (!dir.isDirectory) continue
-                    val listed =
-                        try {
-                            dir.list()
-                        } catch (_: Exception) {
-                            null
-                        }
-                    if (listed?.isEmpty() != true) continue
-                    dir.delete()
-                } catch (_: Exception) {
-                }
-            }
+            DiagnosticLog.record(
+                context,
+                buildString {
+                    append("Undo folder sweep: ${distinctSorted.size} recorded, $deleted deleted")
+                    if (skipped.isNotEmpty()) append(", kept ${skipped.joinToString("; ")}")
+                },
+            )
         }
 
         private fun deleteDocumentUriWithFallback(documentUri: Uri) {
@@ -585,12 +473,53 @@ class UndoRunUseCase
             }
         }
 
-        private fun parentSourceFolderForUndo(sourceUriString: String): String? {
-            if (sourceUriString.startsWith("content://")) return parentTreeUriString(sourceUriString)
+        /**
+         * Where to put the file back, as the exact inverse of the forward transfer.
+         *
+         * The forward move resolved its destination as *root + relative subfolders*, so undoing it
+         * has to name the root and let the transfer recreate the same subfolders — not name the
+         * file's immediate parent and *also* pass the subfolders, which would nest them twice
+         * (`/DCIM/sub` + `sub` → `/DCIM/sub/sub`).
+         *
+         * Naming the root rather than the parent matters for a second reason on SAF: the parent of
+         * a file found in a subfolder is itself a subfolder, and a tree URI synthesized for it
+         * carries no grant, whereas the root is the folder the user actually picked.
+         *
+         * If the recorded segments don't match the source layout, falls back to the immediate
+         * parent with no segments — still the correct destination, just without the root anchor.
+         */
+        private fun restoreTargetForUndo(fileMoved: FileMoved): UndoRestoreTarget? {
+            val segments = normalizeDestinationParentSegments(fileMoved.relativeParentSegments)
+            val sourceUriString = fileMoved.sourceUri
             if (sourceUriString.startsWith("file:")) {
                 val path = sourceUriString.toUri().path ?: return null
                 val parent = File(path).parentFile ?: return null
-                return normalizeFilesystemFolderPath(parent.absolutePath)
+                val root = if (segments.isEmpty()) null else fileWithoutTrailingSegments(parent, segments)
+                val folder = normalizeFilesystemFolderPath((root ?: parent).absolutePath) ?: return null
+                return UndoRestoreTarget(
+                    folderUriString = folder,
+                    relativeParentSegments = if (root != null) segments else emptyList(),
+                )
+            }
+            if (sourceUriString.startsWith("content://")) {
+                val parsed = sourceUriString.toUri()
+                val authority = parsed.authority ?: return null
+                val documentId =
+                    try {
+                        DocumentsContract.getDocumentId(parsed)
+                    } catch (_: Exception) {
+                        return null
+                    }
+                val parentDocumentId = parentDocumentIdOrNull(documentId) ?: return null
+                val rootDocumentId =
+                    if (segments.isEmpty()) null else documentIdWithoutTrailingSegments(parentDocumentId, segments)
+                return UndoRestoreTarget(
+                    folderUriString =
+                        DocumentsContract
+                            .buildTreeDocumentUri(authority, rootDocumentId ?: parentDocumentId)
+                            .toString(),
+                    relativeParentSegments = if (rootDocumentId != null) segments else emptyList(),
+                )
             }
             return null
         }
@@ -622,31 +551,6 @@ class UndoRunUseCase
                 false
             }
 
-        /**
-         * Derives the parent folder as a SAF tree URI string from a document URI.
-         * e.g. content://...document/primary%3ADCIM%2FCamera%2Fphoto.jpg
-         *   → content://...tree/primary%3ADCIM%2FCamera
-         */
-        private fun parentTreeUriString(documentUriString: String): String? {
-            if (!documentUriString.startsWith("content://")) return null
-            return try {
-                val parsed = documentUriString.toUri()
-                val docAuthority = parsed.authority ?: return null
-                val docId = DocumentsContract.getDocumentId(parsed)
-                val relativePath = docId.substringAfter(":", "")
-                val parentDocId =
-                    if ('/' in relativePath) {
-                        docId.substringBeforeLast('/')
-                    } else {
-                        // File is directly at the volume root — parent is the root itself
-                        docId.substringBefore(':') + ":"
-                    }
-                DocumentsContract.buildTreeDocumentUri(docAuthority, parentDocId).toString()
-            } catch (_: Exception) {
-                null
-            }
-        }
-
         private suspend fun undoCopyFile(fileMoved: FileMoved): SingleFileUndoOutcome {
             if (fileMoved.destinationUri.startsWith("file:")) {
                 val path = fileMoved.destinationUri.toUri().path
@@ -673,7 +577,6 @@ class UndoRunUseCase
                         reversed = true,
                         failed = false,
                         physicalUndoCompleted = true,
-                        copyDeletedDestinationUri = fileMoved.destinationUri,
                     )
                 } else {
                     SingleFileUndoOutcome(
@@ -708,7 +611,6 @@ class UndoRunUseCase
                         reversed = true,
                         failed = false,
                         physicalUndoCompleted = true,
-                        copyDeletedDestinationUri = fileMoved.destinationUri,
                     )
                 } else {
                     SingleFileUndoOutcome(
@@ -726,8 +628,8 @@ class UndoRunUseCase
             filesystemAccessEnabled: Boolean,
         ): SingleFileUndoOutcome {
             val destUri = fileMoved.destinationUri.toUri()
-            val sourceFolderUriString =
-                parentSourceFolderForUndo(fileMoved.sourceUri)
+            val restoreTarget =
+                restoreTargetForUndo(fileMoved)
                     ?: return SingleFileUndoOutcome(
                         reversed = false,
                         failed = true,
@@ -735,8 +637,16 @@ class UndoRunUseCase
                         error = "${fileMoved.fileName}: cannot determine original source folder",
                     )
             val wasInterrupted = fileMoved.undoStatus == FileUndoStatus.IN_PROGRESS
-            val sizeBytes = getDestinationFileSizeBytes(fileMoved)
-            if (sizeBytes == null) {
+            // Reads the file's real timestamp and move support, not just its size. Restoring a file
+            // must not restamp it as modified now, and for SAF that is only achievable by having
+            // the provider relocate the document — a stream copy cannot carry a timestamp.
+            val sourceEntry =
+                fileOperationRepository.entryForExistingFile(
+                    uri = destUri,
+                    name = fileMoved.fileName,
+                    relativeParentSegments = restoreTarget.relativeParentSegments,
+                )
+            if (sourceEntry == null) {
                 return if (wasInterrupted && originalSourceMatches(fileMoved)) {
                     SingleFileUndoOutcome(reversed = true, failed = false, physicalUndoCompleted = true)
                 } else {
@@ -749,23 +659,20 @@ class UndoRunUseCase
                 }
             }
 
-            val sourceEntry =
-                FileEntry(
-                    uri = destUri,
-                    name = fileMoved.fileName,
-                    size = sizeBytes,
-                    relativeParentSegments = fileMoved.relativeParentSegments,
-                )
             val reverseResult =
                 fileOperationRepository.moveFile(
                     sourceEntry = sourceEntry,
-                    destFolderUriString = sourceFolderUriString,
+                    destFolderUriString = restoreTarget.folderUriString,
                     conflictPolicy = ConflictPolicy.SKIP,
                     operationMode = OperationMode.MOVE,
                     filesystemAccessEnabled = filesystemAccessEnabled,
                 )
             return if (reverseResult.success && !reverseResult.skipped) {
-                SingleFileUndoOutcome(reversed = true, failed = false, physicalUndoCompleted = true)
+                SingleFileUndoOutcome(
+                    reversed = true,
+                    failed = false,
+                    physicalUndoCompleted = true,
+                )
             } else {
                 val reverseError =
                     reverseResult.errorMessage
@@ -778,21 +685,6 @@ class UndoRunUseCase
                 )
             }
         }
-
-        private fun getDestinationFileSizeBytes(fileMoved: FileMoved): Long? {
-            val destUri = fileMoved.destinationUri.toUri()
-            return if (fileMoved.destinationUri.startsWith("file:")) {
-                val path = destUri.path
-                if (path.isNullOrBlank()) return null
-                val destFile = File(path)
-                if (!destFile.isFile) return null
-                destFile.length()
-            } else {
-                val destDoc = DocumentFile.fromSingleUri(context, destUri)
-                if (destDoc == null || !destDoc.exists()) return null
-                destDoc.length()
-            }
-        }
     }
 
 private data class SingleFileUndoOutcome(
@@ -800,7 +692,15 @@ private data class SingleFileUndoOutcome(
     val failed: Boolean,
     val physicalUndoCompleted: Boolean,
     val error: String? = null,
-    val copyDeletedDestinationUri: String? = null,
+)
+
+/**
+ * Folder a file is restored into, plus the subfolders the transfer should recreate beneath it. The
+ * two travel together because they are only correct as a pair — see `restoreTargetForUndo`.
+ */
+private data class UndoRestoreTarget(
+    val folderUriString: String,
+    val relativeParentSegments: List<String>,
 )
 
 @Suppress("ktlint:standard:function-expression-body")

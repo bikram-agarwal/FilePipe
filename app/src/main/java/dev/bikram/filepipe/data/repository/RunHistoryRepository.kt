@@ -10,6 +10,7 @@ import dev.bikram.filepipe.AppDatabase
 import dev.bikram.filepipe.data.local.dao.FileMovedDao
 import dev.bikram.filepipe.data.local.dao.RuleDao
 import dev.bikram.filepipe.data.local.dao.RunHistoryDao
+import dev.bikram.filepipe.data.local.database.Converters
 import dev.bikram.filepipe.data.local.entity.FileMovedEntity
 import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
 import dev.bikram.filepipe.data.local.entity.toDomain
@@ -281,6 +282,16 @@ class RunHistoryRepository
         }
 
         suspend fun getHistoryById(id: Long): RunHistory? = runHistoryDao.getHistoryById(id)?.toDomain()
+
+        /**
+         * Destination folders that any recorded run of [ruleId] created, flattened across runs. The
+         * column stores a JSON list per run, so the rows are decoded and unioned.
+         */
+        suspend fun getCreatedDestFolderUrisForRule(ruleId: Long): List<String> =
+            runHistoryDao
+                .getCreatedDestFolderUrisForRule(ruleId)
+                .flatMap { encoded -> Converters().toStringList(encoded) }
+                .distinct()
 
         fun observeHistoryById(id: Long): Flow<RunHistory?> = runHistoryDao.observeHistoryById(id).map { entity -> entity?.toDomain() }
 
