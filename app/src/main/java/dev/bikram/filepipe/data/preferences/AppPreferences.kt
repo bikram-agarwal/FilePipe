@@ -24,6 +24,16 @@ fun SwipeAction.materialSymbolName(): String =
 /** Surface-shading intensity used when nothing is stored yet. 1.0 == the slider's "medium" notch. */
 const val DEFAULT_SHADING_INTENSITY = 1.0f
 
+/** ObtainX-style UI scale. Multiplies Compose density so layout, icons, and text grow together. */
+const val DEFAULT_UI_SCALE = 1.0f
+const val UI_SCALE_MIN = 0.75f
+const val UI_SCALE_MAX = 1.25f
+
+fun clampUiScale(raw: Float): Float {
+    if (!raw.isFinite() || raw <= 0f) return DEFAULT_UI_SCALE
+    return raw.coerceIn(UI_SCALE_MIN, UI_SCALE_MAX)
+}
+
 fun defaultUpdateCheckSchedule(): UpdateCheckSchedule =
     if (BuildConfig.FLAVOR == "fdroid") {
         UpdateCheckSchedule.NEVER
@@ -70,6 +80,7 @@ data class AppPreferences(
     val updateApkDownloadsCopySucceeded: Boolean = false,
     val useGradientBackground: Boolean = true,
     val shadingIntensity: Float = DEFAULT_SHADING_INTENSITY,
+    val uiScale: Float = DEFAULT_UI_SCALE,
     /** SAF vs All files. Legacy [FolderAccessMode.DEFERRED] is migrated to [FolderAccessMode.SAF_ONLY]. */
     val folderAccessMode: FolderAccessMode = FolderAccessMode.SAF_ONLY,
     /**

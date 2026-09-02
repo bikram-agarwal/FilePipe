@@ -92,6 +92,7 @@ private object PrefKeys {
     val ENHANCED_SHADING = booleanPreferencesKey("enhanced_shading")
     val SHADING_INTENSITY = stringPreferencesKey("shading_intensity")
     val SHADING_INTENSITY_FACTOR = floatPreferencesKey("shading_intensity_factor")
+    val UI_SCALE = floatPreferencesKey("ui_scale")
 
     /** Legacy DataStore key; read once then removed in [UserPreferencesRepository.migrateLegacyEnhancedShadingPreferenceIfNeeded]. */
     val ENHANCED_SHADING_LEGACY = booleanPreferencesKey("fixed_card_colors")
@@ -256,6 +257,7 @@ class UserPreferencesRepository
                     saveUpdateApkToDownloads = prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] ?: false,
                     updateApkDownloadsCopySucceeded = prefs[PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED] ?: false,
                     useGradientBackground = prefs[PrefKeys.USE_GRADIENT_BACKGROUND] ?: true,
+                    uiScale = clampUiScale(prefs[PrefKeys.UI_SCALE] ?: DEFAULT_UI_SCALE),
                     shadingIntensity = readShadingIntensity(prefs),
                     folderAccessMode =
                         normalizeFolderAccessModeStored(
@@ -531,6 +533,10 @@ class UserPreferencesRepository
             }
         }
 
+        suspend fun setUiScale(scale: Float) {
+            dataStore.edit { it[PrefKeys.UI_SCALE] = clampUiScale(scale) }
+        }
+
         /**
          * Copies `fixed_card_colors` into [PrefKeys.ENHANCED_SHADING] if needed, then deletes the legacy key.
          * Safe to call on every launch.
@@ -610,6 +616,7 @@ class UserPreferencesRepository
                 prefs.remove(PrefKeys.ENHANCED_SHADING)
                 prefs.remove(PrefKeys.SHADING_INTENSITY)
                 prefs.remove(PrefKeys.SHADING_INTENSITY_FACTOR)
+                prefs.remove(PrefKeys.UI_SCALE)
                 prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
                 prefs.remove(PrefKeys.PROGRESSIVE_BLUR)
                 prefs.remove(PrefKeys.CUSTOM_FONT_PATH)
@@ -825,6 +832,7 @@ class UserPreferencesRepository
                 // Older backups carry only the useEnhancedShading bool (true == shading on).
                 val shadingIntensity = dto.shadingIntensity ?: if (dto.useEnhancedShading) 1.0f else 0.0f
                 prefs[PrefKeys.SHADING_INTENSITY_FACTOR] = shadingIntensity
+                prefs[PrefKeys.UI_SCALE] = clampUiScale(dto.uiScale ?: DEFAULT_UI_SCALE)
                 prefs.remove(PrefKeys.SHADING_INTENSITY)
                 prefs.remove(PrefKeys.ENHANCED_SHADING)
                 prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)

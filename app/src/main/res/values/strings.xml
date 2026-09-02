@@ -404,6 +404,10 @@
     <string name="settings_enhanced_shading_desc">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="settings_surface_shading">Surface shading</string>
     <string name="settings_surface_shading_desc">Adjust how strongly theme colors tint surfaces</string>
+    <string name="settings_surface_shading_info_cd">Explain surface shading</string>
+    <string name="settings_ui_scale">UI scale</string>
+    <string name="settings_ui_scale_desc">Make the whole interface smaller or larger</string>
+    <string name="settings_ui_scale_info_cd">Explain UI scale</string>
     <string name="settings_use_black_theme">Use pure black dark theme</string>
     <string name="settings_black_theme_effect_disabled">Can not enable in black theme</string>
     <string name="settings_backup_section">Backup &amp; restore</string>
@@ -759,6 +763,7 @@
     <string name="diagnostics_active_custom_seed_format">Active custom seed set: %1$s</string>
     <string name="diagnostics_gradient_background_format">Gradient background: %1$s</string>
     <string name="diagnostics_surface_shading_format">Surface shading: %1$s</string>
+    <string name="diagnostics_ui_scale_format">UI scale: %1$s</string>
     <string name="diagnostics_folder_access_mode_format">Folder access mode: %1$s</string>
     <string name="diagnostics_log_retention_days_format">Log retention days: %1$d</string>
     <string name="diagnostics_auto_export_rule_change_format">Auto export on rule change: %1$s</string>

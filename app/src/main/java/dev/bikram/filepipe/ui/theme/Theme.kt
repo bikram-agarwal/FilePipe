@@ -51,6 +51,7 @@ import com.materialkolor.rememberDynamicColorScheme
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.DEFAULT_SHADING_INTENSITY
+import dev.bikram.filepipe.data.preferences.DEFAULT_UI_SCALE
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.data.preferences.blackThemeEligible
 import dev.bikram.filepipe.data.preferences.effectiveDarkTheme
@@ -244,6 +245,7 @@ fun FilePipeTheme(
     themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     hapticFeedbackEnabled: Boolean = true,
     shadingIntensity: Float = 0.0f,
+    uiScale: Float = DEFAULT_UI_SCALE,
     activeCustomSeedHex: String = "",
     useGradientBackground: Boolean = true,
     progressiveBlurEnabled: Boolean = true,
@@ -262,9 +264,10 @@ fun FilePipeTheme(
             )
         }
     val appDensity =
-        remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale, stableDensity) {
+        remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale, stableDensity, uiScale) {
+            val cappedDisplayDensity = baseDensity.density.coerceAtMost(stableDensity * MAX_APP_DISPLAY_SCALE)
             Density(
-                density = baseDensity.density.coerceAtMost(stableDensity * MAX_APP_DISPLAY_SCALE),
+                density = cappedDisplayDensity * uiScale,
                 fontScale = (baseDensity.fontScale * responsiveTextScale).coerceAtMost(MAX_APP_FONT_SCALE),
             )
         }
@@ -421,6 +424,7 @@ fun FilePipeTheme(
             themePaletteStyle = themePaletteStyle,
             useGradientBackground = effectiveUseGradientBackground,
             shadingIntensity = effectiveShadingIntensity,
+            uiScale = uiScale,
             progressiveBlurEnabled = progressiveBlurEnabled,
         )
 

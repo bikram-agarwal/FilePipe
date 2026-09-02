@@ -39,6 +39,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonColors
 import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.ToggleButtonElevation
 import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
@@ -423,10 +424,12 @@ fun FilePipeToggleButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shapes: ToggleButtonShapes = ToggleButtonDefaults.shapesFor(ButtonDefaults.MinHeight),
-    colors: ToggleButtonColors = ToggleButtonDefaults.toggleButtonColors(),
-    elevation: ButtonElevation? = null,
+    // Compose M3 1.5.0-alpha27 renamed toggleButtonColors() to colors(), made ContentPadding
+    // private in favor of contentPaddingFor(), and gave ToggleButton its own elevation type.
+    colors: ToggleButtonColors = ToggleButtonDefaults.colors(),
+    elevation: ToggleButtonElevation? = null,
     border: BorderStroke? = null,
-    contentPadding: PaddingValues = ToggleButtonDefaults.ContentPadding,
+    contentPadding: PaddingValues = ToggleButtonDefaults.contentPaddingFor(ButtonDefaults.MinHeight),
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit,
 ) {

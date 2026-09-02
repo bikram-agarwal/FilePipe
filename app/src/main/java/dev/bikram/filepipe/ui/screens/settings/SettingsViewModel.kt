@@ -351,6 +351,11 @@ class SettingsViewModel
                 userPreferencesRepository.setShadingIntensity(intensity)
             }
 
+        fun setUiScale(scale: Float) =
+            viewModelScope.launch {
+                userPreferencesRepository.setUiScale(scale)
+            }
+
         fun setUpdateCheckSchedule(schedule: UpdateCheckSchedule) =
             viewModelScope.launch {
                 userPreferencesRepository.setUpdateCheckSchedule(schedule)

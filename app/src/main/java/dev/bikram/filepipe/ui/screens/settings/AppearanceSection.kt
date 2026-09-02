@@ -42,6 +42,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Label
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Slider
@@ -51,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -91,6 +93,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -100,6 +103,8 @@ import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
+import dev.bikram.filepipe.data.preferences.UI_SCALE_MAX
+import dev.bikram.filepipe.data.preferences.UI_SCALE_MIN
 import dev.bikram.filepipe.data.preferences.generateTripletForSeed
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
@@ -407,6 +412,7 @@ fun AppearanceSection(
     themePaletteStyle: ThemePaletteStyle,
     useGradientBackground: Boolean,
     shadingIntensity: Float,
+    uiScale: Float,
     progressiveBlurEnabled: Boolean,
     customFontPath: String,
     customFontName: String,
@@ -420,6 +426,7 @@ fun AppearanceSection(
     onRemoveCustomSeedHex: (String) -> Unit,
     onUseGradientBackground: (Boolean) -> Unit,
     onShadingIntensity: (Float) -> Unit,
+    onUiScale: (Float) -> Unit,
     onProgressiveBlurEnabled: (Boolean) -> Unit,
     onCustomFontImported: (Uri) -> Unit,
     onCustomFontClear: () -> Unit,
@@ -477,10 +484,17 @@ fun AppearanceSection(
         GroupedListItem(position = GroupPosition.MIDDLE) {
             val enabled = !blackThemeActive
             Column(
-                modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .appClickable(enabled = !enabled) {
+                            onBlackThemeEffectClick()
+                        }.padding(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 10.dp),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         text = stringResource(R.string.settings_surface_shading),
                         style = MaterialTheme.typography.bodyLarge,
@@ -490,11 +504,12 @@ fun AppearanceSection(
                             } else {
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                             },
+                        modifier = Modifier.weight(1f, fill = false),
                     )
-                    Text(
-                        text = stringResource(R.string.settings_surface_shading_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color =
+                    SettingsInfoDropdown(
+                        tipText = stringResource(R.string.settings_surface_shading_desc),
+                        contentDescription = stringResource(R.string.settings_surface_shading_info_cd),
+                        iconTint =
                             if (enabled) {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             } else {
@@ -507,6 +522,34 @@ fun AppearanceSection(
                     enabled = enabled,
                     onDisabledClick = onBlackThemeEffectClick,
                     onValueChange = onShadingIntensity,
+                )
+            }
+        }
+        GroupedListItem(position = GroupPosition.MIDDLE) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 10.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_ui_scale),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    SettingsInfoDropdown(
+                        tipText = stringResource(R.string.settings_ui_scale_desc),
+                        contentDescription = stringResource(R.string.settings_ui_scale_info_cd),
+                    )
+                }
+                UiScaleSlider(
+                    scale = uiScale,
+                    onValueChangeFinished = onUiScale,
                 )
             }
         }
@@ -1114,6 +1157,81 @@ private fun updateTargetHex(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun UiScaleSlider(
+    scale: Float,
+    onValueChangeFinished: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var sliderValue by remember { mutableFloatStateOf(scale.roundToUiScaleStep()) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isDragged by interactionSource.collectIsDraggedAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val interacting = isDragged || isPressed
+
+    LaunchedEffect(scale, interacting) {
+        if (!interacting) {
+            sliderValue = scale.roundToUiScaleStep()
+        }
+    }
+
+    // The 48dp interactive-size floor pads the slider well beyond its 32dp thumb, which reads as
+    // dead space between the row title and the track. The thumb stays a full-width drag target.
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+        Slider(
+            value = sliderValue,
+            onValueChange = { rawValue ->
+                sliderValue = rawValue.roundToUiScaleStep()
+            },
+            onValueChangeFinished = {
+                onValueChangeFinished(sliderValue)
+            },
+            valueRange = UI_SCALE_MIN..UI_SCALE_MAX,
+            steps = UiScaleSliderStepCount,
+            interactionSource = interactionSource,
+            thumb = {
+                Label(
+                    label = {
+                        PlainTooltip(
+                            modifier =
+                                Modifier
+                                    .sizeIn(
+                                        minWidth = ShadingSliderLabelMinWidth,
+                                        minHeight = ShadingSliderLabelMinHeight,
+                                    ).wrapContentWidth(),
+                        ) {
+                            Text(getUiScaleLabel(sliderValue))
+                        }
+                    },
+                    interactionSource = interactionSource,
+                    isPersistent = interacting,
+                ) {
+                    SliderDefaults.Thumb(
+                        interactionSource = interactionSource,
+                        thumbSize = ShadingSliderThumbSize,
+                    )
+                }
+            },
+            modifier = modifier.fillMaxWidth(),
+        )
+    }
+}
+
+private fun getUiScaleLabel(value: Float): String {
+    val percentage = (value * 100f).roundToInt()
+    return "$percentage%"
+}
+
+private fun Float.roundToUiScaleStep(): Float {
+    val stepsFromMin = ((this - UI_SCALE_MIN) / UI_SCALE_STEP).roundToInt()
+    return (UI_SCALE_MIN + stepsFromMin * UI_SCALE_STEP).coerceIn(UI_SCALE_MIN, UI_SCALE_MAX)
+}
+
+private const val UI_SCALE_STEP = 0.05f
+private val UiScaleSliderStepCount =
+    ((UI_SCALE_MAX - UI_SCALE_MIN) / UI_SCALE_STEP).roundToInt() - 1
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun ShadingIntensitySlider(
     intensity: Float,
     enabled: Boolean,
@@ -1133,49 +1251,51 @@ private fun ShadingIntensitySlider(
         }
     }
 
-    Slider(
-        value = sliderValue,
-        onValueChange = { rawValue ->
-            if (enabled) {
-                val steppedValue = rawValue.roundToShadingStep()
-                if (steppedValue != sliderValue) {
-                    sliderValue = steppedValue
-                    onValueChange(steppedValue)
-                }
-            } else {
-                onDisabledClick()
-            }
-        },
-        valueRange = 0f..2f,
-        steps = 19,
-        enabled = enabled,
-        interactionSource = interactionSource,
-        thumb = {
-            Label(
-                label = {
-                    PlainTooltip(
-                        modifier =
-                            Modifier
-                                .sizeIn(
-                                    minWidth = ShadingSliderLabelMinWidth,
-                                    minHeight = ShadingSliderLabelMinHeight,
-                                ).wrapContentWidth(),
-                    ) {
-                        Text(getShadingLabel(sliderValue))
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+        Slider(
+            value = sliderValue,
+            onValueChange = { rawValue ->
+                if (enabled) {
+                    val steppedValue = rawValue.roundToShadingStep()
+                    if (steppedValue != sliderValue) {
+                        sliderValue = steppedValue
+                        onValueChange(steppedValue)
                     }
-                },
-                interactionSource = interactionSource,
-                isPersistent = interacting,
-            ) {
-                SliderDefaults.Thumb(
+                } else {
+                    onDisabledClick()
+                }
+            },
+            valueRange = 0f..2f,
+            steps = 19,
+            enabled = enabled,
+            interactionSource = interactionSource,
+            thumb = {
+                Label(
+                    label = {
+                        PlainTooltip(
+                            modifier =
+                                Modifier
+                                    .sizeIn(
+                                        minWidth = ShadingSliderLabelMinWidth,
+                                        minHeight = ShadingSliderLabelMinHeight,
+                                    ).wrapContentWidth(),
+                        ) {
+                            Text(getShadingLabel(sliderValue))
+                        }
+                    },
                     interactionSource = interactionSource,
-                    enabled = enabled,
-                    thumbSize = ShadingSliderThumbSize,
-                )
-            }
-        },
-        modifier = modifier.fillMaxWidth(),
-    )
+                    isPersistent = interacting,
+                ) {
+                    SliderDefaults.Thumb(
+                        interactionSource = interactionSource,
+                        enabled = enabled,
+                        thumbSize = ShadingSliderThumbSize,
+                    )
+                }
+            },
+            modifier = modifier.fillMaxWidth(),
+        )
+    }
 }
 
 private fun getShadingLabel(value: Float): String {
@@ -1277,7 +1397,7 @@ private fun ThemeModeSegmentedRow(
         val compact = maxWidth < 340.dp
         val ultraCompact = maxWidth < 300.dp
         val colors =
-            ToggleButtonDefaults.toggleButtonColors(
+            ToggleButtonDefaults.colors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,

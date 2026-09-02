@@ -192,5 +192,6 @@
 
 ### Visual effects
 - **Gradient background** blends your primary color into the screen background for depth.
+- **UI scale** makes the whole interface smaller or larger (75% to 125%). Text, icons, and spacing change together.
 - **Blur bars** apply a frosted-glass effect behind the top and bottom bars.
 - Effects can be combined or turned off individually in Settings.

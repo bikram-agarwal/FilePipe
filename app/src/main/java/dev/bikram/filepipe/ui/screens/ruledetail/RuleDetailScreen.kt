@@ -1539,7 +1539,7 @@ fun RuleDetailScreen(
                                 style = MaterialTheme.typography.labelMedium,
                             )
                         val toggleColors =
-                            ToggleButtonDefaults.toggleButtonColors(
+                            ToggleButtonDefaults.colors(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 contentColor = MaterialTheme.colorScheme.onSurface,
                                 checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,

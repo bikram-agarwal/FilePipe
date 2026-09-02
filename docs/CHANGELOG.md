@@ -1,3 +1,10 @@
+## v3.10.0 UI Scale
+
+### ✨ New Features
+- UI scale in Appearance settings (75% to 125%). Make the whole interface - Text, icons, and spacing - smaller or larger.
+
+---
+
 ## v3.9.9 Preserve file timestamp
 
 ### 🛠 Improved Features

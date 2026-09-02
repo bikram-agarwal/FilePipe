@@ -600,12 +600,12 @@ private fun AccessModeSwitcher(
     val stateBOutlineColor = scheme.outline
     val allFilesActiveFillColor = scheme.primary
     val transparentInactiveColors =
-        ToggleButtonDefaults.toggleButtonColors(
+        ToggleButtonDefaults.colors(
             containerColor = Color.Transparent,
             contentColor = scheme.onSurfaceVariant,
         )
     val selectiveActiveColors =
-        ToggleButtonDefaults.toggleButtonColors(
+        ToggleButtonDefaults.colors(
             checkedContainerColor = stateBAccentColor,
             checkedContentColor = scheme.onSurface,
         )
@@ -640,7 +640,7 @@ private fun AccessModeSwitcher(
                         .copy(shape = pillShape),
                 colors =
                     if (allFilesSelected) {
-                        ToggleButtonDefaults.toggleButtonColors()
+                        ToggleButtonDefaults.colors()
                     } else {
                         transparentInactiveColors
                     },
@@ -728,7 +728,7 @@ private fun AccessModeSwitcher(
                         shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
                         colors =
                             if (allFilesSelected) {
-                                ToggleButtonDefaults.toggleButtonColors()
+                                ToggleButtonDefaults.colors()
                             } else {
                                 transparentInactiveColors
                             },

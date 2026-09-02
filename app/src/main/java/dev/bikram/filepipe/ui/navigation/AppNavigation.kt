@@ -707,6 +707,45 @@ fun AppNavigation(
                                             fadeOut(animationSpec = navFadeOutSpec)
                                     }
                             },
+                            // Navigation Compose 2.10 routes the back *gesture* through these and
+                            // ignores popEnterTransition/popExitTransition above, which only run for
+                            // a tapped back. Its default predictivePopExitTransition is
+                            // scaleOut(0.7f), so leaving these unset makes a swipe zoom the screen
+                            // out instead of sliding it. Reuse the exact same tab-slide logic the
+                            // tapped pop uses (primaryTabEnterTransition/primaryTabExitTransition)
+                            // instead of keying direction off which screen edge the gesture started
+                            // from - the swipe-edge param doesn't correlate with tab order, so it
+                            // could slide the wrong way depending on where the user's thumb started.
+                            // Parity: Remember hit and fixed the same regression in NavGraph.kt
+                            // (mainTabEnterTransition/mainTabExitTransition with pop = true).
+                            predictivePopEnterTransition = {
+                                primaryTabEnterTransition(
+                                    reducedMotion = reducedMotion,
+                                    verticalMotion = useNavigationSuiteScaffold,
+                                    spatialSpec = navSpatialSpec,
+                                    fadeInSpec = navFadeInSpec,
+                                )
+                                    ?: if (reducedMotion) {
+                                        EnterTransition.None
+                                    } else {
+                                        slideInHorizontally(animationSpec = navSpatialSpec) { -it } +
+                                            fadeIn(animationSpec = navFadeInSpec)
+                                    }
+                            },
+                            predictivePopExitTransition = {
+                                primaryTabExitTransition(
+                                    reducedMotion = reducedMotion,
+                                    verticalMotion = useNavigationSuiteScaffold,
+                                    spatialSpec = navSpatialSpec,
+                                    fadeOutSpec = navFadeOutSpec,
+                                )
+                                    ?: if (reducedMotion) {
+                                        ExitTransition.None
+                                    } else {
+                                        slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
+                                            fadeOut(animationSpec = navFadeOutSpec)
+                                    }
+                            },
                         ) {
                             val sharedTransitionScope = this@SharedTransitionLayout
                             composable(

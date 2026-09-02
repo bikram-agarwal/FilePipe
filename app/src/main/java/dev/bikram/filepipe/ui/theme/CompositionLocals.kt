@@ -6,6 +6,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
+import dev.bikram.filepipe.data.preferences.DEFAULT_UI_SCALE
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.data.preferences.blackThemeEligible
 
@@ -71,6 +72,7 @@ data class FilePipeThemeState(
     val themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     val useGradientBackground: Boolean = true,
     val shadingIntensity: Float = 0.0f,
+    val uiScale: Float = DEFAULT_UI_SCALE,
     val progressiveBlurEnabled: Boolean = true,
 ) {
     val useEnhancedShading: Boolean
