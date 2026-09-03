@@ -62,6 +62,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.bikram.filepipe.ui.common.LocalAllowCompactControls
 import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.performLongPressHaptic
@@ -486,9 +487,8 @@ fun FilePipeFloatingActionButton(
     tooltipLabel: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val isSmallLandscape = isSmallLandscape()
     val sizeModifier =
-        if (isSmallLandscape) {
+        if (isSmallLandscape() && LocalAllowCompactControls.current) {
             Modifier.size(rememberResponsiveActionButtonSize())
         } else {
             Modifier

@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +45,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -146,6 +148,7 @@ import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.LocalAllowCompactControls
 import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.components.AlertFloatingActionButtonMenu
 import dev.bikram.filepipe.ui.components.FilePipeButton
@@ -480,6 +483,16 @@ fun AppNavigation(
     LaunchedEffect(hasSeenIntro, pendingHistoryId, navController) {
         val historyId = pendingHistoryId ?: return@LaunchedEffect
         if (!hasSeenIntro) return@LaunchedEffect
+        // Plant the History tab underneath first, same as pendingOpenHistory above, so back
+        // navigation from the detail screen lands on History instead of falling through to
+        // whatever the default start tab is.
+        navController.navigate(Screen.History.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
         navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
             launchSingleTop = true
         }
@@ -1309,10 +1322,20 @@ fun AppNavigation(
             }
         }
         if (showNavigationSuiteScaffold) {
-            Row(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        // Landscape 3-button nav sits on a side edge, not the bottom, so the rail and
+                        // both panes have to clear it. Insetting here (rather than inside the rail) keeps
+                        // the theme background bleeding under the bar.
+                        .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal)),
+            ) {
                 NavigationRail(
                     containerColor = Color.Transparent,
-                    windowInsets = WindowInsets.systemBars,
+                    // Vertical only: with full systemBars the rail also absorbed the opposite edge's
+                    // horizontal inset, widening itself and pushing the list pane off-centre.
+                    windowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Vertical),
                     modifier = Modifier.padding(start = 24.dp),
                 ) {
                     bottomNavItems.forEach { navItem ->
@@ -1353,7 +1376,16 @@ fun AppNavigation(
                 }
             }
         } else {
-            navigationContent()
+            // Single pane needs the same side-bar clearance as the rail branch above: in landscape the
+            // 3-button nav bar sits on a side edge, and nothing else here insets content horizontally.
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal)),
+            ) {
+                navigationContent()
+            }
         }
     }
 }
@@ -2207,30 +2239,33 @@ private fun FloatingNavBar(
     leadingFab: (@Composable () -> Unit)? = null,
 ) {
     val isSmallLandscape = isSmallLandscape()
-    val fabBottomInset = if (isSmallLandscape) 8.dp else 0.dp
-    CenteredPillWithSideFab(
-        pill = {
-            FilePipeFloatingNavPill(
-                items = items,
-                currentDestination = currentDestination,
-                onItemClick = onItemClick,
-            )
-        },
-        leadingFab = leadingFab,
-        fab = fabContent,
-        fabGap = 12.dp,
-        fabBottomInset = fabBottomInset,
-        leadingFabBottomInset = fabBottomInset,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(
-                    bottom = if (isSmallLandscape) 6.dp else 12.dp,
-                    start = 24.dp,
-                    end = 24.dp,
-                ),
-    )
+    // Single-pane chrome keeps full-size controls even on a short landscape window: it is
+    // one row of buttons over the content, so it can afford the height, and shrinking them
+    // made the same FABs a different size per orientation.
+    CompositionLocalProvider(LocalAllowCompactControls provides false) {
+        CenteredPillWithSideFab(
+            pill = {
+                FilePipeFloatingNavPill(
+                    items = items,
+                    currentDestination = currentDestination,
+                    onItemClick = onItemClick,
+                )
+            },
+            leadingFab = leadingFab,
+            fab = fabContent,
+            fabGap = 12.dp,
+            fabCoreSize = 56.dp,
+            modifier =
+                modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(
+                        bottom = if (isSmallLandscape) 6.dp else 12.dp,
+                        start = 24.dp,
+                        end = 24.dp,
+                    ),
+        )
+    }
 }
 
 /**
@@ -2326,12 +2361,15 @@ private fun CenteredPillWithSideFab(
     pill: @Composable () -> Unit,
     fab: @Composable () -> Unit,
     fabGap: androidx.compose.ui.unit.Dp,
+    // Must be the real rendered FAB diameter: a core that disagrees with the buttons is what used to
+    // push each tab's FABs to a slightly different spot. Callers that let their FABs shrink on short
+    // landscape windows have to pass the shrunken size here too.
+    fabCoreSize: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     leadingFab: (@Composable () -> Unit)? = null,
-    fabCoreSize: androidx.compose.ui.unit.Dp = 56.dp,
-    fabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
-    leadingFabGap: androidx.compose.ui.unit.Dp = fabGap,
-    leadingFabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
+    // Padding the trailing FAB's own wrapper leaves between its visible button and its placeable's
+    // right/bottom edges. Cancelling it is what lets a wrapped FAB and a bare one land identically.
+    fabWrapperInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     // Side FABs are measured at their natural width and with infinite height so hosted
     // menus can unfurl above the strip. The strip reports only the scaled FAB core
@@ -2362,10 +2400,8 @@ private fun CenteredPillWithSideFab(
                 .getOrNull(2)
                 ?.measure(loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
         val gapPx = fabGap.roundToPx()
-        val leadingGapPx = leadingFabGap.roundToPx()
         val fabCorePx = fabCoreSize.roundToPx()
-        val fabBottomInsetPx = fabBottomInset.roundToPx()
-        val leadingFabBottomInsetPx = leadingFabBottomInset.roundToPx()
+        val fabWrapperInsetPx = fabWrapperInset.roundToPx()
 
         val width =
             if (constraints.hasBoundedWidth) {
@@ -2373,18 +2409,10 @@ private fun CenteredPillWithSideFab(
             } else {
                 pillPlaceable.width + gapPx + fabPlaceable.width
             }
-        val trailingSideRoomPx = gapPx + maxOf(fabCorePx, fabPlaceable.width)
-        val leadingSideRoomPx =
-            if (leadingFabPlaceable != null) {
-                leadingGapPx + maxOf(fabCorePx, leadingFabPlaceable.width)
-            } else {
-                0
-            }
-        val sideRoomPx =
-            maxOf(
-                trailingSideRoomPx,
-                leadingSideRoomPx,
-            )
+        // Identical slot on both sides keeps the pill centred and the two FABs equidistant from it.
+        // Deliberately ignores the measured FAB widths: an expanded FAB menu is far wider than its
+        // button and must not feed back into the scale or shift the pill.
+        val sideRoomPx = gapPx + fabCorePx
         val rowNaturalWidth = pillPlaceable.width + sideRoomPx * 2
         val chromeScale =
             if (rowNaturalWidth > width && rowNaturalWidth > 0) {
@@ -2398,11 +2426,7 @@ private fun CenteredPillWithSideFab(
         val scaledFabHeight = (fabPlaceable.height * chromeScale).roundToInt()
         val scaledFabCore = (fabCorePx * chromeScale).roundToInt()
         val scaledGap = (gapPx * chromeScale).roundToInt()
-        val scaledFabBottomInset = (fabBottomInsetPx * chromeScale).roundToInt()
-        val scaledLeadingGap = (leadingGapPx * chromeScale).roundToInt()
-        val scaledLeadingFabBottomInset = (leadingFabBottomInsetPx * chromeScale).roundToInt()
-        // Strip height tracks the FAB's *core* size rather than the wrapper's measured
-        // height so the expanded menu never re-flows the strip.
+        val scaledFabWrapperInset = (fabWrapperInsetPx * chromeScale).roundToInt()
         val stripHeight = maxOf(scaledPillHeight, scaledFabCore)
 
         layout(width, stripHeight) {
@@ -2414,12 +2438,13 @@ private fun CenteredPillWithSideFab(
                 transformOrigin = TransformOrigin(0f, 0f)
             }
 
-            val fabX =
-                (pillX + scaledPillWidth + scaledGap)
-                    .coerceAtMost(width - scaledFabWidth)
-                    .coerceAtLeast(0)
-            val fabBottomY = (stripHeight + scaledFabCore) / 2 + scaledFabBottomInset
-            val fabY = fabBottomY - scaledFabHeight
+            // Anchored by the visible button's bottom-right corner, so the button lands on the pill's
+            // centre line scaledGap away, and an expanded menu grows up and to the left from there.
+            // fabWrapperInset backs the placeable off by whatever padding sits outside the button.
+            val fabCoreRight = (pillX + scaledPillWidth + scaledGap + scaledFabCore).coerceAtMost(width)
+            val fabCoreBottom = (stripHeight + scaledFabCore) / 2
+            val fabX = (fabCoreRight - scaledFabWidth + scaledFabWrapperInset).coerceAtLeast(0)
+            val fabY = fabCoreBottom + scaledFabWrapperInset - scaledFabHeight
             fabPlaceable.placeWithLayer(fabX, fabY) {
                 scaleX = chromeScale
                 scaleY = chromeScale
@@ -2428,13 +2453,12 @@ private fun CenteredPillWithSideFab(
 
             leadingFabPlaceable?.let { leadingPlaceable ->
                 val scaledLeadingFabWidth = (leadingPlaceable.width * chromeScale).roundToInt()
-                val leadingX =
-                    (pillX - scaledLeadingGap - scaledLeadingFabWidth)
-                        .coerceAtLeast(0)
-                val leadingFabBottomY = (stripHeight + scaledFabCore) / 2 + scaledLeadingFabBottomInset
-                val leadingY =
-                    leadingFabBottomY -
-                        (leadingPlaceable.height * chromeScale).roundToInt()
+                val scaledLeadingFabHeight = (leadingPlaceable.height * chromeScale).roundToInt()
+                // The alert FAB's placeable is always just its button - the unfurled bars are placed
+                // in a zero-size layer - so mirroring the trailing gap and centring on the strip puts
+                // it the same distance from the pill, on the same centre line.
+                val leadingX = (pillX - scaledGap - scaledLeadingFabWidth).coerceAtLeast(0)
+                val leadingY = (stripHeight - scaledLeadingFabHeight) / 2
                 leadingPlaceable.placeWithLayer(leadingX, leadingY) {
                     scaleX = chromeScale
                     scaleY = chromeScale

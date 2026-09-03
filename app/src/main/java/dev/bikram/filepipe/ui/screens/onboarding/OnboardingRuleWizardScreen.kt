@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -99,6 +98,10 @@ fun OnboardingRuleWizardScreen(
                         contentDescription = null,
                         size = 24.dp,
                         autoMirror = true,
+                        // Corrects the icon font's glyph not sitting centered in its own box -
+                        // same fix as every other icon-next-to-text pairing in the app (e.g.
+                        // AppNavigation's nav-item icons, RulesScreen's add button).
+                        opticalCenterYOffset = (-2).dp,
                         modifier = Modifier.size(24.dp),
                     )
                     Spacer(Modifier.weight(1f))
@@ -108,6 +111,8 @@ fun OnboardingRuleWizardScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.weight(1f))
+                    // Matches the icon's width so the text above measures as perfectly centered
+                    // in the row, while the icon itself stays pinned to the leading edge.
                     Spacer(Modifier.size(24.dp))
                 }
             }
@@ -121,6 +126,8 @@ fun OnboardingRuleWizardScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // Matches the icon's width so the text below measures as perfectly centered
+                    // in the row, while the icon itself stays pinned to the trailing edge.
                     Spacer(Modifier.size(24.dp))
                     Spacer(Modifier.weight(1f))
                     Text(
@@ -134,6 +141,7 @@ fun OnboardingRuleWizardScreen(
                         contentDescription = null,
                         size = 24.dp,
                         autoMirror = true,
+                        opticalCenterYOffset = (-2).dp,
                         modifier = Modifier.size(24.dp),
                     )
                 }
@@ -189,6 +197,8 @@ fun OnboardingRuleWizardScreen(
                 }
             }
         } else {
+            // Portrait: scroll the actions with the grid, same as the short-screen branch above -
+            // a pinned footer would overlap the last row of templates instead of clearing it.
             Column(
                 modifier = Modifier.fillMaxSize(),
             ) {
@@ -201,7 +211,7 @@ fun OnboardingRuleWizardScreen(
                         Modifier
                             .weight(1f)
                             .fillMaxWidth(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp + navBarInset),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp + navBarInset),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -214,16 +224,12 @@ fun OnboardingRuleWizardScreen(
                     item {
                         StartBlankCard(onStartBlank = onStartBlank)
                     }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        OnboardingBottomActions(modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)) {
+                            actionButtons()
+                        }
+                    }
                 }
-            }
-            OnboardingBottomActions(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(bottom = 40.dp),
-            ) {
-                actionButtons()
             }
         }
     }

@@ -423,7 +423,13 @@ fun OnboardingPermissionsScreen(
                                         .weight(1.2f)
                                         .verticalScroll(rememberScrollState())
                                         .heightIn(min = screenHeight)
-                                        .padding(top = statusBarInset, bottom = navBarInset),
+                                        // This column's content typically fills the whole height, so
+                                        // Arrangement.Center never gets slack to distribute - the CTA
+                                        // ends up flush against navBarInset alone. On a landscape
+                                        // 3-button nav bar that inset is 0 (the bar sits on a side
+                                        // edge, not the bottom), leaving the button touching the raw
+                                        // screen edge. Add a fixed margin on top of the inset.
+                                        .padding(top = statusBarInset, bottom = navBarInset + 24.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
                             ) {
                                 if (selected == FolderAccessMode.SAF_ONLY) {
@@ -546,7 +552,10 @@ fun OnboardingPermissionsScreen(
                                             .onGloballyPositioned { coordinates ->
                                                 bottomActionsHeight = with(responsiveDensity) { coordinates.size.height.toDp() }
                                             }.navigationBarsPadding()
-                                            .padding(bottom = 40.dp),
+                                            // Sits a constant 16.dp above the system bar, so the tall
+                                            // 3-button bar and the short gesture handle both get the
+                                            // same visual gap.
+                                            .padding(bottom = 16.dp),
                                 ) {
                                     bottomActionsCluster()
                                 }

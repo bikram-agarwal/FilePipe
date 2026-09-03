@@ -5,6 +5,7 @@ package dev.bikram.filepipe.ui.common
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -18,6 +19,17 @@ import androidx.compose.ui.unit.dp
 
 /** Below this many dp of height in landscape, screens switch to space-saving layouts. */
 const val SMALL_LANDSCAPE_HEIGHT_DP = 480
+
+/**
+ * Lets a container opt its subtree out of the compact control sizes that [isSmallLandscape] would
+ * otherwise trigger, for the cases where the container knows it has the room. The bottom chrome
+ * strip does this: it is a single row of controls over the content, so full-size buttons cost it
+ * nothing, whereas a screen full of list rows genuinely needs the height back.
+ *
+ * Read it alongside [isSmallLandscape] rather than instead of it - compact still requires a short
+ * landscape window, this only vetoes it.
+ */
+val LocalAllowCompactControls = staticCompositionLocalOf { true }
 
 enum class ResponsiveActionLayout {
     HORIZONTAL,

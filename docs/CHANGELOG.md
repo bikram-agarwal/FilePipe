@@ -1,7 +1,10 @@
-## v3.10.0 UI Scale
+## v3.10.1 UI Scale
 
 ### ✨ New Features
 - UI scale in Appearance settings (75% to 125%). Make the whole interface - Text, icons, and spacing - smaller or larger.
+
+### 🐛 Bug Fixes
+- Several UI fixes for landscape / tablet layout, gesture vs 3-button navigation mode etc. 
 
 ---
 

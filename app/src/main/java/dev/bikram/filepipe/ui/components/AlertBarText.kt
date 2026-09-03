@@ -23,6 +23,9 @@ internal fun AlertBarText(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(2.dp * contentScale),
     ) {
+        // Single line each, never wrapped: the bar spans the full chrome strip, which is sized to
+        // fit these two lines, so wrapping would mean the strip geometry is wrong rather than the
+        // text being too long.
         Text(
             text = title,
             style = titleStyle.copy(fontSize = titleStyle.fontSize * contentScale),

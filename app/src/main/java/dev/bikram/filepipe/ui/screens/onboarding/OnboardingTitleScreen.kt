@@ -263,7 +263,7 @@ fun OnboardingTitleScreen(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(bottom = 120.dp),
+                        .padding(bottom = 96.dp),
             ) {
                 bylinePill()
             }
@@ -272,7 +272,9 @@ fun OnboardingTitleScreen(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(bottom = 40.dp),
+                        // Sits a constant 16.dp above the system bar, so the tall 3-button bar and
+                        // the short gesture handle both get the same visual gap.
+                        .padding(bottom = 16.dp),
             ) {
                 beginButton()
             }
