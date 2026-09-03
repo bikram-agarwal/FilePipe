@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.ui.components
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -150,6 +151,7 @@ private fun Modifier.ruleCardBodyGestures(
         },
     )
 
+@SuppressLint("ModifierParameter")
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RuleCardClickableBody(

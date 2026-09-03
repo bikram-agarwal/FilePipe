@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">FilePipe</string>
 
     <!-- Bottom nav labels -->
@@ -11,9 +11,6 @@
     <string name="rules_empty_title">No rules yet</string>
     <string name="rules_empty_subtitle">Tap \"Add rule\" to create your first organizing rule</string>
     <string name="rules_add_rule">Add rule</string>
-    <string name="rules_two_pane_empty_title">No rule selected</string>
-    <string name="rules_two_pane_empty_message">Create or select a rule to see its details here.</string>
-    <string name="rules_two_pane_empty_action">Create rule</string>
     <string name="rule_card_types_none">None</string>
     <string name="rule_card_from">From</string>
     <string name="rule_card_from_none">No sources</string>
@@ -103,31 +100,25 @@
     <string name="schedule_label">Schedule (optional)</string>
     <string name="schedule_card_label">Run</string>
     <string name="schedule_frequency">Frequency</string>
-    <string name="schedule_daily">Daily</string>
-    <string name="schedule_weekly">Weekly</string>
     <string name="schedule_day">Day of week</string>
-    <string name="schedule_time">Time</string>
     <string name="schedule_dialog_title">Set schedule</string>
-    <string name="schedule_hourly">Hourly</string>
-    <string name="schedule_interval_hours">Every (hours)</string>
-    <string name="schedule_interval_hours_helper">1-24 hours. For anything longer, use \"Days\".</string>
-    <string name="schedule_interval_days_helper">1-365 days.</string>
-    <string name="schedule_interval_weeks_helper">1-52 weeks.</string>
+    <string name="schedule_interval_hours_helper">1–24 hours. For anything longer, use \"Days\".</string>
+    <string name="schedule_interval_days_helper">1–365 days.</string>
+    <string name="schedule_interval_weeks_helper">1–52 weeks.</string>
     <string name="schedule_remove_short">Remove</string>
     <string name="schedule_every">Every</string>
     <string name="schedule_unit_hours">Hours</string>
     <string name="schedule_unit_days">Days</string>
     <string name="schedule_unit_weeks">Weeks</string>
-    <string name="schedule_choose_start_time">Choose start time</string>
     <string name="schedule_start_time">Start time</string>
     <string name="schedule_every_hour">Every hour</string>
-    <string name="schedule_every_hours">Every %1$d hours</string>
+    <string name="schedule_every_hours" tools:ignore="PluralsCandidate">Every %1$d hours</string>
     <string name="schedule_every_hour_starting">Every hour starting at %1$s</string>
-    <string name="schedule_every_hours_starting">Every %1$d hours starting at %2$s</string>
+    <string name="schedule_every_hours_starting" tools:ignore="PluralsCandidate">Every %1$d hours starting at %2$s</string>
     <string name="schedule_daily_at">Daily at %1$s</string>
-    <string name="schedule_every_days_at">Every %1$d days at %2$s</string>
+    <string name="schedule_every_days_at" tools:ignore="PluralsCandidate">Every %1$d days at %2$s</string>
     <string name="schedule_weekly_on">Weekly on %1$s at %2$s</string>
-    <string name="schedule_every_weeks_on">Every %1$d weeks on %2$s at %3$s</string>
+    <string name="schedule_every_weeks_on" tools:ignore="PluralsCandidate">Every %1$d weeks on %2$s at %3$s</string>
     <string name="day_sun">Sun</string>
     <string name="day_mon">Mon</string>
     <string name="day_tue">Tue</string>
@@ -135,7 +126,6 @@
     <string name="day_thu">Thu</string>
     <string name="day_fri">Fri</string>
     <string name="day_sat">Sat</string>
-    <string name="schedule_pick_time">Choose time</string>
     <string name="schedule_time_picker_title">Pick time</string>
     <string name="schedule_time_input_mode_cd">Type time with keyboard</string>
     <string name="schedule_time_dial_mode_cd">Pick time with clock dial</string>
@@ -146,13 +136,11 @@
     <string name="rule_icon_apply_emoji_cd">Apply custom emoji</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
-    <string name="close">Close</string>
     <string name="delete">Delete</string>
     <string name="delete_forever">Delete forever</string>
     <string name="restore">Restore</string>
     <string name="move_to_trash">Move to Trash</string>
     <string name="undo">Undo</string>
-    <string name="action_edit">Edit</string>
     <string name="action_expand">Expand</string>
     <string name="action_collapse">Collapse</string>
     <string name="action_expand_collapse">Expand / collapse</string>
@@ -187,10 +175,6 @@
     <string name="history_detail_summary_label">%1$s: </string>
     <string name="history_detail_source_path">From: %1$s</string>
     <string name="history_detail_file_skipped">Skipped</string>
-    <string name="history_two_pane_empty_title">No run selected</string>
-    <string name="history_two_pane_empty_message">Run details will appear here when history is available.</string>
-    <string name="history_two_pane_trash_title">Trash selected</string>
-    <string name="history_two_pane_trash_message">Trashed rules stay in the list. Run details appear when you switch back to Runs.</string>
     <string name="history_detail_files_moved_label">Files moved</string>
     <string name="history_detail_files_copied_label">Files copied</string>
     <string name="history_detail_files_deleted_label">Files deleted</string>
@@ -375,7 +359,6 @@
 
     <!-- Settings -->
     <string name="settings_export_folder_permission_failed">Could not acquire persistent permission for the selected folder</string>
-    <string name="settings_cloud_backup_configuration_failed">The backup was exported once, but automatic cloud backups could not be configured</string>
     <string name="settings_folder_access_section">Folder access</string>
     <string name="settings_folder_access_saf_only">Selective access</string>
     <string name="settings_folder_access_all_files">All files access</string>
@@ -400,8 +383,6 @@
     <string name="settings_collapse_all_sections_cd">Collapse all settings sections</string>
     <string name="settings_gradient_background">Gradient background</string>
     <string name="settings_gradient_background_desc">Tinted background using your theme color</string>
-    <string name="settings_enhanced_shading">Enhanced shading</string>
-    <string name="settings_enhanced_shading_desc">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="settings_surface_shading">Surface shading</string>
     <string name="settings_surface_shading_desc">Adjust how strongly theme colors tint surfaces</string>
     <string name="settings_surface_shading_info_cd">Explain surface shading</string>
@@ -419,8 +400,6 @@
     <string name="settings_cloud_backup_file_cleared">Cloud backup folder reset</string>
     <string name="settings_export_select_folder_first">Select a local or cloud backup folder first</string>
     <string name="settings_export_success">%1$s exported</string>
-    <string name="settings_backup_export_success">Backup exported</string>
-    <string name="settings_backup_export_success_to">Backup exported to %1$s</string>
     <string name="settings_backup_export_failed">Export failed: %1$s</string>
     <string name="settings_export_now">Export backup</string>
     <string name="cloud_provider_google_drive">Google Drive</string>
@@ -477,12 +456,9 @@
     <string name="theme_color_dusk">Dusk</string>
     <string name="theme_color_berry">Berry</string>
     <string name="theme_color_custom">Custom</string>
-    <string name="settings_palette_style">Palette style</string>
     <string name="settings_palette">Palette</string>
     <string name="settings_theme_preview_named">Preview · %1$s</string>
     <string name="settings_theme_preview_customize">Customize</string>
-    <string name="settings_theme_preview_surface_ladder">Surface ladder</string>
-    <string name="settings_theme_preview_accent_containers">Accent containers</string>
     <string name="settings_theme_preview_label_lowest">lowest</string>
     <string name="settings_theme_preview_label_surface">surface</string>
     <string name="settings_theme_preview_label_low">low</string>
@@ -830,7 +806,6 @@
     <string name="settings_reliable_schedules">Reliable schedules</string>
     <string name="settings_reliable_schedules_desc_enabled">Scheduled rules can run at the selected time</string>
     <string name="settings_reliable_schedules_desc_disabled">Enable to run scheduled rules close to their set time</string>
-    <string name="theme_black">Black (OLED)</string>
 
     <!-- Settings – Updates (GitHub builds) -->
     <string name="settings_updates_section">Updates</string>
@@ -869,7 +844,6 @@
     <string name="settings_play_in_app_update_canceled">Update was canceled. You can try again from Updates in Settings.</string>
     <string name="update_bar_available_title">Update available</string>
     <string name="update_bar_available_action">Check</string>
-    <string name="update_fab_label">Update</string>
     <string name="main_alert_fab_label">Alerts</string>
     <string name="play_update_bar_downloading_title">Downloading update</string>
     <string name="play_update_bar_downloading">from Play Store…</string>
@@ -905,7 +879,7 @@
         <item quantity="one">%1$d file will be permanently deleted. This cannot be undone.</item>
         <item quantity="other">%1$d files will be permanently deleted. This cannot be undone.</item>
     </plurals>
-    <string name="delete_run_confirm_more">…and %1$d more</string>
+    <string name="delete_run_confirm_more" tools:ignore="PluralsCandidate">…and %1$d more</string>
     <string name="rule_conflict_policy_label">If file already exists</string>
     <string name="conflict_skip">Skip</string>
     <string name="conflict_overwrite">Overwrite</string>
@@ -978,7 +952,7 @@
     <string name="advanced_max_size_label">Max size (MB)</string>
     <string name="advanced_min_age_label">Min age (days)</string>
     <string name="advanced_max_age_label">Max age (days)</string>
-    <string name="rule_error_age_out_of_range">Age must be between 1 and %1$d days</string>
+    <string name="rule_error_age_out_of_range" tools:ignore="PluralsCandidate">Age must be between 1 and %1$d days</string>
     <string name="rule_error_minimum_age_exceeds_maximum">Minimum age cannot be greater than maximum age</string>
     <string name="advanced_exclude_patterns_label">Exclude patterns, comma separated</string>
     <string name="advanced_exclude_placeholder">e.g. .nomedia</string>

@@ -1,3 +1,5 @@
+@file:Suppress("ConfigurationScreenWidthHeight")
+
 package dev.bikram.filepipe.ui.screens.settings
 
 import android.Manifest

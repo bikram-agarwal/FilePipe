@@ -21,7 +21,7 @@
   <br/>
   <!-- Distribution Badges -->
   <a href="https://github.com/bikram-agarwal/FilePipe/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/bikram-agarwal/FilePipe?color=a1168e&include_prereleases&logo=github&style=for-the-badge&labelColor=700f63"/></a>
-  <a href="https://play.google.com/store/apps/details?id=dev.bikram.filepipe"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v3.9.9-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
+  <a href="https://play.google.com/store/apps/details?id=dev.bikram.filepipe"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v3.10.1-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
   <a href="https://f-droid.org/packages/dev.bikram.filepipe.gh"><img alt="F-Droid" src="https://img.shields.io/f-droid/v/dev.bikram.filepipe.gh?color=a1168e&logo=FDROID&style=for-the-badge&labelColor=700f63"/></a>
 </p>
 

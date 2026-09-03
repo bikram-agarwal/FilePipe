@@ -1,3 +1,5 @@
+@file:Suppress("ConfigurationScreenWidthHeight")
+
 package dev.bikram.filepipe.ui.components
 
 import androidx.compose.foundation.background

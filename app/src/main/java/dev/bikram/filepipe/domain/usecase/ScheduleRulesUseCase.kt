@@ -1,10 +1,10 @@
 package dev.bikram.filepipe.domain.usecase
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.domain.model.Rule
@@ -139,18 +139,15 @@ class ScheduleRulesUseCase
             )
         }
 
+        @SuppressLint("MissingPermission")
         private fun scheduleAlarm(
             triggerAtMillis: Long,
             pendingIntent: PendingIntent,
         ) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-                } else {
-                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-                }
-            } else {
+            if (alarmManager.canScheduleExactAlarms()) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            } else {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
             }
         }
 

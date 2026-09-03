@@ -612,12 +612,7 @@ class DevOptionsViewModel
                     DevOptionsInfoRow(R.string.dev_options_info_last_update, formatInstant(packageInfo.lastUpdateTime)),
                 )
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val exactAlarmAllowed =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    alarmManager.canScheduleExactAlarms()
-                } else {
-                    true
-                }
+            val exactAlarmAllowed = alarmManager.canScheduleExactAlarms()
             val permissions =
                 listOf(
                     DevOptionsInfoRow(R.string.dev_options_info_folder_access_mode, prefs.folderAccessMode.name),

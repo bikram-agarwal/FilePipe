@@ -188,7 +188,7 @@ extensions.configure<ApplicationExtension>("android") {
     }
 
     lint {
-        disable += "NullSafeMutableLiveData"
+        baseline = file("lint-baseline.xml")
     }
 }
 
@@ -298,10 +298,10 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
-    androidTestImplementation("androidx.room:room-testing:${libs.versions.room.get()}")
-    androidTestImplementation("androidx.test:core:1.7.0")
-    androidTestImplementation("androidx.test.ext:junit:1.3.0")
-    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation(libs.room.testing)
+    androidTestImplementation(libs.test.core)
+    androidTestImplementation(libs.test.ext.junit)
+    androidTestImplementation(libs.test.runner)
 
     // Play in-app update AARs merge extra manifest entries. App info may list permissions under the
     // "Nearby devices" group on Android 12+ even though FilePipe does not declare them in src manifests.

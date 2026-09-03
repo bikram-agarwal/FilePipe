@@ -529,7 +529,6 @@ class FilePipeUpdateViewModel
 
         override fun onCleared() {
             devReleasePlayBannerMockSequenceJob?.cancel()
-            super.onCleared()
         }
 
         companion object {
