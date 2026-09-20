@@ -1,3 +1,10 @@
+## v3.10.2 Tablet layout fix
+
+### 🛠 Improved Features
+- Prevent two-panel layout from appearing on phone portrait mode. 
+
+---
+
 ## v3.10.1 UI Scale
 
 ### ✨ New Features

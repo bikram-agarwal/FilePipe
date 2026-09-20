@@ -34,4 +34,13 @@ class AdaptiveLayoutTest {
             responsiveActionLayout(320.dp, effectiveFontScale = 1.20f, itemCount = 1),
         )
     }
+
+    @Test
+    fun multiPaneLayoutRequiresBothExpandedDirectiveAndExpandedWindowWidth() {
+        assertEquals(false, supportsMultiPaneLayout(maxHorizontalPartitions = 2, screenWidthDp = 438))
+        assertEquals(false, supportsMultiPaneLayout(maxHorizontalPartitions = 1, screenWidthDp = 840))
+        assertEquals(true, supportsMultiPaneLayout(maxHorizontalPartitions = 2, screenWidthDp = 840))
+        // Phone in landscape at the smallest system display size: wide window, short side stays phone-sized.
+        assertEquals(true, supportsMultiPaneLayout(maxHorizontalPartitions = 2, screenWidthDp = 1079))
+    }
 }

@@ -58,13 +58,18 @@ val previewVersionSuffix =
 extensions.configure<ApplicationExtension>("android") {
     val filePipeApplicationId = "dev.bikram.filepipe"
     namespace = filePipeApplicationId
-    compileSdk = 37
+    compileSdk {
+        version =
+            release(37) {
+                minorApiLevel = 2
+            }
+    }
     defaultConfig {
         applicationId = filePipeApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 31001
-        versionName = "3.10.1"
+        versionCode = 31002
+        versionName = "3.10.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

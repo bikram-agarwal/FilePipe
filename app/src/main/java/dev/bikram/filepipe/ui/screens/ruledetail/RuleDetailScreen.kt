@@ -48,6 +48,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -111,6 +114,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -625,7 +629,7 @@ fun RuleDetailScreen(
     var showDeleteForeverConfirm by remember { mutableStateOf(false) }
     var showTemplateSheet by remember { mutableStateOf(viewModel.showInitialTemplatePicker) }
     var showRuleIconSheet by remember { mutableStateOf(false) }
-    var customEmojiDraft by remember { mutableStateOf("") }
+    val customEmojiTextFieldState = rememberTextFieldState()
     val previewSheetState =
         rememberBottomSheetState(
             initialValue = SheetValue.Hidden,
@@ -2459,9 +2463,15 @@ fun RuleDetailScreen(
             )
         LaunchedEffect(showRuleIconSheet) {
             if (showRuleIconSheet) {
-                customEmojiDraft = state.iconEmoji.orEmpty()
+                val initialEmoji = state.iconEmoji.orEmpty()
+                customEmojiTextFieldState.edit {
+                    replace(0, length, initialEmoji)
+                    selection = TextRange(initialEmoji.length)
+                }
+                customEmojiTextFieldState.undoState.clearHistory()
             }
         }
+        val customEmojiDraft = customEmojiTextFieldState.text.toString()
         AppBottomSheet(
             title = stringResource(R.string.rule_icon_sheet_title),
             onDismiss = { showRuleIconSheet = false },
@@ -2550,26 +2560,16 @@ fun RuleDetailScreen(
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         ) {
                             BasicTextField(
-                                value = customEmojiDraft,
-                                onValueChange = { newValue ->
-                                    if (newValue.isEmpty()) {
-                                        customEmojiDraft = ""
-                                    } else {
-                                        val boundary = java.text.BreakIterator.getCharacterInstance()
-                                        boundary.setText(newValue)
-                                        val start = boundary.first()
-                                        val end = boundary.next()
-                                        customEmojiDraft = newValue.substring(start, end)
-                                    }
-                                },
+                                state = customEmojiTextFieldState,
                                 modifier =
                                     Modifier
                                         .fillMaxSize()
                                         .padding(horizontal = 6.dp, vertical = 10.dp),
                                 textStyle = emojiTextStyle.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                                 cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurfaceVariant),
-                                singleLine = true,
-                                decorationBox = { innerTextField ->
+                                lineLimits = TextFieldLineLimits.SingleLine,
+                                inputTransformation = FirstGraphemeInputTransformation,
+                                decorator = { innerTextField ->
                                     Box(
                                         modifier = Modifier.fillMaxSize(),
                                         contentAlignment = Alignment.Center,
@@ -2851,3 +2851,17 @@ fun RuleDetailScreen(
         }
     }
 }
+
+private val FirstGraphemeInputTransformation =
+    InputTransformation {
+        val entered = asCharSequence().toString()
+        if (entered.isEmpty()) return@InputTransformation
+        val boundary = java.text.BreakIterator.getCharacterInstance()
+        boundary.setText(entered)
+        val start = boundary.first()
+        val end = boundary.next()
+        val firstGrapheme = entered.substring(start, end)
+        if (firstGrapheme != entered) {
+            replace(0, length, firstGrapheme)
+        }
+    }

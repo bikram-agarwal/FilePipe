@@ -223,13 +223,12 @@ jobs:
           name: v${{ steps.version.outputs.version }}-Preview-${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           body: |
+            ### In preview
+            - one
+            - two
             > [!WARNING]
-            > This is a preview build intended for testing. It may contain bugs,
-            > unfinished changes, or regressions. Do not install it if you want a
-            > stable experience.
-
-            Back up your FilePipe data before installing and report any problems
-            through the repository's issue tracker.
+            > This is a preview build intended for testing. It may contain bugs, unfinished changes, or regressions. Do not install it if you want a stable experience.
+            > Back up your FilePipe data before installing and report any problems through the repository's issue tracker.
 
             Built from `${{ github.ref_name }}` at commit `${{ github.sha }}`.
           files: release-assets/*

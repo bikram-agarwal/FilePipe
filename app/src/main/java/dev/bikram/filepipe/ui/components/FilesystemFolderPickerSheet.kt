@@ -27,8 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
-import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -48,7 +47,9 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathAllowedForRules
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.LocalSystemPaneScaffoldDirective
 import dev.bikram.filepipe.ui.common.isLandscape
+import dev.bikram.filepipe.ui.common.supportsMultiPaneLayout
 import dev.bikram.filepipe.ui.feedback.appClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -473,8 +474,19 @@ fun FilesystemFolderPickerSheetContent(
         Spacer(Modifier.height(8.dp))
         val fontScale = LocalDensity.current.fontScale
         val isLandscape = isLandscape()
-        val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
-        val isTwoPane = calculatePaneScaffoldDirective(windowAdaptiveInfo).maxHorizontalPartitions > 1
+        val paneScaffoldDirective = LocalSystemPaneScaffoldDirective.current
+
+        // Lint prefers LocalWindowInfo.current.containerSize, but converting that to dp needs
+        // LocalDensity, which the theme replaces for visual scaling - the exact distortion this gate
+        // exists to defend against. Configuration reports the OS width directly.
+        @Suppress("ConfigurationScreenWidthHeight")
+        val systemWindowWidthDp = LocalConfiguration.current.screenWidthDp
+        val isTwoPane =
+            paneScaffoldDirective != null &&
+                supportsMultiPaneLayout(
+                    maxHorizontalPartitions = paneScaffoldDirective.maxHorizontalPartitions,
+                    screenWidthDp = systemWindowWidthDp,
+                )
         if (fontScale > 1.15f) {
             if (isLandscape || isTwoPane) {
                 Row(

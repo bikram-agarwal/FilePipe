@@ -11,11 +11,13 @@ import android.os.Environment
 import android.os.PowerManager
 import android.os.SystemClock
 import android.os.storage.StorageManager
+import android.util.DisplayMetrics
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.ui.common.MIN_MULTI_PANE_WIDTH_DP
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -286,6 +288,15 @@ object DiagnosticLog {
                 displayMetrics.density,
                 displayMetrics.density * configuration.fontScale,
                 displayMetrics.densityDpi,
+                DisplayMetrics.DENSITY_DEVICE_STABLE.toFloat() / DisplayMetrics.DENSITY_DEFAULT,
+            ),
+        )
+        appendLine(
+            context.getString(
+                R.string.diagnostics_adaptive_layout_format,
+                configuration.screenWidthDp,
+                configuration.smallestScreenWidthDp,
+                configuration.screenWidthDp >= MIN_MULTI_PANE_WIDTH_DP,
             ),
         )
     }

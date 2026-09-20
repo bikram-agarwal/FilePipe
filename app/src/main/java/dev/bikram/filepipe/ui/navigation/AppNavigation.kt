@@ -114,6 +114,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -149,7 +150,10 @@ import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.LocalAllowCompactControls
+import dev.bikram.filepipe.ui.common.LocalSystemPaneScaffoldDirective
+import dev.bikram.filepipe.ui.common.LocalSystemWindowAdaptiveInfo
 import dev.bikram.filepipe.ui.common.isSmallLandscape
+import dev.bikram.filepipe.ui.common.supportsMultiPaneLayout
 import dev.bikram.filepipe.ui.components.AlertFloatingActionButtonMenu
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
@@ -261,13 +265,24 @@ fun AppNavigation(
         bottomNavItems.any {
             currentDestination?.hierarchy?.any { destination -> destination.route == it.screen.route } == true
         }
-    val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
+    val windowAdaptiveInfo = LocalSystemWindowAdaptiveInfo.current ?: currentWindowAdaptiveInfoV2()
     val navigationSuiteType =
         NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
     // Derive the pane directive directly instead of allocating a throwaway navigator (each
     // two-pane route creates its own). Matches the navigator's default directive.
-    val paneScaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
-    val useListDetailPanes = paneScaffoldDirective.maxHorizontalPartitions > 1
+    val paneScaffoldDirective =
+        LocalSystemPaneScaffoldDirective.current ?: calculatePaneScaffoldDirective(windowAdaptiveInfo)
+
+    // Lint prefers LocalWindowInfo.current.containerSize, but converting that to dp needs
+    // LocalDensity, which the theme replaces for visual scaling - the exact distortion this gate
+    // exists to defend against. Configuration reports the OS width directly.
+    @Suppress("ConfigurationScreenWidthHeight")
+    val systemWindowWidthDp = LocalConfiguration.current.screenWidthDp
+    val useListDetailPanes =
+        supportsMultiPaneLayout(
+            maxHorizontalPartitions = paneScaffoldDirective.maxHorizontalPartitions,
+            screenWidthDp = systemWindowWidthDp,
+        )
     val useNavigationSuiteScaffold = useListDetailPanes
     val showFloatingBottomBar = showBottomBar && !useNavigationSuiteScaffold
 
@@ -822,6 +837,7 @@ fun AppNavigation(
                             composable(Screen.Rules.route) {
                                 if (useListDetailPanes) {
                                     RulesTwoPaneRoute(
+                                        paneScaffoldDirective = paneScaffoldDirective,
                                         contentPadding = primaryTabContentPadding,
                                         onOpenRuleDetail = { ruleId ->
                                             navController.navigate(Screen.RuleDetail.createRoute(ruleId))
@@ -900,6 +916,7 @@ fun AppNavigation(
                             composable(Screen.History.route) {
                                 if (useListDetailPanes) {
                                     HistoryTwoPaneRoute(
+                                        paneScaffoldDirective = paneScaffoldDirective,
                                         contentPadding = primaryTabContentPadding,
                                         onOpenHistoryDetail = { historyId ->
                                             navController.navigate(Screen.HistoryDetail.createRoute(historyId))
@@ -999,6 +1016,7 @@ fun AppNavigation(
                                 ) {
                                     if (useListDetailPanes) {
                                         SettingsTwoPaneRoute(
+                                            paneScaffoldDirective = paneScaffoldDirective,
                                             contentPadding = primaryTabContentPadding,
                                             onOpenIntro = {
                                                 navController.navigate(Screen.OnboardingTitle.route)
@@ -1173,6 +1191,7 @@ fun AppNavigation(
                             ) {
                                 if (useListDetailPanes) {
                                     HistoryTwoPaneRoute(
+                                        paneScaffoldDirective = paneScaffoldDirective,
                                         contentPadding = PaddingValues(),
                                         onOpenHistoryDetail = { historyId ->
                                             navController.navigate(Screen.HistoryDetail.createRoute(historyId))
@@ -1393,6 +1412,7 @@ fun AppNavigation(
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun RulesTwoPaneRoute(
+    paneScaffoldDirective: PaneScaffoldDirective,
     contentPadding: PaddingValues,
     onOpenRuleDetail: (Long) -> Unit,
     onOpenNewRule: () -> Unit,
@@ -1405,7 +1425,10 @@ private fun RulesTwoPaneRoute(
     settingsViewModel: SettingsViewModel = hiltViewModel(),
     updateVm: FilePipeUpdateViewModel = hiltViewModel(),
 ) {
-    val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
+    val navigator =
+        rememberListDetailPaneScaffoldNavigator<Long>(
+            scaffoldDirective = paneScaffoldDirective,
+        )
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
 
     if (!isMultiPane) {
@@ -1877,6 +1900,7 @@ private fun RulesSelectionActionContent(
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun HistoryTwoPaneRoute(
+    paneScaffoldDirective: PaneScaffoldDirective,
     contentPadding: PaddingValues,
     onOpenHistoryDetail: (Long) -> Unit,
     onNavigateBack: (() -> Unit)?,
@@ -1893,7 +1917,10 @@ private fun HistoryTwoPaneRoute(
         PaddingValues(
             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
         )
-    val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
+    val navigator =
+        rememberListDetailPaneScaffoldNavigator<Long>(
+            scaffoldDirective = paneScaffoldDirective,
+        )
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
 
     if (!isMultiPane) {

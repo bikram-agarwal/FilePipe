@@ -205,6 +205,7 @@ private fun SettingsSectionListRow(
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsTwoPaneRoute(
+    paneScaffoldDirective: PaneScaffoldDirective,
     contentPadding: PaddingValues,
     onOpenIntro: () -> Unit,
     onOpenFaqStorageSection: () -> Unit,
@@ -230,7 +231,10 @@ fun SettingsTwoPaneRoute(
             .userPreferencesRepository()
             .developerOptionsEnabledFlow
             .collectAsStateWithLifecycle(initialValue = false)
-    val navigator = rememberListDetailPaneScaffoldNavigator<String>()
+    val navigator =
+        rememberListDetailPaneScaffoldNavigator<String>(
+            scaffoldDirective = paneScaffoldDirective,
+        )
     val paneContentPadding =
         PaddingValues(
             bottom = contentPadding.calculateBottomPadding(),

@@ -12,6 +12,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SliderState
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -77,19 +79,30 @@ fun HueColorSlider(
             inactiveTrackColor = Color.Transparent,
             inactiveTickColor = Color.Transparent,
         )
+    val sliderState =
+        rememberSliderState(
+            value = hue,
+            trackRange = 0f..360f,
+        )
+
+    LaunchedEffect(hue) {
+        if (sliderState.value != hue) {
+            sliderState.value = hue
+        }
+    }
 
     Slider(
-        value = hue,
-        onValueChange = { nextHue ->
+        state = sliderState,
+        modifier = modifier.fillMaxWidth(),
+        onValueChange = { nextHue: Float ->
             hue = nextHue
             currentHex = colorHexFromHue(nextHue)
             onSelect(currentHex)
         },
-        modifier = modifier.fillMaxWidth(),
-        valueRange = 0f..360f,
-        colors = sliderColors,
         onValueChangeFinished = { onValueChangeFinished?.invoke(currentHex) },
-        track = { sliderState ->
+        colors = sliderColors,
+        track = { sliderState: SliderState ->
+            val trackHue = sliderState.value
             BoxWithConstraints(
                 modifier =
                     Modifier
@@ -105,7 +118,7 @@ fun HueColorSlider(
                             .clip(HueSliderTrackShape)
                             .background(Brush.horizontalGradient(HueSliderColors)),
                 )
-                val handleGapOffset = maxWidth * (hue / 360f) - handleGapWidth / 2
+                val handleGapOffset = maxWidth * (trackHue / 360f) - handleGapWidth / 2
                 Box(
                     modifier =
                         Modifier
@@ -118,7 +131,7 @@ fun HueColorSlider(
                     modifier =
                         Modifier
                             .align(Alignment.CenterStart)
-                            .offset { IntOffset((maxWidth * (hue / 360f) - handleWidth / 2).roundToPx(), 0) }
+                            .offset { IntOffset((maxWidth * (trackHue / 360f) - handleWidth / 2).roundToPx(), 0) }
                             .size(width = handleWidth, height = HueSliderHandleHeight)
                             .clip(RoundedCornerShape(2.dp))
                             .background(thumbColor),

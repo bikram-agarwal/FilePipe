@@ -3,6 +3,8 @@
 package dev.bikram.filepipe.ui.common
 
 import android.content.res.Configuration
+import androidx.compose.material3.adaptive.WindowAdaptiveInfo
+import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -19,6 +21,30 @@ import androidx.compose.ui.unit.dp
 
 /** Below this many dp of height in landscape, screens switch to space-saving layouts. */
 const val SMALL_LANDSCAPE_HEIGHT_DP = 480
+
+/**
+ * Material's Expanded-width lower bound, cross-checked against the OS-reported window width so a
+ * replaced Compose density can never promote a narrow window to tablet chrome. Deliberately keyed on
+ * the current window width rather than `smallestScreenWidthDp`: the latter is the smaller dimension
+ * across both orientations, so a phone would never qualify even in a genuinely wide landscape window.
+ */
+const val MIN_MULTI_PANE_WIDTH_DP = 840
+
+/**
+ * Adaptive information captured before [FilePipeTheme][dev.bikram.filepipe.ui.theme.FilePipeTheme]
+ * replaces [androidx.compose.ui.platform.LocalDensity] for visual scaling.
+ */
+val LocalSystemWindowAdaptiveInfo = staticCompositionLocalOf<WindowAdaptiveInfo?> { null }
+
+/** The pane directive calculated from [LocalSystemWindowAdaptiveInfo]. */
+val LocalSystemPaneScaffoldDirective = staticCompositionLocalOf<PaneScaffoldDirective?> { null }
+
+fun supportsMultiPaneLayout(
+    maxHorizontalPartitions: Int,
+    screenWidthDp: Int,
+): Boolean =
+    maxHorizontalPartitions > 1 &&
+        screenWidthDp >= MIN_MULTI_PANE_WIDTH_DP
 
 /**
  * Lets a container opt its subtree out of the compact control sizes that [isSmallLandscape] would

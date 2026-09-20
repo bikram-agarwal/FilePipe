@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -24,6 +28,8 @@ import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.ui.InAppRatingAutoPromptHost
+import dev.bikram.filepipe.ui.common.LocalSystemPaneScaffoldDirective
+import dev.bikram.filepipe.ui.common.LocalSystemWindowAdaptiveInfo
 import dev.bikram.filepipe.ui.navigation.AppNavigation
 import dev.bikram.filepipe.ui.theme.FilePipeTheme
 import dev.bikram.filepipe.update.AppReviewLauncher
@@ -47,6 +53,7 @@ class MainActivity : ComponentActivity() {
 
     private var isReady = false
 
+    @OptIn(ExperimentalMaterial3AdaptiveApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -63,6 +70,8 @@ class MainActivity : ComponentActivity() {
         openSettingsUpdatesIfAppWasUpdated()
 
         setContent {
+            val systemWindowAdaptiveInfo = currentWindowAdaptiveInfoV2()
+            val systemPaneScaffoldDirective = calculatePaneScaffoldDirective(systemWindowAdaptiveInfo)
             val preferencesState by userPreferencesRepository.preferencesFlow
                 .collectAsStateWithLifecycle(initialValue = null)
 
@@ -76,41 +85,46 @@ class MainActivity : ComponentActivity() {
             }
 
             val preferences = preferencesState ?: AppPreferences.DEFAULT
-            FilePipeTheme(
-                themeMode = preferences.themeMode,
-                useBlackTheme = preferences.useBlackTheme,
-                colorSource = preferences.colorSource,
-                savedCustomSeedHexes = preferences.savedCustomSeedHexes,
-                themePaletteStyle = preferences.themePaletteStyle,
-                hapticFeedbackEnabled = preferences.hapticFeedbackEnabled,
-                shadingIntensity = preferences.shadingIntensity,
-                uiScale = preferences.uiScale,
-                activeCustomSeedHex = preferences.activeCustomSeedHex,
-                useGradientBackground = preferences.useGradientBackground,
-                progressiveBlurEnabled = preferences.progressiveBlurEnabled,
-                customFontPath = preferences.customFontPath,
+            CompositionLocalProvider(
+                LocalSystemWindowAdaptiveInfo provides systemWindowAdaptiveInfo,
+                LocalSystemPaneScaffoldDirective provides systemPaneScaffoldDirective,
             ) {
-                if (introSeenAtLaunch == null) {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background,
-                    ) {
-                        Box(Modifier.fillMaxSize())
+                FilePipeTheme(
+                    themeMode = preferences.themeMode,
+                    useBlackTheme = preferences.useBlackTheme,
+                    colorSource = preferences.colorSource,
+                    savedCustomSeedHexes = preferences.savedCustomSeedHexes,
+                    themePaletteStyle = preferences.themePaletteStyle,
+                    hapticFeedbackEnabled = preferences.hapticFeedbackEnabled,
+                    shadingIntensity = preferences.shadingIntensity,
+                    uiScale = preferences.uiScale,
+                    activeCustomSeedHex = preferences.activeCustomSeedHex,
+                    useGradientBackground = preferences.useGradientBackground,
+                    progressiveBlurEnabled = preferences.progressiveBlurEnabled,
+                    customFontPath = preferences.customFontPath,
+                ) {
+                    if (introSeenAtLaunch == null) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background,
+                        ) {
+                            Box(Modifier.fillMaxSize())
+                        }
+                    } else {
+                        val currentPrefs = preferencesState!!
+                        InAppRatingAutoPromptHost(
+                            preferences = currentPrefs,
+                            activity = this@MainActivity,
+                            userPreferencesRepository = userPreferencesRepository,
+                            appReviewLauncher = appReviewLauncher,
+                        )
+                        AppNavigation(
+                            hasSeenIntro = currentPrefs.hasSeenIntro,
+                            introSeenAtLaunch = introSeenAtLaunch,
+                            preferences = currentPrefs,
+                            pendingShortcutRepository = pendingShortcutRepository,
+                        )
                     }
-                } else {
-                    val currentPrefs = preferencesState!!
-                    InAppRatingAutoPromptHost(
-                        preferences = currentPrefs,
-                        activity = this@MainActivity,
-                        userPreferencesRepository = userPreferencesRepository,
-                        appReviewLauncher = appReviewLauncher,
-                    )
-                    AppNavigation(
-                        hasSeenIntro = currentPrefs.hasSeenIntro,
-                        introSeenAtLaunch = introSeenAtLaunch,
-                        preferences = currentPrefs,
-                        pendingShortcutRepository = pendingShortcutRepository,
-                    )
                 }
             }
         }
