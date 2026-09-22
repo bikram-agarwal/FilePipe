@@ -21,8 +21,13 @@
   <br/>
   <!-- Distribution Badges -->
   <a href="https://github.com/bikram-agarwal/FilePipe/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/bikram-agarwal/FilePipe?color=a1168e&include_prereleases&logo=github&style=for-the-badge&labelColor=700f63"/></a>
-  <a href="https://play.google.com/store/apps/details?id=dev.bikram.filepipe"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v3.10.2-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
+  <a href="https://play.google.com/store/apps/details?id=dev.bikram.filepipe"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v3.10.1-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
   <a href="https://f-droid.org/packages/dev.bikram.filepipe.gh"><img alt="F-Droid" src="https://img.shields.io/f-droid/v/dev.bikram.filepipe.gh?color=a1168e&logo=FDROID&style=for-the-badge&labelColor=700f63"/></a>
+</p>
+
+<p align="center">
+<strong>Featured by Sam Beckman: Best Android Apps of 2026! 🎊</strong><br/>
+  <a href="https://youtu.be/9q1yhqX2DD4?t=543"><img width="50%" alt="FilePipe: Best Android Apps of 2026!" src="docs/assets/feature_sb.webp" /></a>
 </p>
 
 FilePipe turns your chaotic storage into a perfectly organized library — automatically.
