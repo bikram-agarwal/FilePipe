@@ -210,7 +210,7 @@ jobs:
           subject-path: 'release-assets/*'
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: filepipe-v${{ steps.version.outputs.version }}-release
           path: release-assets/*
