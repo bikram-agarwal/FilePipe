@@ -1,6 +1,8 @@
 package dev.bikram.filepipe.update
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -50,5 +52,46 @@ class GithubUpdateDecisionTest {
     @Test
     fun newerPreviewRunIsNewer() {
         assertTrue(isRemoteVersionNewer("v3.9.8-Preview-240", "3.9.8-preview-239"))
+    }
+
+    @Test
+    fun selectsGithubApkWhenFdroidIsListedFirst() {
+        val selected =
+            selectGithubReleaseApkAsset(
+                listOf(
+                    GithubAsset(
+                        name = "filepipe-v3.10.1-fdroid.apk",
+                        browser_download_url = "https://example.com/fdroid.apk",
+                    ),
+                    GithubAsset(
+                        name = "filepipe-v3.10.1-github.apk",
+                        browser_download_url = "https://example.com/github.apk",
+                    ),
+                    GithubAsset(
+                        name = "filepipe-v3.10.1-offline.apk",
+                        browser_download_url = "https://example.com/offline.apk",
+                    ),
+                ),
+            )
+        assertEquals("filepipe-v3.10.1-github.apk", selected?.name)
+        assertEquals("https://example.com/github.apk", selected?.browser_download_url)
+    }
+
+    @Test
+    fun returnsNullWhenNoGithubApkAssetExists() {
+        val selected =
+            selectGithubReleaseApkAsset(
+                listOf(
+                    GithubAsset(
+                        name = "filepipe-v3.10.1-fdroid.apk",
+                        browser_download_url = "https://example.com/fdroid.apk",
+                    ),
+                    GithubAsset(
+                        name = "filepipe-v3.10.1-offline.apk",
+                        browser_download_url = "https://example.com/offline.apk",
+                    ),
+                ),
+            )
+        assertNull(selected)
     }
 }

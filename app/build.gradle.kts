@@ -68,8 +68,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = filePipeApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 31002
-        versionName = "3.10.2"
+        versionCode = 31100
+        versionName = "3.11.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -153,6 +153,15 @@ extensions.configure<ApplicationExtension>("android") {
 
     flavorDimensions += "distribution"
     productFlavors {
+        create("fdroid") {
+            dimension = "distribution"
+            applicationIdSuffix = ".gh"
+            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
+        }
         create("github") {
             dimension = "distribution"
             applicationIdSuffix = ".gh"
@@ -162,14 +171,16 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
             buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
-        create("fdroid") {
+        // FilePipe-only: no INTERNET, no in-app updates. Do not mirror into Remember
+        // (Remember still needs network for Google Tasks on github/playstore).
+        create("offline") {
             dimension = "distribution"
-            applicationIdSuffix = ".gh"
-            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            applicationIdSuffix = ".offline"
+            buildConfigField("String", "GITHUB_REPO", "\"\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "false")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"\"")
         }
         create("playstore") {
             dimension = "distribution"

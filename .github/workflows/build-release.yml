@@ -3,8 +3,9 @@
 # - Main/tag build: creates stable v{versionName}.
 # - Non-main branch build: creates draft prerelease v{versionName}-Preview-{run number}.
 # - Build toggles:
-#     - build_github: filepipe-v{version}-github.apk   (GitHub Releases / sideload; GitHub distribution flavor)
 #     - build_fdroid: filepipe-v{version}-fdroid.apk   (F-Droid distribution flavor)
+#     - build_github: filepipe-v{version}-github.apk   (GitHub Releases / sideload; GitHub distribution flavor)
+#     - build_offline: filepipe-v{version}-offline.apk (no INTERNET; offline distribution flavor)
 #     - build_playstore: filepipe-v{version}-playstore.aab (Play Store upload; playstore distribution flavor)
 # - GitHub Release: always draft; publish from the Releases UI when ready.
 # - Run from any branch (e.g. main); the tagged commit is the commit that was built.
@@ -22,13 +23,18 @@ name: Build and release
 on:
   workflow_dispatch:
     inputs:
+      build_fdroid:
+        description: "Build F-Droid APK."
+        required: true
+        default: true
+        type: boolean
       build_github:
         description: "Build GitHub APK."
         required: true
         default: true
         type: boolean
-      build_fdroid:
-        description: "Build F-Droid APK."
+      build_offline:
+        description: "Build Offline APK (no INTERNET permission)."
         required: true
         default: true
         type: boolean
@@ -92,7 +98,7 @@ jobs:
       - name: Validate build target
         run: |
           set -euo pipefail
-          if [ "${{ inputs.build_github }}" != "true" ] && [ "${{ inputs.build_fdroid }}" != "true" ] && [ "${{ inputs.build_playstore }}" != "true" ]; then
+          if [ "${{ inputs.build_fdroid }}" != "true" ] && [ "${{ inputs.build_github }}" != "true" ] && [ "${{ inputs.build_offline }}" != "true" ] && [ "${{ inputs.build_playstore }}" != "true" ]; then
             echo "Enable at least one build toggle."
             exit 1
           fi
@@ -130,11 +136,14 @@ jobs:
           set -euo pipefail
           gradle_tasks=()
           gradle_arguments=()
+          if [ "${{ inputs.build_fdroid }}" = "true" ]; then
+            gradle_tasks+=(":app:assembleFdroidRelease")
+          fi
           if [ "${{ inputs.build_github }}" = "true" ]; then
             gradle_tasks+=(":app:assembleGithubRelease")
           fi
-          if [ "${{ inputs.build_fdroid }}" = "true" ]; then
-            gradle_tasks+=(":app:assembleFdroidRelease")
+          if [ "${{ inputs.build_offline }}" = "true" ]; then
+            gradle_tasks+=(":app:assembleOfflineRelease")
           fi
           if [ "${{ inputs.build_playstore }}" = "true" ]; then
             gradle_tasks+=(":app:bundlePlaystoreRelease")
@@ -151,9 +160,19 @@ jobs:
           out="release-assets"
           mkdir -p "$out"
 
-          github_apk="app/build/outputs/apk/github/release/app-github-release.apk"
           fdroid_apk="app/build/outputs/apk/fdroid/release/app-fdroid-release.apk"
+          github_apk="app/build/outputs/apk/github/release/app-github-release.apk"
+          offline_apk="app/build/outputs/apk/offline/release/app-offline-release.apk"
           play_aab="app/build/outputs/bundle/playstoreRelease/app-playstore-release.aab"
+
+          if [ "${{ inputs.build_fdroid }}" = "true" ]; then
+            if [ ! -f "$fdroid_apk" ]; then
+              echo "Expected F-Droid flavor APK not found: $fdroid_apk"
+              find app/build/outputs/apk -name '*.apk' -print || true
+              exit 1
+            fi
+            cp "$fdroid_apk" "$out/filepipe-v${version}-fdroid.apk"
+          fi
 
           if [ "${{ inputs.build_github }}" = "true" ]; then
             if [ ! -f "$github_apk" ]; then
@@ -164,13 +183,14 @@ jobs:
             cp "$github_apk" "$out/filepipe-v${version}-github.apk"
           fi
 
-          if [ "${{ inputs.build_fdroid }}" = "true" ]; then
-            if [ ! -f "$fdroid_apk" ]; then
-              echo "Expected F-Droid flavor APK not found: $fdroid_apk"
+
+          if [ "${{ inputs.build_offline }}" = "true" ]; then
+            if [ ! -f "$offline_apk" ]; then
+              echo "Expected Offline flavor APK not found: $offline_apk"
               find app/build/outputs/apk -name '*.apk' -print || true
               exit 1
             fi
-            cp "$fdroid_apk" "$out/filepipe-v${version}-fdroid.apk"
+            cp "$offline_apk" "$out/filepipe-v${version}-offline.apk"
           fi
 
           if [ "${{ inputs.build_playstore }}" = "true" ]; then

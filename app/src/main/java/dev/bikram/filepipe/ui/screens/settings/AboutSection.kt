@@ -111,7 +111,10 @@ private fun AboutOtherAppsAndLinks(
     copyLinkToClipboard: (String) -> Unit,
     isSmallLandscape: Boolean,
 ) {
-    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
+    val useGithubLikeAboutLinks =
+        BuildConfig.FLAVOR == "github" ||
+            BuildConfig.FLAVOR == "fdroid" ||
+            BuildConfig.FLAVOR == "offline"
     val rememberRoute =
         AboutAppRoute(
             packageId = REMEMBER_FDROID_PACKAGE_ID,
@@ -348,7 +351,9 @@ fun launchAppShareChooser(context: Context) {
                 playStoreListingUrl
             }
 
-            BuildConfig.FLAVOR == "fdroid" || BuildConfig.FLAVOR == "github" -> {
+            BuildConfig.FLAVOR == "fdroid" ||
+                BuildConfig.FLAVOR == "github" ||
+                BuildConfig.FLAVOR == "offline" -> {
                 portfolioUrl
             }
 
@@ -504,13 +509,17 @@ private fun AboutSettingsBlock(
         BuildConfig.GITHUB_REPO
             .trim()
             .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
-    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
+    val useGithubLikeAboutLinks =
+        BuildConfig.FLAVOR == "github" ||
+            BuildConfig.FLAVOR == "fdroid" ||
+            BuildConfig.FLAVOR == "offline"
     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
     val buildFlavorLabel =
         when (BuildConfig.FLAVOR) {
             "github" -> stringResource(R.string.build_flavor_github)
             "fdroid" -> stringResource(R.string.build_flavor_fdroid)
             "playstore" -> stringResource(R.string.build_flavor_playstore)
+            "offline" -> stringResource(R.string.build_flavor_offline)
             else -> BuildConfig.FLAVOR
         }
     val buildTypeLabel =

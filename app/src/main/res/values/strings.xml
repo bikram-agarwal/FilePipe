@@ -488,8 +488,9 @@
     <string name="settings_about_section">About</string>
     <string name="app_version_format">%1$s v%2$s</string>
     <string name="about_build_variant_format">%1$s, %2$s</string>
-    <string name="build_flavor_github">GitHub</string>
     <string name="build_flavor_fdroid">F-Droid</string>
+    <string name="build_flavor_github">GitHub</string>
+    <string name="build_flavor_offline">Offline</string>
     <string name="build_flavor_playstore">PlayStore</string>
     <string name="build_type_debug">Debug</string>
     <string name="build_type_dev_release">devRelease</string>
