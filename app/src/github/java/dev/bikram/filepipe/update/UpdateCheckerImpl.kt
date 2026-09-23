@@ -26,7 +26,7 @@ private data class GithubRelease(
 )
 
 @Serializable
-private data class GithubAsset(
+internal data class GithubAsset(
     val name: String,
     val browser_download_url: String,
     val updated_at: String = "",
@@ -66,7 +66,7 @@ class UpdateCheckerImpl
 
                     val remoteVersion = release.tag_name.removePrefix("v")
                     val apkAsset =
-                        release.assets.firstOrNull { it.name.endsWith(".apk") }
+                        selectGithubReleaseApkAsset(release.assets)
                             ?: return@runCatching null
 
                     val apkUpdatedAt = apkAsset.updated_at
@@ -148,6 +148,16 @@ private fun JsonObject.longOrNull(key: String): Long? {
     val element = this[key] as? JsonPrimitive ?: return null
     return element.longOrNull ?: element.contentOrNull?.toLongOrNull()
 }
+
+/**
+ * Prefer the GitHub-flavor sideload APK (`*-github.apk`). Releases also ship `*-fdroid.apk`
+ * and `*-offline.apk`; GitHub API asset order often lists fdroid first.
+ */
+internal fun selectGithubReleaseApkAsset(assets: List<GithubAsset>): GithubAsset? =
+    assets.firstOrNull { asset ->
+        asset.name.endsWith(".apk", ignoreCase = true) &&
+            asset.name.contains("-github", ignoreCase = true)
+    }
 
 internal fun isGithubReleaseUpdateAvailable(
     remoteVersion: String,
