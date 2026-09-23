@@ -93,7 +93,7 @@ jobs:
           fi
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Validate build target
         run: |
