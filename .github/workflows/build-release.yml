@@ -24,22 +24,22 @@ on:
   workflow_dispatch:
     inputs:
       build_fdroid:
-        description: "Build F-Droid APK."
+        description: "Build F-Droid APK"
         required: true
         default: true
         type: boolean
       build_github:
-        description: "Build GitHub APK."
+        description: "Build GitHub APK"
         required: true
         default: true
         type: boolean
       build_offline:
-        description: "Build Offline APK (no INTERNET permission)."
+        description: "Build Offline APK"
         required: true
         default: true
         type: boolean
       build_playstore:
-        description: "Build Play Store AAB."
+        description: "Build Play Store AAB"
         required: true
         default: true
         type: boolean

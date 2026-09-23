@@ -1,7 +1,12 @@
-## v3.10.2 Tablet layout fix
+## v3.11.0 Offline flavor, Tablet layout fix
 
-### 🛠 Improved Features
+### ✨ New Features
+- New Offline build with no internet permission and no in-app update checks.
+
+### 🐛 Bug Fixes
+- GitHub builds no longer download the F-Droid APK when checking for updates.
 - Prevent two-panel layout from appearing on phone portrait mode. 
+- Fixed cases where Display size settings made the whole app look too small on some devices.
 
 ---
 

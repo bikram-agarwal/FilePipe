@@ -42,6 +42,8 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 [<img src="docs/assets/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.filepipe.gh)
 [<img src="docs/assets/badge_github.png" alt="Get FilePipe on GitHub" height="80">](https://github.com/bikram-agarwal/FilePipe/releases/latest)
 
+[Differences](docs/FLAVOR_DIFFERENCES.md)
+
 ## 🛠️ How to use
 
 1. **Choose access mode**: `Selective Access` for granular control or `All Files Access` for ease of use. 
