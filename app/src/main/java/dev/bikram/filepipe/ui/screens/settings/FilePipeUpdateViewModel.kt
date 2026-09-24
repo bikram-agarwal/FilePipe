@@ -18,12 +18,13 @@ import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.di.MainDispatcher
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.update.AppReviewLauncher
+import dev.bikram.filepipe.update.FilePipeUpdateChecker
 import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
 import dev.bikram.filepipe.update.PlayInAppUpdateProgressController
 import dev.bikram.filepipe.update.PlayInAppUpdateStarter
+import dev.bikram.filepipe.update.PlayStoreUpdateChecker
 import dev.bikram.filepipe.update.PlayUpdateSessionHandle
 import dev.bikram.filepipe.update.UpdateAvailableNotifier
-import dev.bikram.filepipe.update.UpdateChecker
 import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.update.copyUpdateApkToMediaStoreDownloads
 import dev.bikram.filepipe.update.notificationDedupeKey
@@ -56,7 +57,8 @@ class FilePipeUpdateViewModel
     constructor(
         @param:ApplicationContext private val context: Context,
         private val userPreferencesRepository: UserPreferencesRepository,
-        private val updateChecker: UpdateChecker,
+        private val filePipeUpdateChecker: FilePipeUpdateChecker,
+        private val playStoreUpdateChecker: PlayStoreUpdateChecker,
         private val playUpdateSessionHandle: PlayUpdateSessionHandle,
         private val playInAppUpdateStarter: PlayInAppUpdateStarter,
         private val playInAppUpdateProgressController: PlayInAppUpdateProgressController,
@@ -101,6 +103,9 @@ class FilePipeUpdateViewModel
 
         private val _updateCheckFinishedWithoutResult = MutableStateFlow(false)
         val updateCheckFinishedWithoutResult: StateFlow<Boolean> = _updateCheckFinishedWithoutResult.asStateFlow()
+
+        private val _updateCheckFailed = MutableStateFlow(false)
+        val updateCheckFailed: StateFlow<Boolean> = _updateCheckFailed.asStateFlow()
 
         private val _showUpdateSheet = MutableStateFlow(false)
         val showUpdateSheet: StateFlow<Boolean> = _showUpdateSheet.asStateFlow()
@@ -277,7 +282,7 @@ class FilePipeUpdateViewModel
                 }
                 _isCheckingUpdate.value = true
                 _downloadProgress.value = null
-                val checked = runCatching { updateChecker.checkForUpdate() }
+                val checked = runCatching { resolveAvailableUpdate() }
                 _isCheckingUpdate.value = false
                 val info =
                     checked
@@ -308,21 +313,22 @@ class FilePipeUpdateViewModel
 
         /**
          * Manual flow from the update sheet: sets checking immediately on the main thread, then runs the check.
-         * No snackbar; the sheet shows up-to-date vs available.
+         * No snackbar; the sheet shows up-to-date vs available vs check failed.
          */
         fun beginManualUpdateCheckFromSheet() {
             _manualUpdateCheckTrigger.value += 1
             _isCheckingUpdate.value = true
             _downloadProgress.value = null
             _updateCheckFinishedWithoutResult.value = false
+            _updateCheckFailed.value = false
             viewModelScope.launch {
-                val checked = runCatching { updateChecker.checkForUpdate() }
+                val checked = runCatching { resolveAvailableUpdate() }
                 _isCheckingUpdate.value = false
                 val info =
                     checked
                         .onFailure { error ->
                             DiagnosticLog.record(context, "Update sheet check failed", error)
-                            _updateCheckFinishedWithoutResult.value = true
+                            _updateCheckFailed.value = true
                         }.getOrNull()
                 if (checked.isFailure) return@launch
                 if (info != null) {
@@ -341,6 +347,13 @@ class FilePipeUpdateViewModel
                 }
             }
         }
+
+        private suspend fun resolveAvailableUpdate(): UpdateInfo? =
+            if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
+                playStoreUpdateChecker.checkForUpdate()
+            } else {
+                filePipeUpdateChecker.checkForUpdate()
+            }
 
         fun loadChangelogForUpdateSheet() =
             viewModelScope.launch {
@@ -379,6 +392,7 @@ class FilePipeUpdateViewModel
             }
             _updateSheetChangelog.value = ChangelogUiState.Hidden
             _updateCheckFinishedWithoutResult.value = false
+            _updateCheckFailed.value = false
         }
 
         /** Close the sheet because a Play download/install began behind it (banner takes over). */
@@ -387,6 +401,7 @@ class FilePipeUpdateViewModel
             _downloadProgress.value = null
             _updateSheetChangelog.value = ChangelogUiState.Hidden
             _updateCheckFinishedWithoutResult.value = false
+            _updateCheckFailed.value = false
         }
 
         fun tryStartPlayInAppUpdate(

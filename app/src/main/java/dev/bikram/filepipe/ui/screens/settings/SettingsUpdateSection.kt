@@ -133,6 +133,7 @@ internal fun UpdateCheckBottomSheetContent(
     isCheckingUpdate: Boolean,
     updateInfo: UpdateInfo?,
     manualUpdateNoResult: Boolean,
+    updateCheckFailed: Boolean,
     downloadProgress: Float?,
     changelogState: ChangelogUiState,
     showGithubExtraUi: Boolean,
@@ -269,6 +270,28 @@ internal fun UpdateCheckBottomSheetContent(
                                 Text(stringResource(R.string.settings_update_skip_version))
                             }
                         }
+                    }
+                }
+
+                updateCheckFailed -> {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        FilePipeMaterialRoundedSymbol(
+                            name = "warning",
+                            contentDescription = null,
+                            size = 40.dp,
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = stringResource(R.string.settings_update_check_failed),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
 

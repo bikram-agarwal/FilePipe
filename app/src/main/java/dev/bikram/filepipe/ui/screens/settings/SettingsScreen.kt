@@ -326,6 +326,7 @@ fun SettingsScreen(
     val downloadProgress by updateVm.downloadProgress.collectAsStateWithLifecycle()
     val showUpdateSheet by updateVm.showUpdateSheet.collectAsStateWithLifecycle()
     val updateCheckFinishedWithoutResult by updateVm.updateCheckFinishedWithoutResult.collectAsStateWithLifecycle()
+    val updateCheckFailed by updateVm.updateCheckFailed.collectAsStateWithLifecycle()
     val updateSheetChangelog by updateVm.updateSheetChangelog.collectAsStateWithLifecycle()
     val openSheetRequested by updateVm.openSheetRequested.collectAsStateWithLifecycle()
     val openUpdateSheetFromRulesPromo by updateVm.openUpdateSheetFromRulesPromo.collectAsStateWithLifecycle()
@@ -717,6 +718,7 @@ fun SettingsScreen(
                 isCheckingUpdate = isCheckingUpdate,
                 updateInfo = updateInfo,
                 manualUpdateNoResult = updateCheckFinishedWithoutResult,
+                updateCheckFailed = updateCheckFailed,
                 downloadProgress = downloadProgress,
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",

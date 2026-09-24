@@ -10,9 +10,10 @@ import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
+import dev.bikram.filepipe.update.FilePipeUpdateChecker
+import dev.bikram.filepipe.update.PlayStoreUpdateChecker
 import dev.bikram.filepipe.update.UpdateAvailableNotifier
 import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
-import dev.bikram.filepipe.update.UpdateChecker
 
 @HiltWorker
 class UpdateCheckWorker
@@ -20,7 +21,8 @@ class UpdateCheckWorker
     constructor(
         @Assisted private val appContext: Context,
         @Assisted workerParams: WorkerParameters,
-        private val updateChecker: UpdateChecker,
+        private val filePipeUpdateChecker: FilePipeUpdateChecker,
+        private val playStoreUpdateChecker: PlayStoreUpdateChecker,
         private val userPreferencesRepository: UserPreferencesRepository,
         private val updateAvailableNotifier: UpdateAvailableNotifier,
         private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
@@ -38,7 +40,12 @@ class UpdateCheckWorker
                 return Result.success()
             }
             runCatching {
-                val info = updateChecker.checkForUpdate()
+                val info =
+                    if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
+                        playStoreUpdateChecker.checkForUpdate()
+                    } else {
+                        filePipeUpdateChecker.checkForUpdate()
+                    }
                 if (info != null) {
                     updateAvailableNotifier.notifyIfNewUpdateAvailable(info, prefs)
                 }

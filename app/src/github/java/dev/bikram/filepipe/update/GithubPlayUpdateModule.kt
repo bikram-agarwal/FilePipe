@@ -25,5 +25,9 @@ abstract class GithubPlayUpdateModule {
 
     @Binds
     @Singleton
+    abstract fun bindPlayStoreUpdateChecker(impl: GithubPlayUpdateNoOp): PlayStoreUpdateChecker
+
+    @Binds
+    @Singleton
     abstract fun bindAppReviewLauncher(impl: GithubPlayUpdateNoOp): AppReviewLauncher
 }

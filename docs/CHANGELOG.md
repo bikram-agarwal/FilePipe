@@ -1,4 +1,4 @@
-## v3.11.0 Offline flavor, Tablet layout fix
+## v3.11.1 Offline flavor, Tablet layout fix
 
 ### ✨ New Features
 - New Offline build with no internet permission and no in-app update checks.
@@ -7,6 +7,8 @@
 - GitHub builds no longer download the F-Droid APK when checking for updates.
 - Prevent two-panel layout from appearing on phone portrait mode. 
 - Fixed cases where Display size settings made the whole app look too small on some devices.
+- If update check fails, the update screen now says "*Couldn't check for updates*" instead of wrongly saying "*You're up to date*". 
+- If a scheduled update check fails, FilePipe now retries up to 3 times over the next few minutes before waiting for the next scheduled check.
 
 ---
 

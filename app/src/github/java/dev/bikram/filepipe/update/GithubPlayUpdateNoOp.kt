@@ -17,6 +17,7 @@ class GithubPlayUpdateNoOp
     PlayUpdateSessionHandle,
         PlayInAppUpdateStarter,
         PlayInAppUpdateProgressController,
+        PlayStoreUpdateChecker,
         AppReviewLauncher {
         private val bannerState = MutableStateFlow<PlayInAppUpdateBannerUiState>(PlayInAppUpdateBannerUiState.Hidden)
         override val bannerUiState: StateFlow<PlayInAppUpdateBannerUiState> = bannerState.asStateFlow()
@@ -33,6 +34,8 @@ class GithubPlayUpdateNoOp
         override fun ensureInstallStateListenerRegistered() {}
 
         override fun completeFlexibleUpdateIfReady(activity: Activity) {}
+
+        override suspend fun checkForUpdate(): UpdateInfo? = null
 
         override fun tryLaunchInAppReview(
             activity: ComponentActivity,

@@ -68,8 +68,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = filePipeApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 31100
-        versionName = "3.11.0"
+        versionCode = 31101
+        versionName = "3.11.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -171,8 +171,6 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
             buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
-        // FilePipe-only: no INTERNET, no in-app updates. Do not mirror into Remember
-        // (Remember still needs network for Google Tasks on github/playstore).
         create("offline") {
             dimension = "distribution"
             applicationIdSuffix = ".offline"
@@ -194,6 +192,10 @@ extensions.configure<ApplicationExtension>("android") {
 
     sourceSets {
         getByName("fdroid") {
+            java.directories.add("src/github/java")
+            kotlin.directories.add("src/github/java")
+        }
+        getByName("offline") {
             java.directories.add("src/github/java")
             kotlin.directories.add("src/github/java")
         }

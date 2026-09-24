@@ -7,6 +7,8 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 <b>━━ 📋 RULES ━━</b>
 Use templates to start fast, or build your own. Create a rule by choosing source folders, file extensions, and a destination. Each rule can move, copy or delete files, and you control what happens when a filename collision occurs — skip, overwrite, or rename automatically. Rules can scan subfolders recursively and each one gets its own schedule.
 
+Moved files keep their original date and time (copies too, with All files access), so they stay in the right order in your gallery and file manager instead of showing up as brand new.
+
 <b>━━ 🎛️ ADVANCED FILTERS ━━</b>
 Not every file in a folder should match. Narrow things down with:
 • Filename patterns (wildcards or RegEx)
@@ -41,7 +43,7 @@ Long-press the app icon to run any of your top four enabled rules immediately, w
 Scheduled runs post a summary notification showing the files that were moved. Tap <b>Undo</b> directly from the notification to reverse the last batch.
 
 <b>━━ 💾 BACKUP AND RESTORE ━━</b>
-Export all your rules to a JSON file and import them back at any time. Auto-export on rule change and scheduled exports are available in Settings.
+Export your rules, run history, and settings to a JSON file and restore them at any time. Auto-export on rule change and scheduled exports are available in Settings.
 
 <b>━━ 🎨 LOOK AND FEEL ━━</b>
 • Light, dark, black (OLED), or system-default theme
@@ -51,6 +53,7 @@ Export all your rules to a JSON file and import them back at any time. Auto-expo
 • Optional gradient background
 • Optional progressive blur behind the nav bar (Android 12+)
 • Use your own custom font
+• UI scale from 75% to 125% to make text, icons, and spacing smaller or larger
 
 <b>━━ 🛡️ PRIVACY ━━</b>
 Works entirely on-device. No accounts, no cloud sync, no data collection. You control how folders are accessed - either one at a time or grant once & access everything.

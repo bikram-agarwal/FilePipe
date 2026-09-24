@@ -8,20 +8,20 @@ import com.google.android.play.core.ktx.requestAppUpdateInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
-class UpdateCheckerImpl
+class PlayStoreUpdateCheckerImpl
     @Inject
     constructor(
         @param:ApplicationContext private val context: Context,
         private val playInAppUpdateSession: PlayInAppUpdateSession,
-    ) : UpdateChecker {
+    ) : PlayStoreUpdateChecker {
         override suspend fun checkForUpdate(): UpdateInfo? {
             val manager = AppUpdateManagerFactory.create(context)
             val appUpdateInfo =
                 try {
                     manager.requestAppUpdateInfo()
-                } catch (_: Exception) {
+                } catch (error: Exception) {
                     playInAppUpdateSession.clearPendingPlayUpdate()
-                    return null
+                    throw error
                 }
 
             when (appUpdateInfo.updateAvailability()) {

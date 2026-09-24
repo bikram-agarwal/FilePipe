@@ -194,6 +194,7 @@ internal fun SettingsInfoDropdown(
     modifier: Modifier = Modifier,
     title: String? = null,
     iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    bulletItems: List<String> = emptyList(),
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
@@ -235,6 +236,24 @@ internal fun SettingsInfoDropdown(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+                bulletItems.forEach { item ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "\u2022",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = item,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
     }

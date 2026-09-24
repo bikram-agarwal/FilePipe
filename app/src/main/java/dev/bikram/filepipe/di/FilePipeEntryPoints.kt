@@ -14,7 +14,6 @@ import dev.bikram.filepipe.update.PlayInAppUpdateStarter
 import dev.bikram.filepipe.update.PlayUpdateSessionHandle
 import dev.bikram.filepipe.update.UpdateAvailableNotifier
 import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
-import dev.bikram.filepipe.update.UpdateChecker
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
@@ -26,8 +25,6 @@ interface SettingsDependenciesEntryPoint {
     fun importRulesUseCase(): ImportRulesUseCase
 
     fun rulesAutoExportTrigger(): RulesAutoExportTrigger
-
-    fun updateChecker(): UpdateChecker
 
     fun playInAppUpdateStarter(): PlayInAppUpdateStarter
 

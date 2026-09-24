@@ -14,3 +14,8 @@ interface PlayInAppUpdateStarter {
         launcher: ActivityResultLauncher<IntentSenderRequest>,
     ): Boolean
 }
+
+interface PlayStoreUpdateChecker {
+    /** Null when Play reports no update; throws when Play can't be queried, so callers can show "check failed". */
+    suspend fun checkForUpdate(): UpdateInfo?
+}

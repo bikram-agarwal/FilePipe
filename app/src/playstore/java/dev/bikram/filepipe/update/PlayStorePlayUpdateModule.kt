@@ -27,5 +27,9 @@ abstract class PlayStorePlayUpdateModule {
 
     @Binds
     @Singleton
+    abstract fun bindPlayStoreUpdateChecker(impl: PlayStoreUpdateCheckerImpl): PlayStoreUpdateChecker
+
+    @Binds
+    @Singleton
     abstract fun bindAppReviewLauncher(impl: PlayStoreAppReviewLauncher): AppReviewLauncher
 }

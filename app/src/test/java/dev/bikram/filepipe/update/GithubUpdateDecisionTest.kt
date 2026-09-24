@@ -61,20 +61,20 @@ class GithubUpdateDecisionTest {
                 listOf(
                     GithubAsset(
                         name = "filepipe-v3.10.1-fdroid.apk",
-                        browser_download_url = "https://example.com/fdroid.apk",
+                        browserDownloadUrl = "https://example.com/fdroid.apk",
                     ),
                     GithubAsset(
                         name = "filepipe-v3.10.1-github.apk",
-                        browser_download_url = "https://example.com/github.apk",
+                        browserDownloadUrl = "https://example.com/github.apk",
                     ),
                     GithubAsset(
                         name = "filepipe-v3.10.1-offline.apk",
-                        browser_download_url = "https://example.com/offline.apk",
+                        browserDownloadUrl = "https://example.com/offline.apk",
                     ),
                 ),
             )
         assertEquals("filepipe-v3.10.1-github.apk", selected?.name)
-        assertEquals("https://example.com/github.apk", selected?.browser_download_url)
+        assertEquals("https://example.com/github.apk", selected?.browserDownloadUrl)
     }
 
     @Test
@@ -84,11 +84,11 @@ class GithubUpdateDecisionTest {
                 listOf(
                     GithubAsset(
                         name = "filepipe-v3.10.1-fdroid.apk",
-                        browser_download_url = "https://example.com/fdroid.apk",
+                        browserDownloadUrl = "https://example.com/fdroid.apk",
                     ),
                     GithubAsset(
                         name = "filepipe-v3.10.1-offline.apk",
-                        browser_download_url = "https://example.com/offline.apk",
+                        browserDownloadUrl = "https://example.com/offline.apk",
                     ),
                 ),
             )
