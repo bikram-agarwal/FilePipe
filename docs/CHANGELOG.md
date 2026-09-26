@@ -1,7 +1,8 @@
-## v3.11.1 Offline flavor, Tablet layout fix
+## v3.11.3 Offline flavor, Tablet layout fix
 
 ### ✨ New Features
 - New Offline build with no internet permission and no in-app update checks.
+- GitHub, F-Droid, and Offline builds can be directly shared to ObtainX for update tracking. 
 
 ### 🐛 Bug Fixes
 - GitHub builds no longer download the F-Droid APK when checking for updates.
@@ -9,6 +10,8 @@
 - Fixed cases where Display size settings made the whole app look too small on some devices.
 - If update check fails, the update screen now says "*Couldn't check for updates*" instead of wrongly saying "*You're up to date*". 
 - If a scheduled update check fails, FilePipe now retries up to 3 times over the next few minutes before waiting for the next scheduled check.
+- About links open in their own window, so the browser or store no longer sits inside FilePipe in Recents.
+- Play and Offline builds now show the GitHub button in About.
 
 ---
 

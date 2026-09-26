@@ -831,6 +831,10 @@
     <string name="settings_update_check_failed">Couldn\'t check for updates</string>
     <string name="settings_update_download_failed">Could not download update</string>
     <string name="settings_check_for_updates">Check for updates</string>
+    <string name="settings_track_updates_via_obtainx">Track updates via ObtainX</string>
+    <string name="settings_track_updates_via_obtainx_desc">Let ObtainX track and install updates for this app</string>
+    <string name="settings_track_updates_via_obtainx_desc_fdroid">Let ObtainX check F-Droid for updates of this app</string>
+    <string name="settings_track_updates_via_obtainx_get_desc">Get ObtainX to receive updates automatically</string>
     <string name="settings_open_fdroid">Open F-Droid</string>
     <string name="settings_download_install">Download update (v%1$s)</string>
     <string name="settings_downloading">Downloading…</string>

@@ -12,6 +12,14 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
+val filePipeApplicationId = "dev.bikram.filepipe"
+val filePipeCompileSdk = 37
+val filePipeCompileSdkMinor = 2
+val filePipeMinSdk = 31
+val filePipeTargetSdk = 37
+val versionCode = 31103
+val versionName = "3.11.3"
+
 kotlin {
     jvmToolchain(
         libs.versions.java
@@ -56,20 +64,20 @@ val previewVersionSuffix =
     providers.gradleProperty("previewVersionSuffix").orNull?.takeIf { it.isNotBlank() }
 
 extensions.configure<ApplicationExtension>("android") {
-    val filePipeApplicationId = "dev.bikram.filepipe"
     namespace = filePipeApplicationId
     compileSdk {
         version =
-            release(37) {
-                minorApiLevel = 2
+            release(filePipeCompileSdk) {
+                minorApiLevel = filePipeCompileSdkMinor
             }
     }
+    defaultConfig.versionCode = versionCode
+    defaultConfig.versionName = versionName
+
     defaultConfig {
         applicationId = filePipeApplicationId
-        minSdk = 31
-        targetSdk = 37
-        versionCode = 31101
-        versionName = "3.11.1"
+        minSdk = filePipeMinSdk
+        targetSdk = filePipeTargetSdk
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

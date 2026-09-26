@@ -72,10 +72,10 @@ import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.feedback.appCombinedClickable
 import dev.bikram.filepipe.ui.theme.compactControlShape
 import dev.bikram.filepipe.ui.theme.pillShape
+import dev.bikram.filepipe.update.OBTAINX_PACKAGE_ID
 import kotlinx.coroutines.launch
 
 private const val REMEMBER_FDROID_PACKAGE_ID = "dev.bikram.remember.gh"
-private const val OBTAINX_FDROID_PACKAGE_ID = "dev.bikram.obtainx"
 private const val DEVELOPER_OPTIONS_UNLOCK_TAPS = 7
 
 private data class AboutAppRoute(
@@ -123,7 +123,7 @@ private fun AboutOtherAppsAndLinks(
         )
     val obtainXRoute =
         AboutAppRoute(
-            packageId = OBTAINX_FDROID_PACKAGE_ID,
+            packageId = OBTAINX_PACKAGE_ID,
             portfolioUrl = stringResource(R.string.settings_about_obtainx_website_url),
         )
     val websiteUrl = stringResource(R.string.settings_about_filepipe_website_url)

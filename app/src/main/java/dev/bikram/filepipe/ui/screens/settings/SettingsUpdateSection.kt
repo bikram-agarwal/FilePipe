@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +53,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
@@ -59,11 +66,17 @@ import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
+import dev.bikram.filepipe.ui.components.containers.GroupPosition
+import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
+import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.components.text.SimpleMarkdown
 import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.theme.compactControlShape
 import dev.bikram.filepipe.ui.theme.pillShape
 import dev.bikram.filepipe.update.UpdateInfo
+import dev.bikram.filepipe.update.isObtainXInstalled
+import dev.bikram.filepipe.update.supportsObtainXTracking
+import dev.bikram.filepipe.update.trackUpdatesViaObtainX
 import kotlinx.coroutines.launch
 
 @Composable
@@ -670,6 +683,119 @@ internal fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
             modifier = Modifier.align(Alignment.Center),
         )
     }
+}
+
+/** The check-for-updates row is last unless the ObtainX row follows it. */
+internal fun checkForUpdatesRowPosition(): GroupPosition = if (supportsObtainXTracking) GroupPosition.MIDDLE else GroupPosition.LAST
+
+/**
+ * Offline can't check for updates itself, so ObtainX is its only update option. The single-list
+ * settings page shows it as a card of its own instead of an Updates section holding one row. The
+ * two-pane layout keeps that Updates section, because its section list is how the option is reached.
+ */
+private val obtainXIsOnlyUpdateOption: Boolean
+    get() = supportsObtainXTracking && !BuildConfig.CHECK_UPDATES
+
+/** Whether the Updates section is emitted. [singleList] is the phone layout, with no section selected. */
+internal fun showsUpdatesSection(singleList: Boolean): Boolean = BuildConfig.CHECK_UPDATES || (obtainXIsOnlyUpdateOption && !singleList)
+
+/** Whether the ObtainX card stands on its own on the settings page. See [showsUpdatesSection]. */
+internal fun showsStandaloneObtainXCard(singleList: Boolean): Boolean = obtainXIsOnlyUpdateOption && singleList
+
+/**
+ * The ObtainX item inside the Updates section: last after the update-check rows, or the only row in
+ * the offline two-pane layout. Absent on Play.
+ */
+@Composable
+internal fun TrackUpdatesViaObtainXItem() {
+    if (!supportsObtainXTracking) return
+    GroupedListItem(position = if (BuildConfig.CHECK_UPDATES) GroupPosition.LAST else GroupPosition.ONLY) {
+        TrackUpdatesViaObtainXRow()
+    }
+}
+
+/** The ObtainX row as its own card, outside any section. See [showsStandaloneObtainXCard]. */
+@Composable
+internal fun StandaloneTrackUpdatesViaObtainXCard(modifier: Modifier = Modifier) {
+    GroupedListColumn(modifier = modifier) {
+        GroupedListItem(position = GroupPosition.ONLY) {
+            TrackUpdatesViaObtainXRow()
+        }
+    }
+}
+
+/**
+ * Row that hands this build to ObtainX, or opens ObtainX's page when it isn't installed. Offered on
+ * every non-Play flavor; on offline it is the only way to get updates without installing them by
+ * hand.
+ */
+@Composable
+internal fun TrackUpdatesViaObtainXRow(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val obtainXInstalled = rememberObtainXInstalled()
+    val subtitleRes =
+        when {
+            !obtainXInstalled -> R.string.settings_track_updates_via_obtainx_get_desc
+            BuildConfig.FLAVOR == "fdroid" -> R.string.settings_track_updates_via_obtainx_desc_fdroid
+            else -> R.string.settings_track_updates_via_obtainx_desc
+        }
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .appClickable { trackUpdatesViaObtainX(context) }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.logo_obtainx),
+            contentDescription = null,
+            modifier =
+                Modifier
+                    .size(24.dp)
+                    .clip(MaterialTheme.shapes.extraSmall),
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.settings_track_updates_via_obtainx),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = stringResource(subtitleRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        SettingsArrowOutwardBadge()
+    }
+}
+
+/** Re-checked on resume, so the subtitle updates when the user comes back after installing ObtainX. */
+@Composable
+private fun rememberObtainXInstalled(): Boolean {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var installed by remember(context) { mutableStateOf(isObtainXInstalled(context)) }
+
+    DisposableEffect(context, lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    installed = isObtainXInstalled(context)
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    return installed
 }
 
 internal fun openFdroidPackagePage(context: Context) {

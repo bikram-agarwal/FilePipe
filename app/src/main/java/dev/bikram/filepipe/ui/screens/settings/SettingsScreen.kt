@@ -255,16 +255,30 @@ private fun settingsSectionScrollIndex(
         .count { section -> isRendered(section) }
 }
 
+// The two-pane section list. On offline it keeps Updates for the ObtainX row, which the single-list
+// page shows as a standalone card instead (showsUpdatesSection / showsStandaloneObtainXCard).
 val settingsPaneSections: List<SettingsSectionKey>
     get() =
         SettingsSectionKey.entries.filter { sectionKey ->
             sectionKey != SettingsSectionKey.DeveloperOptions &&
-                (sectionKey != SettingsSectionKey.Updates || BuildConfig.CHECK_UPDATES)
+                (sectionKey != SettingsSectionKey.Updates || showsUpdatesSection(singleList = false))
         }
 
+/**
+ * Route keys of the sections the page emits with a collapse control. About has none, and Updates is
+ * left out wherever it isn't emitted, so "all sections collapsed" can still become true.
+ */
+private fun expandableSettingsSectionKeys(singleList: Boolean): Set<String> =
+    settingsPaneSections
+        .filter { sectionKey ->
+            sectionKey != SettingsSectionKey.About &&
+                (sectionKey != SettingsSectionKey.Updates || showsUpdatesSection(singleList))
+        }.map { sectionKey -> sectionKey.routeKey }
+        .toSet()
+
 // Resolved from the enum rather than a hand-maintained `when`, so a routeKey has exactly one home.
-// settingsPaneSections already excludes DeveloperOptions and hides Updates unless CHECK_UPDATES,
-// which is precisely the set this used to accept.
+// settingsPaneSections already excludes DeveloperOptions, which is precisely the set this used to
+// accept.
 fun settingsSectionKeyForHighlight(highlightSectionKey: String?): SettingsSectionKey? {
     val routeKey = highlightSectionKey?.substringBefore(".") ?: return null
     return settingsPaneSections.firstOrNull { section ->
@@ -356,6 +370,7 @@ fun SettingsScreen(
             initialFirstVisibleItemScrollOffset = SettingsScreenSessionState.listFirstVisibleItemScrollOffset,
         )
     val forceExpandedSections = selectedSectionKey != null
+    val singleList = selectedSectionKey == null
 
     fun shouldRenderSection(sectionKey: SettingsSectionKey): Boolean = selectedSectionKey == null || selectedSectionKey == sectionKey
 
@@ -382,13 +397,7 @@ fun SettingsScreen(
     // Derived from the enum, not a duplicate hardcoded list. When this was hand-maintained, renaming
     // a routeKey made the stored key fail this filter and updateCollapsedSettingsSectionKeys wrote
     // the filtered set back - permanently discarding that section's collapsed state.
-    val settingsExpandableSectionKeys =
-        remember {
-            settingsPaneSections
-                .filter { sectionKey -> sectionKey != SettingsSectionKey.About }
-                .map { sectionKey -> sectionKey.routeKey }
-                .toSet()
-        }
+    val settingsExpandableSectionKeys = remember(singleList) { expandableSettingsSectionKeys(singleList) }
     var collapsedSettingsSectionKeys by rememberSaveable {
         mutableStateOf<Set<String>?>(null)
     }
@@ -1287,7 +1296,7 @@ fun SettingsScreen(
             }
 
             // ── Updates (GitHub APK or Play in-app updates by flavor) ─────────
-            if (BuildConfig.CHECK_UPDATES && shouldRenderSection(SettingsSectionKey.Updates)) {
+            if (showsUpdatesSection(singleList) && shouldRenderSection(SettingsSectionKey.Updates)) {
                 item {
                     Column {
                         SettingsExpandableSection(
@@ -1300,110 +1309,121 @@ fun SettingsScreen(
                             forceExpanded = forceExpandedSections,
                         ) {
                             GroupedListColumn {
-                                GroupedListItem(position = GroupPosition.FIRST) {
-                                    UpdateCheckScheduleDropdown(
-                                        selected = preferences.updateCheckSchedule,
-                                        onSelect = { schedule ->
-                                            viewModel.setUpdateCheckSchedule(schedule)
-                                        },
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    )
-                                }
-                                if (BuildConfig.FLAVOR == "github") {
+                                if (BuildConfig.CHECK_UPDATES) {
+                                    GroupedListItem(position = GroupPosition.FIRST) {
+                                        UpdateCheckScheduleDropdown(
+                                            selected = preferences.updateCheckSchedule,
+                                            onSelect = { schedule ->
+                                                viewModel.setUpdateCheckSchedule(schedule)
+                                            },
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                        )
+                                    }
+                                    if (BuildConfig.FLAVOR == "github") {
+                                        GroupedListItem(position = GroupPosition.MIDDLE) {
+                                            SettingsToggleRow(
+                                                title = stringResource(R.string.settings_save_update_apk_to_downloads),
+                                                checked = preferences.saveUpdateApkToDownloads,
+                                                onCheckedChange = viewModel::setSaveUpdateApkToDownloads,
+                                            )
+                                        }
+                                    }
                                     GroupedListItem(position = GroupPosition.MIDDLE) {
                                         SettingsToggleRow(
-                                            title = stringResource(R.string.settings_save_update_apk_to_downloads),
-                                            checked = preferences.saveUpdateApkToDownloads,
-                                            onCheckedChange = viewModel::setSaveUpdateApkToDownloads,
-                                        )
-                                    }
-                                }
-                                GroupedListItem(position = GroupPosition.MIDDLE) {
-                                    SettingsToggleRow(
-                                        title = stringResource(R.string.settings_notify_new_updates),
-                                        checked = preferences.notifyOnNewUpdates,
-                                        onCheckedChange = { enabled ->
-                                            when {
-                                                !enabled -> {
-                                                    pendingEnableUpdateNotificationsAfterPermission = false
-                                                    viewModel.setNotifyOnNewUpdates(false)
-                                                }
+                                            title = stringResource(R.string.settings_notify_new_updates),
+                                            checked = preferences.notifyOnNewUpdates,
+                                            onCheckedChange = { enabled ->
+                                                when {
+                                                    !enabled -> {
+                                                        pendingEnableUpdateNotificationsAfterPermission = false
+                                                        viewModel.setNotifyOnNewUpdates(false)
+                                                    }
 
-                                                preferences.updateCheckSchedule == UpdateCheckSchedule.NEVER -> {
-                                                    coroutineScope.launch {
-                                                        snackbarHostState.showSnackbar(
-                                                            resources.getString(
-                                                                R.string.settings_notify_updates_need_auto_check,
-                                                            ),
-                                                        )
+                                                    preferences.updateCheckSchedule == UpdateCheckSchedule.NEVER -> {
+                                                        coroutineScope.launch {
+                                                            snackbarHostState.showSnackbar(
+                                                                resources.getString(
+                                                                    R.string.settings_notify_updates_need_auto_check,
+                                                                ),
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                                        ContextCompat.checkSelfPermission(
+                                                            context,
+                                                            Manifest.permission.POST_NOTIFICATIONS,
+                                                        ) != PackageManager.PERMISSION_GRANTED -> {
+                                                        pendingEnableUpdateNotificationsAfterPermission = true
+                                                        requestPostNotificationPermissionOrOpenAppSettings()
+                                                    }
+
+                                                    !NotificationManagerCompat.from(context).areNotificationsEnabled() -> {
+                                                        coroutineScope.launch {
+                                                            snackbarHostState.showSnackbar(
+                                                                resources.getString(
+                                                                    R.string.settings_notify_updates_enable_notifications,
+                                                                ),
+                                                            )
+                                                        }
+                                                        viewModel.openAppNotificationSettings()
+                                                    }
+
+                                                    else -> {
+                                                        viewModel.setNotifyOnNewUpdates(true)
                                                     }
                                                 }
-
-                                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                                    ContextCompat.checkSelfPermission(
-                                                        context,
-                                                        Manifest.permission.POST_NOTIFICATIONS,
-                                                    ) != PackageManager.PERMISSION_GRANTED -> {
-                                                    pendingEnableUpdateNotificationsAfterPermission = true
-                                                    requestPostNotificationPermissionOrOpenAppSettings()
-                                                }
-
-                                                !NotificationManagerCompat.from(context).areNotificationsEnabled() -> {
-                                                    coroutineScope.launch {
-                                                        snackbarHostState.showSnackbar(
-                                                            resources.getString(
-                                                                R.string.settings_notify_updates_enable_notifications,
-                                                            ),
-                                                        )
-                                                    }
-                                                    viewModel.openAppNotificationSettings()
-                                                }
-
-                                                else -> {
-                                                    viewModel.setNotifyOnNewUpdates(true)
-                                                }
-                                            }
-                                        },
-                                    )
-                                }
-                                GroupedListItem(position = GroupPosition.LAST) {
-                                    ListItem(
-                                        leadingContent = {
-                                            FilePipeMaterialRoundedSymbol(
-                                                name = "new_releases",
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                            )
-                                        },
-                                        modifier =
-                                            Modifier.appClickable {
-                                                onUpdateCheckStarted()
-                                                updateVm.openSheetFromSettingsRow()
                                             },
-                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    ) {
-                                        val available = updateInfo
-                                        Text(
-                                            text =
-                                                if (available != null) {
-                                                    stringResource(
-                                                        R.string.settings_update_available_button,
-                                                        available.versionName,
-                                                    )
-                                                } else {
-                                                    stringResource(R.string.settings_check_for_updates)
-                                                },
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.SemiBold,
                                         )
                                     }
+                                    // PARITY: Remember has the same row as CheckForUpdatesRow in
+                                    // SettingsUpdateSection.kt.
+                                    GroupedListItem(position = checkForUpdatesRowPosition()) {
+                                        ListItem(
+                                            leadingContent = {
+                                                FilePipeMaterialRoundedSymbol(
+                                                    name = "new_releases",
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                )
+                                            },
+                                            modifier =
+                                                Modifier.appClickable {
+                                                    onUpdateCheckStarted()
+                                                    updateVm.openSheetFromSettingsRow()
+                                                },
+                                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                        ) {
+                                            val available = updateInfo
+                                            Text(
+                                                text =
+                                                    if (available != null) {
+                                                        stringResource(
+                                                            R.string.settings_update_available_button,
+                                                            available.versionName,
+                                                        )
+                                                    } else {
+                                                        stringResource(R.string.settings_check_for_updates)
+                                                    },
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                        }
+                                    }
                                 }
+                                TrackUpdatesViaObtainXItem()
                             }
                         }
                     }
+                }
+            }
+
+            if (showsStandaloneObtainXCard(singleList)) {
+                item {
+                    StandaloneTrackUpdatesViaObtainXCard()
                 }
             }
 
@@ -1423,10 +1443,12 @@ fun SettingsScreen(
                     AboutSection(
                         modifier =
                             Modifier.padding(
+                                // No extra room after a standalone item (the dev options entry,
+                                // offline's ObtainX card): the list's normal spacing is enough.
                                 top =
                                     if (isSmallLandscape) {
                                         12.dp
-                                    } else if (developerOptionsEnabled) {
+                                    } else if (developerOptionsEnabled || showsStandaloneObtainXCard(singleList)) {
                                         0.dp
                                     } else {
                                         24.dp

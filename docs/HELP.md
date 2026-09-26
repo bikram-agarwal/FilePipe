@@ -203,6 +203,6 @@
 ### What's different in the Offline flavor
 - The Offline flavor is a separate build of FilePipe with no internet permission at all. It's available from GitHub Releases as `filepipe-v<version>-offline.apk`.
 - **No internet permission.** FilePipe can't connect to internet.
-- **No update checks.** Settings has no Updates section. Install a newer offline APK from GitHub Releases by hand.
+- **No update checks.** FilePipe can't look for new versions itself. Use **Track updates via ObtainX** on the Settings page (under Updates on tablets), or install a newer offline APK from GitHub Releases by hand.
 - **No changelog after an update.** The other versions show what's new the first time you open them after updating.
 - **Installs alongside the other versions** as a separate app, with its own rules, history, and settings. To move your rules over, make a backup in one and restore it in the other, then re-pick your folders so Android grants access to the new app.

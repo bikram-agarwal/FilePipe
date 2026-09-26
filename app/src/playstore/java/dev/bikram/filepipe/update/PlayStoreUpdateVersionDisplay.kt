@@ -4,15 +4,14 @@ import com.google.android.play.core.appupdate.AppUpdateInfo
 
 /**
  * Maps Play's [AppUpdateInfo.availableVersionCode] to a user-visible version string (no "v" prefix).
- * FilePipe encodes semantic version in [versionCode] as major*100 + minor*10 + patch with
- * single-digit minor and patch (for example 304 → 3.0.4).
+ * Version code is major*10000 + minor*100 + patch, two digits each for minor and patch (31102 → 3.11.2).
  */
 internal fun semanticVersionNameFromPlayStoreVersionCode(versionCode: Int): String {
     if (versionCode <= 0) return ""
-    if (versionCode > 99_999) return versionCode.toString()
-    val major = versionCode / 100
-    val minor = (versionCode / 10) % 10
-    val patch = versionCode % 10
+    if (versionCode > 999_999) return versionCode.toString()
+    val major = versionCode / 10_000
+    val minor = (versionCode / 100) % 100
+    val patch = versionCode % 100
     return "$major.$minor.$patch"
 }
 

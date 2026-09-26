@@ -1,3 +1,9 @@
+🏆 Featured in “The Best Android Apps of 2026!”
+
+By Sam Beckman - https://youtu.be/9q1yhqX2DD4?t=543
+
+---
+
 FilePipe is a powerful file management tool that turns your chaotic Download and other messy folders into a perfectly organized library — automatically. 🚀
 
 Ever wanted all your videos in one folder, regardless of which app downloaded them? Or wished your Downloads folder would just sort itself into Documents, Music, Images, and everything else?
@@ -5,7 +11,7 @@ Ever wanted all your videos in one folder, regardless of which app downloaded th
 That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let the pipes do the work. Move or copy any media to its rightful place.
 
 <b>━━ 📋 RULES ━━</b>
-Use templates to start fast, or build your own. Create a rule by choosing source folders, file extensions, and a destination. Each rule can move, copy or delete files, and you control what happens when a filename collision occurs — skip, overwrite, or rename automatically. Rules can scan subfolders recursively and each one gets its own schedule.
+Use templates to start fast or build your own. Create a rule by choosing source folders, file types, and a destination. Types can be specific extensions, All files, or No extension for names with no file type. Each rule can move, copy or delete files, and you control what happens when a filename collision occurs — skip, overwrite, or rename automatically. Rules can scan subfolders recursively and each one gets its own schedule.
 
 Moved files keep their original date and time (copies too, with All files access), so they stay in the right order in your gallery and file manager instead of showing up as brand new.
 

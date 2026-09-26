@@ -155,21 +155,27 @@ internal fun SettingsStandaloneNavigationRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .clip(MaterialTheme.shapes.extraExtraLarge)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center,
-        ) {
-            FilePipeMaterialRoundedSymbol(
-                name = "arrow_outward",
-                contentDescription = null,
-                size = 20.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        SettingsArrowOutwardBadge()
+    }
+}
+
+/** Trailing badge for settings rows that leave the settings list (Developer options, ObtainX). */
+@Composable
+internal fun SettingsArrowOutwardBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier =
+            modifier
+                .size(32.dp)
+                .clip(MaterialTheme.shapes.extraExtraLarge)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        FilePipeMaterialRoundedSymbol(
+            name = "arrow_outward",
+            contentDescription = null,
+            size = 20.dp,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
