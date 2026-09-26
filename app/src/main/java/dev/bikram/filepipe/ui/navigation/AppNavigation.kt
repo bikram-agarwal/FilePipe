@@ -136,7 +136,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -333,7 +332,7 @@ fun AppNavigation(
     var alertBarsExpanded by rememberSaveable { mutableStateOf(false) }
     var lastPresentedAlertKey by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val updateAvailable = BuildConfig.SHOW_UPDATES && updateInfo != null && showBottomBar
+    val updateAvailable = BuildConfig.CHECK_UPDATES && updateInfo != null && showBottomBar
     val updateBarState =
         if (!showBottomBar) {
             UpdateChromeState.Hidden
@@ -445,7 +444,7 @@ fun AppNavigation(
             val poppedToSettings = navController.popBackStack(Screen.Settings.route, inclusive = false)
             if (!poppedToSettings) {
                 navController.navigate(Screen.Settings.route) {
-                    popUpTo(navController.graph.findStartDestination().id) {
+                    popUpTo(Screen.Rules.route) {
                         saveState = true
                     }
                     launchSingleTop = true
@@ -464,7 +463,7 @@ fun AppNavigation(
 
     LaunchedEffect(hasSeenIntro, preferences.updateCheckSchedule) {
         if (hasSeenIntro &&
-            BuildConfig.SHOW_UPDATES &&
+            BuildConfig.CHECK_UPDATES &&
             preferences.updateCheckSchedule == UpdateCheckSchedule.AT_APP_START
         ) {
             updateVm.checkForUpdate(silent = true)
@@ -486,7 +485,7 @@ fun AppNavigation(
     LaunchedEffect(hasSeenIntro, pendingOpenHistory, navController) {
         if (!pendingOpenHistory || !hasSeenIntro) return@LaunchedEffect
         navController.navigate(Screen.History.route) {
-            popUpTo(navController.graph.findStartDestination().id) {
+            popUpTo(Screen.Rules.route) {
                 saveState = true
             }
             launchSingleTop = true
@@ -502,7 +501,7 @@ fun AppNavigation(
         // navigation from the detail screen lands on History instead of falling through to
         // whatever the default start tab is.
         navController.navigate(Screen.History.route) {
-            popUpTo(navController.graph.findStartDestination().id) {
+            popUpTo(Screen.Rules.route) {
                 saveState = true
             }
             launchSingleTop = true
@@ -654,7 +653,7 @@ fun AppNavigation(
             val openUpdateSheetFromChrome = {
                 updateVm.requestOpenSheet()
                 navController.navigate(Screen.Settings.route) {
-                    popUpTo(navController.graph.findStartDestination().id) {
+                    popUpTo(Screen.Rules.route) {
                         saveState = true
                     }
                     launchSingleTop = true
@@ -853,7 +852,7 @@ fun AppNavigation(
                                         },
                                         onNavigateToHistoryList = {
                                             navController.navigate(Screen.History.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                popUpTo(Screen.Rules.route) {
                                                     saveState = true
                                                 }
                                                 launchSingleTop = true
@@ -878,7 +877,7 @@ fun AppNavigation(
                                         },
                                         onNavigateToHistoryList = {
                                             navController.navigate(Screen.History.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                popUpTo(Screen.Rules.route) {
                                                     saveState = true
                                                 }
                                                 launchSingleTop = true
@@ -1277,9 +1276,17 @@ fun AppNavigation(
                             FloatingNavBar(
                                 items = bottomNavItems,
                                 currentDestination = currentDestination,
+                                // Pops to Screen.Rules rather than to graph.findStartDestination().
+                                // Rules is always the root of the back stack once tabs are
+                                // reachable - every onboarding exit re-roots onto it - but the
+                                // graph's *nominal* start destination stays OnboardingTitle for the
+                                // rest of a first-run session, and by then it is no longer on the
+                                // back stack at all. A popUpTo that matches nothing silently pops
+                                // nothing, so tab taps would stack up instead of returning to the
+                                // root. PARITY: same anchor as Remember's openMainTab.
                                 onItemClick = { item ->
                                     navController.navigate(item.screen.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
+                                        popUpTo(Screen.Rules.route) {
                                             saveState = true
                                         }
                                         launchSingleTop = true
@@ -1366,7 +1373,7 @@ fun AppNavigation(
                             selected = selected,
                             onClick = {
                                 navController.navigate(navItem.screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
+                                    popUpTo(Screen.Rules.route) {
                                         saveState = true
                                     }
                                     launchSingleTop = true
@@ -2663,6 +2670,12 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryTabEnterTra
     val targetOrdinal = mainTabRouteOrdinals[targetState.destination.route] ?: return null
     return if (reducedMotion) {
         EnterTransition.None
+    } else if (initialOrdinal == targetOrdinal) {
+        // The same tab on both sides means the back stack was rebuilt under us, not that the user
+        // moved between tabs. There is no relative position to convey, so either slide direction
+        // would be a lie about where the screen came from. Fading here rather than returning null
+        // because null defers to the caller's slide fallback.
+        fadeIn(animationSpec = fadeInSpec)
     } else if (targetOrdinal > initialOrdinal) {
         if (verticalMotion) {
             slideInVertically(animationSpec = spatialSpec) { it } + fadeIn(animationSpec = fadeInSpec)
@@ -2688,6 +2701,8 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryTabExitTran
     val targetOrdinal = mainTabRouteOrdinals[targetState.destination.route] ?: return null
     return if (reducedMotion) {
         ExitTransition.None
+    } else if (initialOrdinal == targetOrdinal) {
+        fadeOut(animationSpec = fadeOutSpec)
     } else if (targetOrdinal > initialOrdinal) {
         if (verticalMotion) {
             slideOutVertically(animationSpec = spatialSpec) { -it / 3 } + fadeOut(animationSpec = fadeOutSpec)

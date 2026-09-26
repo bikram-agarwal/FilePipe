@@ -60,9 +60,6 @@ class FilePipeUpdateChecker
                 if (BuildConfig.FLAVOR == "fdroid") {
                     return@withContext checkFdroidForUpdate()
                 }
-                if (BuildConfig.GITHUB_REPO.isBlank()) {
-                    return@withContext null
-                }
                 val url = URL("https://api.github.com/repos/${BuildConfig.GITHUB_REPO}/releases/latest")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.instanceFollowRedirects = true

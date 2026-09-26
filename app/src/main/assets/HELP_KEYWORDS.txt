@@ -65,3 +65,7 @@ regex -> regex_filters
 regular expression -> regex_filters
 pattern -> regex_filters
 invalid regex -> regex_filters
+offline -> offline_flavor_differences
+no internet -> offline_flavor_differences
+without internet -> offline_flavor_differences
+internet permission -> offline_flavor_differences

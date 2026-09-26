@@ -75,9 +75,10 @@ extensions.configure<ApplicationExtension>("android") {
 
         buildConfigField(
             "String",
-            "PLAY_STORE_LISTING_URL",
+            "PLAY_STORE_URL",
             "\"https://play.google.com/store/apps/details?id=$filePipeApplicationId\"",
         )
+        buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
 
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64", "armeabi-v7a")
@@ -156,37 +157,25 @@ extensions.configure<ApplicationExtension>("android") {
         create("fdroid") {
             dimension = "distribution"
             applicationIdSuffix = ".gh"
-            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "CHECK_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
         create("github") {
             dimension = "distribution"
             applicationIdSuffix = ".gh"
-            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "CHECK_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
         create("offline") {
             dimension = "distribution"
             applicationIdSuffix = ".offline"
-            buildConfigField("String", "GITHUB_REPO", "\"\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "false")
+            buildConfigField("Boolean", "CHECK_UPDATES", "false")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"\"")
         }
         create("playstore") {
             dimension = "distribution"
-            buildConfigField("String", "GITHUB_REPO", "\"\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "CHECK_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "true")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
     }
 

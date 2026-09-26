@@ -57,6 +57,7 @@ private val sectionOptionsByTitle =
         "Privacy & permissions" to SectionOptions("privacy_permissions"),
         "Backup & restore" to SectionOptions("backup_restore"),
         "Customization" to SectionOptions("customization"),
+        "Offline flavor" to SectionOptions("offline_flavor"),
     )
 
 private val itemOptionsByTitle =
@@ -101,6 +102,7 @@ private val itemOptionsByTitle =
         "Theme and appearance" to ItemOptions("theme_appearance"),
         "Colors" to ItemOptions("colors"),
         "Visual effects" to ItemOptions("visual_effects"),
+        "What's different in the Offline flavor" to ItemOptions("offline_flavor_differences"),
     )
 
 fun parseHelpContent(markdown: String): List<FaqSectionContent> {

@@ -259,11 +259,11 @@ val settingsPaneSections: List<SettingsSectionKey>
     get() =
         SettingsSectionKey.entries.filter { sectionKey ->
             sectionKey != SettingsSectionKey.DeveloperOptions &&
-                (sectionKey != SettingsSectionKey.Updates || BuildConfig.SHOW_UPDATES)
+                (sectionKey != SettingsSectionKey.Updates || BuildConfig.CHECK_UPDATES)
         }
 
 // Resolved from the enum rather than a hand-maintained `when`, so a routeKey has exactly one home.
-// settingsPaneSections already excludes DeveloperOptions and hides Updates unless SHOW_UPDATES,
+// settingsPaneSections already excludes DeveloperOptions and hides Updates unless CHECK_UPDATES,
 // which is precisely the set this used to accept.
 fun settingsSectionKeyForHighlight(highlightSectionKey: String?): SettingsSectionKey? {
     val routeKey = highlightSectionKey?.substringBefore(".") ?: return null
@@ -669,14 +669,14 @@ fun SettingsScreen(
     }
 
     LaunchedEffect(openSheetRequested) {
-        if (!openSheetRequested || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
+        if (!openSheetRequested || !BuildConfig.CHECK_UPDATES) return@LaunchedEffect
         onUpdateCheckStarted()
         updateVm.markOpenSheetHandled()
         updateVm.openSheetAndCheck()
     }
 
     LaunchedEffect(openUpdateSheetFromRulesPromo) {
-        if (!openUpdateSheetFromRulesPromo || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
+        if (!openUpdateSheetFromRulesPromo || !BuildConfig.CHECK_UPDATES) return@LaunchedEffect
         updateVm.openSheetFromRulesPromo()
         updateVm.consumeOpenUpdateSheetFromRulesPromo()
     }
@@ -689,7 +689,7 @@ fun SettingsScreen(
         updateVm.consumeStartPlayInAppUpdateAfterRulesPromoSheet()
     }
 
-    if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
+    if (showUpdateSheet && BuildConfig.CHECK_UPDATES) {
         val updateSheetState =
             rememberBottomSheetState(
                 initialValue = SheetValue.Expanded,
@@ -1287,7 +1287,7 @@ fun SettingsScreen(
             }
 
             // ── Updates (GitHub APK or Play in-app updates by flavor) ─────────
-            if (BuildConfig.SHOW_UPDATES && shouldRenderSection(SettingsSectionKey.Updates)) {
+            if (BuildConfig.CHECK_UPDATES && shouldRenderSection(SettingsSectionKey.Updates)) {
                 item {
                     Column {
                         SettingsExpandableSection(

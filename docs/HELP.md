@@ -195,3 +195,14 @@
 - **UI scale** makes the whole interface smaller or larger (75% to 125%). Text, icons, and spacing change together.
 - **Blur bars** apply a frosted-glass effect behind the top and bottom bars.
 - Effects can be combined or turned off individually in Settings.
+
+---
+
+## Offline flavor
+
+### What's different in the Offline flavor
+- The Offline flavor is a separate build of FilePipe with no internet permission at all. It's available from GitHub Releases as `filepipe-v<version>-offline.apk`.
+- **No internet permission.** FilePipe can't connect to internet.
+- **No update checks.** Settings has no Updates section. Install a newer offline APK from GitHub Releases by hand.
+- **No changelog after an update.** The other versions show what's new the first time you open them after updating.
+- **Installs alongside the other versions** as a separate app, with its own rules, history, and settings. To move your rules over, make a backup in one and restore it in the other, then re-pick your folders so Android grants access to the new app.

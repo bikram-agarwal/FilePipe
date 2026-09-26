@@ -189,9 +189,7 @@ class FilePipeUpdateViewModel
 
         fun openSheetFromRulesPromo() {
             _showUpdateSheet.value = true
-            if (BuildConfig.CHANGELOG_GITHUB_REPO.isNotBlank()) {
-                loadChangelogForUpdateSheet()
-            }
+            loadChangelogForUpdateSheet()
         }
 
         fun openSheetFromSettingsRow() {
@@ -204,7 +202,7 @@ class FilePipeUpdateViewModel
          * Dev release: arms the global update promo (Rules / History / Settings). Swipe the card to dismiss.
          */
         fun devReleaseMockArmRulesUpdatePromoForRulesTab() {
-            if (!BuildConfig.SHOW_UPDATES) return
+            if (!BuildConfig.CHECK_UPDATES) return
             _updateInfo.value =
                 UpdateInfo(
                     versionName = "9.9.9",
@@ -299,7 +297,7 @@ class FilePipeUpdateViewModel
                     if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.isPlayStoreUpdateInProgress) {
                         playInAppUpdateProgressController.ensureInstallStateListenerRegistered()
                     }
-                    if (BuildConfig.SHOW_UPDATES) {
+                    if (BuildConfig.CHECK_UPDATES) {
                         val prefsSnapshot = userPreferencesRepository.getPreferencesSnapshot()
                         updateAvailableNotifier.notifyIfNewUpdateAvailable(info, prefsSnapshot)
                     }
@@ -337,7 +335,7 @@ class FilePipeUpdateViewModel
                     if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.isPlayStoreUpdateInProgress) {
                         playInAppUpdateProgressController.ensureInstallStateListenerRegistered()
                     }
-                    if (BuildConfig.SHOW_UPDATES) {
+                    if (BuildConfig.CHECK_UPDATES) {
                         val prefsSnapshot = userPreferencesRepository.getPreferencesSnapshot()
                         updateAvailableNotifier.notifyIfNewUpdateAvailable(info, prefsSnapshot)
                     }
@@ -357,13 +355,6 @@ class FilePipeUpdateViewModel
 
         fun loadChangelogForUpdateSheet() =
             viewModelScope.launch {
-                if (BuildConfig.CHANGELOG_GITHUB_REPO.isBlank()) {
-                    _updateSheetChangelog.value =
-                        ChangelogUiState.Failed(
-                            context.getString(R.string.settings_changelog_load_failed),
-                        )
-                    return@launch
-                }
                 _updateSheetChangelog.value = ChangelogUiState.Loading
                 val loaded =
                     withContext(ioDispatcher) {
@@ -486,10 +477,9 @@ class FilePipeUpdateViewModel
             }
 
         private fun fetchRawChangelog(): String {
-            val repo = BuildConfig.CHANGELOG_GITHUB_REPO
-            val branch = BuildConfig.CHANGELOG_GITHUB_BRANCH
+            val repo = BuildConfig.GITHUB_REPO
             val connection =
-                URL("https://raw.githubusercontent.com/$repo/$branch/docs/CHANGELOG.md").openConnection() as
+                URL("https://raw.githubusercontent.com/$repo/main/docs/CHANGELOG.md").openConnection() as
                     HttpURLConnection
             connection.instanceFollowRedirects = true
             connection.connectTimeout = 15_000

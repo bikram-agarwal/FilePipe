@@ -341,7 +341,7 @@ class DevOptionsViewModel
 
         fun postMockUpdateNotification() {
             viewModelScope.launch {
-                if (!BuildConfig.SHOW_UPDATES) {
+                if (!BuildConfig.CHECK_UPDATES) {
                     _events.emit(context.getString(R.string.dev_options_event_updates_hidden))
                     return@launch
                 }
@@ -712,7 +712,7 @@ class DevOptionsViewModel
                 folderAccess = folderAccess,
                 database = database,
                 workers = workers,
-                showUpdates = BuildConfig.SHOW_UPDATES,
+                showUpdates = BuildConfig.CHECK_UPDATES,
                 usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
                 isGithubFlavor = BuildConfig.FLAVOR == "github",
             )

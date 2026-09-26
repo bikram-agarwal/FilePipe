@@ -196,7 +196,7 @@ class MainActivity : ComponentActivity() {
             val lastSeenVersion = userPreferencesRepository.getLastSeenAppVersion()
             val currentVersion = BuildConfig.VERSION_NAME
             val wasUpdated = !lastSeenVersion.isNullOrBlank() && lastSeenVersion != currentVersion
-            if (wasUpdated && BuildConfig.SHOW_UPDATES) {
+            if (wasUpdated && BuildConfig.CHECK_UPDATES) {
                 pendingShortcutRepository.requestOpenSettingsForUpdates()
             }
             userPreferencesRepository.setLastSeenAppVersion(currentVersion)

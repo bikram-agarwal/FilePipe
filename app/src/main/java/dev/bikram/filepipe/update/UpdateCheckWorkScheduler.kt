@@ -28,7 +28,7 @@ class UpdateCheckWorkScheduler
         private val userPreferencesRepository: Lazy<UserPreferencesRepository>,
     ) {
         suspend fun syncFromPreferences() {
-            if (!BuildConfig.SHOW_UPDATES) {
+            if (!BuildConfig.CHECK_UPDATES) {
                 workManager.cancelUniqueWork(UpdateCheckWorker.UNIQUE_WORK_NAME)
                 return
             }
