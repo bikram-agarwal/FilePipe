@@ -57,6 +57,37 @@ class FileScanOptimizationTest {
     }
 
     @Test
+    fun diskTraversalPrunesTheExcludedDestinationSubtree() {
+        val rootDirectory = Files.createTempDirectory("filepipe-scan").toFile().canonicalFile
+        try {
+            val rootFile = rootDirectory.resolve("root.jpg").apply { writeText("root") }
+            val siblingFile =
+                rootDirectory.resolve("folder1").resolve("keep.jpg").apply {
+                    parentFile!!.mkdirs()
+                    writeText("keep")
+                }
+            val destinationDirectory = rootDirectory.resolve("folder1").resolve("sub-folder2").apply { mkdirs() }
+            destinationDirectory.resolve("delivered.jpg").writeText("delivered")
+            destinationDirectory.resolve("deeper").apply {
+                mkdirs()
+                resolve("nested.jpg").writeText("nested")
+            }
+
+            val scannedFiles =
+                walkDiskFilesWithRelativeParents(
+                    dir = rootDirectory,
+                    maxDepth = MAX_SCAN_DEPTH,
+                    relativeParentSegments = emptyList(),
+                    excludedDirPath = destinationDirectory.path,
+                ).toList()
+
+            assertEquals(setOf(rootFile, siblingFile), scannedFiles.map { result -> result.first }.toSet())
+        } finally {
+            rootDirectory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun destinationSegmentsUseOneNormalizedCacheIdentity() {
         assertEquals(
             listOf("Pictures", "Trips"),

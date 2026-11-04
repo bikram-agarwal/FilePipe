@@ -17,8 +17,8 @@ val filePipeCompileSdk = 37
 val filePipeCompileSdkMinor = 2
 val filePipeMinSdk = 31
 val filePipeTargetSdk = 37
-val versionCode = 31103
-val versionName = "3.11.3"
+val versionCode = 31200
+val versionName = "3.12.0"
 
 kotlin {
     jvmToolchain(

@@ -7,6 +7,7 @@ import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.canonicalIdentity
 import dev.bikram.filepipe.data.repository.normalizeSourcePath
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.Rule
 import kotlinx.coroutines.flow.first
@@ -51,6 +52,9 @@ class SimulateRuleUseCase
                             orientation = rule.orientation,
                             isRegexPattern = rule.isRegexPattern,
                             isExcludeRegexPattern = rule.isExcludeRegexPattern,
+                            // Never rescan the destination when it sits inside a recursively scanned source.
+                            excludedFolderUriString =
+                                rule.destinationFolderPath.takeIf { rule.operationMode != OperationMode.DELETE },
                         )
                     }.distinctBy { entry -> entry.canonicalIdentity() }
 

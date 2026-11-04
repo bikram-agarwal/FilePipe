@@ -86,6 +86,7 @@ class FileOperationRepository
             isRegexPattern: Boolean = false,
             isExcludeRegexPattern: Boolean = false,
             useCache: Boolean = false,
+            excludedFolderUriString: String? = null,
         ): List<FileEntry> =
             withContext(ioDispatcher) {
                 val effectiveMaxDepth = maxDepth.coerceIn(0, MAX_SCAN_DEPTH)
@@ -105,6 +106,7 @@ class FileOperationRepository
                         filesystemAccessEnabled = filesystemAccessEnabled,
                         isRegexPattern = isRegexPattern,
                         isExcludeRegexPattern = isExcludeRegexPattern,
+                        excludedFolderUriString = excludedFolderUriString,
                     )
 
                 if (useCache) {
@@ -132,6 +134,7 @@ class FileOperationRepository
                         orientation = orientation,
                         isRegexPattern = isRegexPattern,
                         isExcludeRegexPattern = isExcludeRegexPattern,
+                        excludedFolderUriString = excludedFolderUriString,
                     )
 
                 val writeTime = System.currentTimeMillis()

@@ -33,6 +33,7 @@ internal data class ScanCacheKey(
     val filesystemAccessEnabled: Boolean,
     val isRegexPattern: Boolean,
     val isExcludeRegexPattern: Boolean,
+    val excludedFolderUriString: String?,
 )
 
 internal data class CacheEntry(
@@ -75,10 +76,15 @@ internal suspend fun FileOperationRepository.listMatchingFilesScan(
     orientation: FileOrientation? = null,
     isRegexPattern: Boolean = false,
     isExcludeRegexPattern: Boolean = false,
+    excludedFolderUriString: String? = null,
 ): List<FileEntry> =
     withContext(ioDispatcher) {
         val effectiveFolderUriString =
             folderPathForFilesystemAccess(folderUriString, filesystemAccessEnabled)
+        val effectiveExcludedFolder =
+            excludedFolderUriString
+                ?.takeIf { it.isNotBlank() }
+                ?.let { folderPathForFilesystemAccess(it, filesystemAccessEnabled) }
         if (isFilesystemFolderPathString(effectiveFolderUriString)) {
             if (!filesystemAccessEnabled) return@withContext emptyList()
             val canonical = normalizeFilesystemFolderPath(effectiveFolderUriString) ?: return@withContext emptyList()
@@ -99,6 +105,10 @@ internal suspend fun FileOperationRepository.listMatchingFilesScan(
                 orientation = orientation,
                 isRegexPattern = isRegexPattern,
                 isExcludeRegexPattern = isExcludeRegexPattern,
+                excludedDirPath =
+                    effectiveExcludedFolder
+                        ?.takeIf(::isFilesystemFolderPathString)
+                        ?.let(::normalizeFilesystemFolderPath),
             )
         }
 
@@ -139,6 +149,7 @@ internal suspend fun FileOperationRepository.listMatchingFilesScan(
                     rootDocumentId = rootDocumentId,
                     scanSubdirectories = scanSubdirectories,
                     maxDepth = maxDepth,
+                    excludedDocumentId = safExcludedDocumentId(treeUri, effectiveExcludedFolder),
                     includeFile = { document ->
                         passesCheapScanFilters(
                             fileName = document.name,
@@ -196,6 +207,7 @@ internal suspend fun FileOperationRepository.listMatchingFilesFromFilesystemRoot
     orientation: FileOrientation?,
     isRegexPattern: Boolean = false,
     isExcludeRegexPattern: Boolean = false,
+    excludedDirPath: String? = null,
 ): List<FileEntry> {
     val scanContext = currentCoroutineContext()
     val filterContext =
@@ -219,6 +231,7 @@ internal suspend fun FileOperationRepository.listMatchingFilesFromFilesystemRoot
                 maxDepth = maxDepth,
                 relativeParentSegments = emptyList(),
                 onDepthLimitReached = { depthTruncated = true },
+                excludedDirPath = excludedDirPath,
             )
         } else {
             (rootDir.listFiles()?.asSequence() ?: emptySequence())
@@ -257,11 +270,21 @@ internal suspend fun FileOperationRepository.listMatchingFilesFromFilesystemRoot
     return results
 }
 
+/**
+ * Walks [dir] depth-first, yielding each file with its folder path relative to the walk root.
+ *
+ * [excludedDirPath] (a canonical path) is pruned along with everything beneath it. The rule's
+ * destination goes here: when it sits inside a recursively scanned source, walking it would pick
+ * up files already delivered and send them back to the destination — re-nesting them one level
+ * deeper per run, renaming or duplicating them in place, or, under Overwrite, deleting the very
+ * file being "moved".
+ */
 internal fun walkDiskFilesWithRelativeParents(
     dir: File,
     maxDepth: Int,
     relativeParentSegments: List<String>,
     onDepthLimitReached: (() -> Unit)? = null,
+    excludedDirPath: String? = null,
 ): Sequence<Pair<File, List<String>>> =
     sequence {
         if (maxDepth <= 0) return@sequence
@@ -270,6 +293,7 @@ internal fun walkDiskFilesWithRelativeParents(
             if (child.isFile) {
                 yield(child to relativeParentSegments)
             } else if (child.isDirectory && segment.isNotEmpty() && segment != "." && segment != "..") {
+                if (child.path == excludedDirPath) return@forEach
                 if (maxDepth <= 1) {
                     onDepthLimitReached?.invoke()
                 } else {
@@ -279,6 +303,7 @@ internal fun walkDiskFilesWithRelativeParents(
                             maxDepth - 1,
                             relativeParentSegments + segment,
                             onDepthLimitReached,
+                            excludedDirPath,
                         ),
                     )
                 }
@@ -410,6 +435,7 @@ internal suspend fun FileOperationRepository.collectSafFiles(
     rootDocumentId: String,
     scanSubdirectories: Boolean,
     maxDepth: Int,
+    excludedDocumentId: String? = null,
     includeFile: (SafDocEntry) -> Boolean = { true },
     onDepthLimitReached: (() -> Unit)? = null,
 ): List<Pair<SafDocEntry, List<String>>> {
@@ -426,7 +452,7 @@ internal suspend fun FileOperationRepository.collectSafFiles(
             scanContext.ensureActive()
             if (child.isFile && includeFile(child)) {
                 out += child to relativeParents
-            } else if (scanSubdirectories && child.isDirectory) {
+            } else if (scanSubdirectories && child.isDirectory && child.documentId != excludedDocumentId) {
                 val segment = child.name.trim()
                 if (segment.isNotEmpty() && segment != "." && segment != "..") {
                     if (depth <= 1) {
@@ -441,4 +467,20 @@ internal suspend fun FileOperationRepository.collectSafFiles(
 
     visit(rootDocumentId, emptyList(), if (scanSubdirectories) maxDepth else 1)
     return out
+}
+
+/**
+ * Document id of [excludedFolderUriString] as a folder inside [sourceTreeUri], so the SAF walk can
+ * prune it — the SAF counterpart of `excludedDirPath` in [walkDiskFilesWithRelativeParents].
+ * Document ids are only comparable within one provider, so a folder from another authority (or
+ * anything that is not a tree URI) excludes nothing.
+ */
+internal fun safExcludedDocumentId(
+    sourceTreeUri: Uri,
+    excludedFolderUriString: String?,
+): String? {
+    if (excludedFolderUriString == null || !excludedFolderUriString.startsWith("content://")) return null
+    val excludedUri = excludedFolderUriString.toUri()
+    if (excludedUri.authority != sourceTreeUri.authority) return null
+    return runCatching { DocumentsContract.getTreeDocumentId(excludedUri) }.getOrNull()
 }

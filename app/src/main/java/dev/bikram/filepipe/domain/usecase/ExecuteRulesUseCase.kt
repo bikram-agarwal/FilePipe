@@ -108,6 +108,9 @@ class ExecuteRulesUseCase
                                     isRegexPattern = rule.isRegexPattern,
                                     isExcludeRegexPattern = rule.isExcludeRegexPattern,
                                     useCache = useCache,
+                                    // Never rescan the destination when it sits inside a recursively scanned source.
+                                    excludedFolderUriString =
+                                        rule.destinationFolderPath.takeIf { rule.operationMode != OperationMode.DELETE },
                                 )
                             }.distinctBy { entry -> entry.canonicalIdentity() }
 
