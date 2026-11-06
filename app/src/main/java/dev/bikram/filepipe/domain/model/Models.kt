@@ -283,6 +283,27 @@ data class RunProgress(
     }
 }
 
+/**
+ * Per-file run notification, for UIs that list the files a manual run works through (the Rules
+ * preview sheet ticks its rows off with these). [sourceUri] is the scanned file's URI string - the
+ * same key as [PreviewFileResult.sourcePath].
+ */
+sealed interface RunFileEvent {
+    val ruleId: Long
+    val sourceUri: String
+
+    data class Started(
+        override val ruleId: Long,
+        override val sourceUri: String,
+    ) : RunFileEvent
+
+    data class Finished(
+        override val ruleId: Long,
+        override val sourceUri: String,
+        val file: FileMoved,
+    ) : RunFileEvent
+}
+
 enum class FileOrientation {
     PORTRAIT,
     LANDSCAPE,

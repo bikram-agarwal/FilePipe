@@ -26,16 +26,16 @@
     <string name="rule_card_progress_copying_file">Copying %1$s (%2$d / %3$d)</string>
     <string name="rule_card_progress_deleting_file">Deleting %1$s (%2$d / %3$d)</string>
     <plurals name="rule_card_progress_files_moved_summary">
-        <item quantity="one">%1$d / %2$d file moved</item>
-        <item quantity="other">%1$d / %2$d files moved</item>
+        <item quantity="one">%1$d/%2$d file moved</item>
+        <item quantity="other">%1$d/%2$d files moved</item>
     </plurals>
     <plurals name="rule_card_progress_files_copied_summary">
-        <item quantity="one">%1$d / %2$d file copied</item>
-        <item quantity="other">%1$d / %2$d files copied</item>
+        <item quantity="one">%1$d/%2$d file copied</item>
+        <item quantity="other">%1$d/%2$d files copied</item>
     </plurals>
     <plurals name="rule_card_progress_files_deleted_summary">
-        <item quantity="one">%1$d / %2$d file deleted</item>
-        <item quantity="other">%1$d / %2$d files deleted</item>
+        <item quantity="one">%1$d/%2$d file deleted</item>
+        <item quantity="other">%1$d/%2$d files deleted</item>
     </plurals>
     <string name="rule_card_progress_error">Error: %1$s</string>
     <string name="rule_card_progress_no_matching_files">No matching files found</string>
@@ -894,6 +894,19 @@
     <!-- Preview sheet -->
     <string name="preview_title">Preview</string>
     <string name="preview_run">Run</string>
+    <!-- Preview sheet: the run shown in place once Run is tapped -->
+    <plurals name="preview_run_status_failed">
+        <item quantity="one">%1$d failed</item>
+        <item quantity="other">%1$d failed</item>
+    </plurals>
+    <plurals name="preview_run_status_cancelled">
+        <item quantity="one">%1$d cancelled</item>
+        <item quantity="other">%1$d cancelled</item>
+    </plurals>
+    <!-- A rule line in the preview sheet plus how its run ended, e.g. "6/10 files moved • 4 cancelled" -->
+    <string name="preview_run_line_with_status">%1$s • %2$s</string>
+    <string name="preview_run_done">Done</string>
+    <string name="preview_run_view_in_history">View in History</string>
     <string name="preview_empty">No matching files found in the selected source folders</string>
     <string name="preview_would_skip">Would skip</string>
     <string name="preview_would_overwrite">Would overwrite</string>

@@ -146,7 +146,11 @@ fun RulesScreen(
     val sortKey = uiState.sortKey
     val sortDirection = uiState.sortDirection
     val selectedRuleIds = uiState.selectedRuleIds
-    val progressMap = uiState.progressMap
+    // While the preview sheet shows a run, that run's progress lives in the sheet only. Its cards pick
+    // it up just if the sheet is dismissed mid-run (dismissing clears previewState, and with it this).
+    val sheetRun = uiState.previewState?.run
+    val sheetRunRuleIds = sheetRun?.ruleIds.orEmpty()
+    val progressMap = uiState.progressMap - sheetRunRuleIds
     val isRunning = uiState.isRunning
     val manualRunCancelAnchor = uiState.manualRunCancelAnchor
     val isCompactMode = uiState.isCompactMode
@@ -786,16 +790,62 @@ fun RulesScreen(
                         modifier = Modifier.padding(vertical = 16.dp),
                     )
                 } else {
+                    val sheetRun = preview.run
+                    val groupedPreview =
+                        remember(preview.ruleGroups, internalStorageDisplayName) {
+                            preview.ruleGroups.map { ruleGroup ->
+                                ruleGroup to
+                                    ruleGroup.results.groupBy { result ->
+                                        previewSourceFolderDisplayPath(
+                                            sourcePath = result.sourcePath,
+                                            fileName = result.fileName,
+                                            internalStorageRootDisplayName = internalStorageDisplayName,
+                                        )
+                                    }
+                            }
+                        }
+                    val previewListState = rememberLazyListState()
+                    // Follow the run: keep the file being processed in view, unless the user is scrolling.
+                    val currentFileKey =
+                        sheetRun?.fileStatuses?.firstNotNullOfOrNull { (ruleId, statuses) ->
+                            statuses.entries
+                                .firstOrNull { (_, status) -> status == PreviewFileRunStatus.IN_PROGRESS }
+                                ?.let { (sourcePath, _) -> "${ruleId}_$sourcePath" }
+                        }
+                    LaunchedEffect(currentFileKey) {
+                        val key = currentFileKey ?: return@LaunchedEffect
+                        if (previewListState.isScrollInProgress) return@LaunchedEffect
+                        val layoutInfo = previewListState.layoutInfo
+                        val index = layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
+                        val fullyVisible =
+                            index != null &&
+                                index.offset >= layoutInfo.viewportStartOffset &&
+                                index.offset + index.size <= layoutInfo.viewportEndOffset
+                        if (fullyVisible) return@LaunchedEffect
+                        val itemKeys =
+                            groupedPreview.flatMap { (ruleGroup, sections) ->
+                                listOf<Any>("header_${ruleGroup.ruleId}") +
+                                    sections.flatMap { (sourceFolder, sourceFiles) ->
+                                        listOf<Any>("source_${ruleGroup.ruleId}_$sourceFolder") +
+                                            sourceFiles.map { file -> "${ruleGroup.ruleId}_${file.sourcePath}" }
+                                    }
+                            }
+                        val targetIndex = itemKeys.indexOf(key)
+                        // Land it a couple of rows down so the files just finished stay visible above it.
+                        if (targetIndex >= 0) previewListState.animateScrollToItem((targetIndex - 2).coerceAtLeast(0))
+                    }
                     LazyColumn(
                         // Grow with the list up to the sheet's own max height (no fixed cap) and only
                         // scroll beyond that; fill = false keeps a short list short, and weighting
                         // measures the Cancel/Run row first so it is never pushed off the sheet.
+                        state = previewListState,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
                                 .weight(1f, fill = false),
                     ) {
-                        preview.ruleGroups.forEach { ruleGroup ->
+                        groupedPreview.forEach { (ruleGroup, groupedResults) ->
+                            val groupInRun = sheetRun != null && ruleGroup.ruleId in sheetRun.ruleIds
                             item(key = "header_${ruleGroup.ruleId}") {
                                 Column(
                                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
@@ -812,36 +862,37 @@ fun RulesScreen(
                                                 MaterialTheme.typography.titleMedium
                                             },
                                     )
-                                    Text(
-                                        text =
-                                            pluralStringResource(
-                                                when (ruleGroup.operationMode) {
-                                                    OperationMode.MOVE -> R.plurals.preview_files_would_move
-                                                    OperationMode.COPY -> R.plurals.preview_files_would_copy
-                                                    OperationMode.DELETE -> R.plurals.preview_files_would_delete
+                                    if (sheetRun != null && groupInRun) {
+                                        val (runLine, runLineColor) = previewGroupRunLine(ruleGroup, sheetRun)
+                                        Text(
+                                            text = runLine,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = runLineColor,
+                                        )
+                                    } else {
+                                        Text(
+                                            text =
+                                                pluralStringResource(
+                                                    when (ruleGroup.operationMode) {
+                                                        OperationMode.MOVE -> R.plurals.preview_files_would_move
+                                                        OperationMode.COPY -> R.plurals.preview_files_would_copy
+                                                        OperationMode.DELETE -> R.plurals.preview_files_would_delete
+                                                    },
+                                                    ruleGroup.results.size,
+                                                    ruleGroup.results.size,
+                                                ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            // "Permanently deleted" is a warning, so it takes the error color.
+                                            color =
+                                                if (ruleGroup.operationMode == OperationMode.DELETE) {
+                                                    MaterialTheme.colorScheme.error
+                                                } else {
+                                                    MaterialTheme.colorScheme.primary
                                                 },
-                                                ruleGroup.results.size,
-                                                ruleGroup.results.size,
-                                            ),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        // "Permanently deleted" is a warning, so it takes the error color.
-                                        color =
-                                            if (ruleGroup.operationMode == OperationMode.DELETE) {
-                                                MaterialTheme.colorScheme.error
-                                            } else {
-                                                MaterialTheme.colorScheme.primary
-                                            },
-                                    )
+                                        )
+                                    }
                                 }
                             }
-                            val groupedResults =
-                                ruleGroup.results.groupBy { result ->
-                                    previewSourceFolderDisplayPath(
-                                        sourcePath = result.sourcePath,
-                                        fileName = result.fileName,
-                                        internalStorageRootDisplayName = internalStorageDisplayName,
-                                    )
-                                }
                             groupedResults.forEach { (sourceFolder, sourceFiles) ->
                                 item(key = "source_${ruleGroup.ruleId}_$sourceFolder") {
                                     Text(
@@ -861,23 +912,37 @@ fun RulesScreen(
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
-                                                .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+                                                .padding(top = 4.dp, bottom = 4.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = result.fileName,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                // The row's indent doubles as the run-status slot (see
+                                                // PreviewRowStatusSlot: fixed size, never grows the row).
+                                                PreviewRowStatusSlot(
+                                                    status =
+                                                        if (sheetRun != null && groupInRun) {
+                                                            sheetRun.fileStatuses[ruleGroup.ruleId]?.get(result.sourcePath)
+                                                        } else {
+                                                            null
+                                                        },
+                                                )
+                                                Text(
+                                                    text = result.fileName,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                            val detailModifier = Modifier.padding(start = PreviewRowIndent)
                                             when {
                                                 result.wouldSkip -> {
                                                     Text(
                                                         text = stringResource(R.string.preview_would_skip),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = detailModifier,
                                                     )
                                                 }
 
@@ -886,6 +951,7 @@ fun RulesScreen(
                                                         text = stringResource(R.string.preview_would_overwrite),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = detailModifier,
                                                     )
                                                 }
 
@@ -900,6 +966,7 @@ fun RulesScreen(
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
+                                                        modifier = detailModifier,
                                                     )
                                                 }
                                             }
@@ -923,29 +990,48 @@ fun RulesScreen(
                 CompositionLocalProvider(
                     LocalMinimumInteractiveComponentSize provides if (landscape) 36.dp else 48.dp,
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        FilePipeTextButton(onClick = { viewModel.dismissPreview() }) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        FilePipeButton(
-                            onClick = { viewModel.runPreviewedRules() },
-                            enabled = previewRunEnabled,
-                            colors =
-                                if (previewRunDeletes) {
-                                    ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.error,
-                                        contentColor = MaterialTheme.colorScheme.onError,
-                                    )
+                    val sheetRun = preview.run
+                    if (sheetRun != null) {
+                        PreviewSheetRunFooter(
+                            run = sheetRun,
+                            ruleGroups = preview.ruleGroups,
+                            onCancelRun = { viewModel.cancelManualRun() },
+                            onDone = { viewModel.dismissPreview() },
+                            onViewHistory = { historyIds ->
+                                viewModel.dismissPreview()
+                                val singleHistoryId = historyIds.singleOrNull()
+                                if (singleHistoryId != null) {
+                                    onNavigateToHistoryDetail(singleHistoryId)
                                 } else {
-                                    ButtonDefaults.buttonColors()
-                                },
+                                    onNavigateToHistoryList()
+                                }
+                            },
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(stringResource(previewRunLabelRes))
+                            FilePipeTextButton(onClick = { viewModel.dismissPreview() }) {
+                                Text(stringResource(R.string.cancel))
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            FilePipeButton(
+                                onClick = { viewModel.runPreviewedRules() },
+                                enabled = previewRunEnabled,
+                                colors =
+                                    if (previewRunDeletes) {
+                                        ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                            contentColor = MaterialTheme.colorScheme.onError,
+                                        )
+                                    } else {
+                                        ButtonDefaults.buttonColors()
+                                    },
+                            ) {
+                                Text(stringResource(previewRunLabelRes))
+                            }
                         }
                     }
                 }

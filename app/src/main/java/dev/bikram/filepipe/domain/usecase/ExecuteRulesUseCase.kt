@@ -15,6 +15,7 @@ import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
+import dev.bikram.filepipe.domain.model.RunFileEvent
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.RunResult
 import dev.bikram.filepipe.domain.model.TriggerType
@@ -50,6 +51,8 @@ class ExecuteRulesUseCase
             triggerType: TriggerType,
             useCache: Boolean = false,
             preparedFileEntriesByRuleId: Map<Long, List<FileEntry>> = emptyMap(),
+            // Kept before onProgress so callers' trailing lambda still binds to onProgress.
+            onFileEvent: (RunFileEvent) -> Unit = {},
             onProgress: (RunProgress) -> Unit = {},
         ): List<RunResult> =
             executeSequentially(rules) { rule ->
@@ -58,6 +61,7 @@ class ExecuteRulesUseCase
                     triggerType = triggerType,
                     useCache = useCache,
                     preparedFileEntries = preparedFileEntriesByRuleId[rule.id],
+                    onFileEvent = onFileEvent,
                     onProgress = onProgress,
                 )
             }
@@ -67,6 +71,7 @@ class ExecuteRulesUseCase
             triggerType: TriggerType,
             useCache: Boolean,
             preparedFileEntries: List<FileEntry>?,
+            onFileEvent: (RunFileEvent) -> Unit,
             onProgress: (RunProgress) -> Unit,
         ): RunResult {
             val startedAt = System.currentTimeMillis()
@@ -134,6 +139,8 @@ class ExecuteRulesUseCase
                             totalFiles = total,
                         ),
                     )
+                    val sourceKey = entry.uri.toString()
+                    onFileEvent(RunFileEvent.Started(rule.id, sourceKey))
 
                     val result =
                         fileOperationRepository.moveFile(
@@ -160,6 +167,7 @@ class ExecuteRulesUseCase
                         if (result.success && !result.skipped) {
                             completedSuccessfulMoves++
                         }
+                        onFileEvent(RunFileEvent.Finished(rule.id, sourceKey, result))
                     }
                 }
             } catch (e: CancellationException) {
