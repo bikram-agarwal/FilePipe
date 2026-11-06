@@ -2761,7 +2761,13 @@ fun RuleDetailScreen(
                                     files.size,
                                 ),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            // Same as the Rules preview sheet: "permanently deleted" takes the error color.
+                            color =
+                                if (state.operationMode == OperationMode.DELETE) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                         val groupedFiles =

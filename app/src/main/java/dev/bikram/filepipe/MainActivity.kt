@@ -151,7 +151,7 @@ class MainActivity : ComponentActivity() {
         val ruleId = sourceIntent.getLongExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID, -1L)
         if (ruleId != -1L) {
             ShortcutManagerCompat.reportShortcutUsed(this, "rule_$ruleId")
-            pendingShortcutRepository.requestRunRule(ruleId)
+            pendingShortcutRepository.requestPreviewRule(ruleId)
             sourceIntent.removeExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID)
         }
     }

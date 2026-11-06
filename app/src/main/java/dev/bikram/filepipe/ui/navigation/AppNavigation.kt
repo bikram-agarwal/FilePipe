@@ -254,6 +254,7 @@ fun AppNavigation(
 ) {
     val navController = rememberNavController()
     val pendingOpenHistory by pendingShortcutRepository.pendingOpenHistory.collectAsStateWithLifecycle()
+    val pendingPreviewRuleId by pendingShortcutRepository.pendingPreviewRuleId.collectAsStateWithLifecycle()
     val pendingHistoryId by pendingShortcutRepository.pendingHistoryDetailId.collectAsStateWithLifecycle()
     val pendingOpenSettingsUpdates by pendingShortcutRepository.pendingOpenSettingsForUpdates.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -480,6 +481,20 @@ fun AppNavigation(
     LaunchedEffect(hasSeenIntro, openSheetRequested, navController, currentDestination?.route) {
         if (!openSheetRequested || !hasSeenIntro) return@LaunchedEffect
         openSettingsRoot()
+    }
+
+    LaunchedEffect(hasSeenIntro, pendingPreviewRuleId, navController) {
+        if (pendingPreviewRuleId == null || !hasSeenIntro) return@LaunchedEffect
+        // A launcher shortcut opens its rule's preview sheet, which lives on the Rules tab. Only
+        // navigate here: RulesScreen consumes the request (RulesViewModel.previewPendingShortcutRules)
+        // once it is on screen, so the request survives until the sheet can actually show.
+        navController.navigate(Screen.Rules.route) {
+            popUpTo(Screen.Rules.route) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
     }
 
     LaunchedEffect(hasSeenIntro, pendingOpenHistory, navController) {
@@ -1644,7 +1659,7 @@ private fun RulesTwoPaneRoute(
                                 } else {
                                     null
                                 },
-                            onActivateRuleForRunInDetailPane =
+                            onActivateRuleForPreviewInDetailPane =
                                 if (showPaneSelectionState) {
                                     { ruleId -> showRuleInDetailPane(ruleId) }
                                 } else {
@@ -1666,17 +1681,12 @@ private fun RulesTwoPaneRoute(
                         RulesSelectionActionPane(
                             selectedCount = uiState.selectedRuleIds.size,
                             totalRuleCount = uiState.rules.size,
-                            enabledSelectedCount =
-                                uiState.rules.count { rule ->
-                                    rule.id in uiState.selectedRuleIds && rule.isEnabled
-                                },
                             isRunning = uiState.isRunning,
                             showRunCancel = uiState.manualRunCancelAnchor == ManualRunCancelAnchor.RunSelectedBar,
                             onSelectAll = viewModel::selectAll,
                             onClearSelection = viewModel::clearSelection,
                             onPreviewSelected = viewModel::startPreviewSelected,
                             onDeleteSelected = { pendingDeleteSelected = true },
-                            onRunSelected = viewModel::runSelected,
                             onCancelRun = viewModel::cancelManualRun,
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -1745,14 +1755,12 @@ private fun RulesTwoPaneRoute(
 private fun RulesSelectionActionPane(
     selectedCount: Int,
     totalRuleCount: Int,
-    enabledSelectedCount: Int,
     isRunning: Boolean,
     showRunCancel: Boolean,
     onSelectAll: () -> Unit,
     onClearSelection: () -> Unit,
     onPreviewSelected: () -> Unit,
     onDeleteSelected: () -> Unit,
-    onRunSelected: () -> Unit,
     onCancelRun: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1835,7 +1843,8 @@ private fun RulesSelectionActionPane(
                         label = stringResource(R.string.run_cancel_selection),
                     )
                 }
-                FilePipeFilledTonalButton(
+                // Every manual run goes through the preview sheet, whose Run button starts it.
+                FilePipeButton(
                     onClick = onPreviewSelected,
                     enabled = !isRunning,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -1844,19 +1853,7 @@ private fun RulesSelectionActionPane(
                 ) {
                     RulesSelectionActionContent(
                         iconName = "visibility",
-                        label = stringResource(R.string.preview_selected_rules),
-                    )
-                }
-                FilePipeButton(
-                    onClick = onRunSelected,
-                    enabled = !isRunning && enabledSelectedCount > 0,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = pillShape,
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-                ) {
-                    RulesSelectionActionContent(
-                        iconName = "play_arrow",
-                        label = stringResource(R.string.run_button),
+                        label = stringResource(R.string.preview_title),
                     )
                 }
                 FilePipeButton(

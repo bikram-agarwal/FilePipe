@@ -197,9 +197,10 @@ fun RuleCard(
     onLongClick: () -> Unit, // toggles selection
     cardActions: List<RuleCardAction>, // non-swipe action icons shown in card
     onToggleEnabled: (Boolean) -> Unit,
-    onRunClick: () -> Unit,
+    // The card's main action. Every manual run starts from the preview sheet (its Run button), so
+    // the card never runs a rule directly.
+    onPreviewClick: () -> Unit,
     onCancelRunClick: () -> Unit,
-    isAnyRuleRunning: Boolean,
     modifier: Modifier = Modifier,
     isSelectionMode: Boolean = false,
     showInlineProgressCancel: Boolean = false,
@@ -265,10 +266,9 @@ fun RuleCard(
                     onLongClick = onLongClick,
                     cardActions = cardActions,
                     onToggleEnabled = onToggleEnabled,
-                    onRunClick = onRunClick,
+                    onPreviewClick = onPreviewClick,
                     onCancelRunClick = onCancelRunClick,
                     showInlineProgressCancel = showInlineProgressCancel,
-                    isAnyRuleRunning = isAnyRuleRunning,
                     folderIssueSeverity = effectiveFolderIssueSeverity,
                     onStaleWarningClick = onStaleWarningClick,
                     onLeadingLongClick = onLeadingLongClick,
@@ -285,10 +285,9 @@ fun RuleCard(
                     onClick = onClick,
                     onLongClick = onLongClick,
                     onToggleEnabled = onToggleEnabled,
-                    onRunClick = onRunClick,
+                    onPreviewClick = onPreviewClick,
                     onCancelRunClick = onCancelRunClick,
                     showInlineProgressCancel = showInlineProgressCancel,
-                    isAnyRuleRunning = isAnyRuleRunning,
                     folderIssueSeverity = effectiveFolderIssueSeverity,
                     onLeadingLongClick = onLeadingLongClick,
                     modifier = reorderLongPressDrag(),
@@ -314,10 +313,9 @@ private fun CompactContent(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
-    onRunClick: () -> Unit,
+    onPreviewClick: () -> Unit,
     onCancelRunClick: () -> Unit,
     showInlineProgressCancel: Boolean,
-    isAnyRuleRunning: Boolean,
     folderIssueSeverity: RuleCardFolderIssueSeverity?,
     modifier: Modifier = Modifier,
     onLeadingLongClick: (() -> Unit)? = null,
@@ -326,7 +324,6 @@ private fun CompactContent(
 ) {
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val activeProgress = progress?.takeUnless { progressValue -> progressValue.isComplete }
-    val runBlocked = isAnyRuleRunning && progress == null
 
     val allFilesLabel = stringResource(R.string.file_type_all_files)
     val noExtensionLabel = stringResource(R.string.file_type_no_extension)
@@ -463,13 +460,12 @@ private fun CompactContent(
                                     }
                                 }
                             } else {
-                                FilePipeFilledTonalIconButton(
-                                    onClick = onRunClick,
-                                    enabled = rule.isEnabled && !runBlocked,
-                                ) {
+                                // Preview is read-only, so it stays available for disabled rules and
+                                // while another rule runs; the sheet's Run button applies those limits.
+                                FilePipeFilledTonalIconButton(onClick = onPreviewClick) {
                                     FilePipeMaterialRoundedSymbol(
-                                        name = "play_arrow",
-                                        contentDescription = stringResource(R.string.run_now),
+                                        name = "visibility",
+                                        contentDescription = stringResource(R.string.preview_title),
                                         size = 20.dp,
                                     )
                                 }
@@ -531,10 +527,9 @@ private fun ExpandedContent(
     onLongClick: () -> Unit,
     cardActions: List<RuleCardAction>,
     onToggleEnabled: (Boolean) -> Unit,
-    onRunClick: () -> Unit,
+    onPreviewClick: () -> Unit,
     onCancelRunClick: () -> Unit,
     showInlineProgressCancel: Boolean,
-    isAnyRuleRunning: Boolean,
     modifier: Modifier = Modifier,
     folderIssueSeverity: RuleCardFolderIssueSeverity? = null,
     onStaleWarningClick: () -> Unit = {},
@@ -947,7 +942,6 @@ private fun ExpandedContent(
                 )
                 if (showOperationalControls) {
                     val runInProgress = progress != null && !progress.isComplete
-                    val runBlocked = isAnyRuleRunning && progress == null
                     if (runInProgress && showInlineProgressCancel) {
                         TooltipBox(
                             positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
@@ -964,23 +958,23 @@ private fun ExpandedContent(
                     } else if (!runInProgress) {
                         TooltipBox(
                             positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                            tooltip = { PlainTooltip { CenteredTooltipText(stringResource(R.string.run_now)) } },
+                            tooltip = { PlainTooltip { CenteredTooltipText(stringResource(R.string.preview_rule)) } },
                             state = rememberTooltipState(),
                         ) {
+                            // Read-only, so not gated on rule.isEnabled / another run (see CompactContent).
                             FilePipeFilledTonalButton(
-                                onClick = onRunClick,
-                                enabled = rule.isEnabled && !runBlocked,
+                                onClick = onPreviewClick,
                                 shape = pillShape,
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                             ) {
                                 FilePipeMaterialRoundedSymbol(
-                                    name = "play_arrow",
+                                    name = "visibility",
                                     contentDescription = null,
                                     size = 20.dp,
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = stringResource(R.string.run_now),
+                                    text = stringResource(R.string.preview_title),
                                     maxLines = 1,
                                     softWrap = false,
                                 )

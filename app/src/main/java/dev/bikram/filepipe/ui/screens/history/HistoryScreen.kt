@@ -946,9 +946,8 @@ private fun TrashRuleCard(
             onLongClick = {},
             cardActions = emptyList(),
             onToggleEnabled = {},
-            onRunClick = {},
+            onPreviewClick = {},
             onCancelRunClick = {},
-            isAnyRuleRunning = false,
             suppressLongClickForReorder = true,
             showOperationalControls = false,
         )

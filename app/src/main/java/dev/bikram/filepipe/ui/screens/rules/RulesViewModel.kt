@@ -43,7 +43,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -72,10 +71,8 @@ data class DeleteUndoEvent(
 )
 
 data class PreviewState(
-    val ruleName: String,
     val isLoading: Boolean = true,
     val results: List<PreviewFileResult> = emptyList(),
-    val selectedRuleCount: Int? = null,
     val ruleGroups: List<PreviewRuleGroup> = emptyList(),
 )
 
@@ -85,6 +82,12 @@ data class PreviewRuleGroup(
     val operationMode: OperationMode,
     val results: List<PreviewFileResult>,
 )
+
+/**
+ * A rule's group while its preview is still scanning: no results yet, but the operation is known,
+ * so the sheet's action button reads Move / Copy / Delete from the first frame.
+ */
+private fun Rule.toPendingPreviewGroup() = PreviewRuleGroup(ruleId = id, ruleName = name, operationMode = operationMode, results = emptyList())
 
 enum class RuleFolderIssueSeverity {
     WARNING,
@@ -197,6 +200,11 @@ class RulesViewModel
         private val _previewState = MutableStateFlow<PreviewState?>(null)
         private var previewJob: Job? = null
         private var previewRequestId = 0L
+
+        // Delete rules' scanned file lists from the open preview, so the sheet's Delete button removes
+        // exactly the files it listed (see runPreviewedRules). Reset with every preview request.
+        private var previewPreparedDeleteEntries: Map<Long, List<FileEntry>> = emptyMap()
+        private var previewPreparedAtMillis = 0L
         private val _manualRunCancelAnchor = MutableStateFlow<ManualRunCancelAnchor>(ManualRunCancelAnchor.None)
 
         // A manual run deferred pending the user's delete confirmation, plus the confirmation shown
@@ -354,33 +362,58 @@ class RulesViewModel
                 }
             }
             _rules.onEach { appShortcutsManager.updateShortcuts(it) }.launchIn(viewModelScope)
-            pendingShortcutRepository.pendingRuleId
+        }
+
+        /**
+         * Opens the preview sheet for a rule launched from a launcher shortcut. Collected by
+         * RulesScreen (not from init) so a request is only consumed while the sheet can actually
+         * show; AppNavigation brings the Rules tab forward first.
+         */
+        suspend fun previewPendingShortcutRules() {
+            pendingShortcutRepository.pendingPreviewRuleId
                 .combine(_rules) { pendingRuleId, rules -> pendingRuleId to rules }
-                .onEach { (pendingRuleId, rules) ->
-                    val ruleId = pendingRuleId ?: return@onEach
+                .collect { (pendingRuleId, rules) ->
+                    val ruleId = pendingRuleId ?: return@collect
                     val rule = rules.find { it.id == ruleId }
                     if (rule == null) {
                         if (rules.isNotEmpty()) {
-                            pendingShortcutRepository.clearPendingRule()
+                            pendingShortcutRepository.clearPendingPreviewRule()
                         }
-                        return@onEach
+                        return@collect
                     }
-                    pendingShortcutRepository.clearPendingRule()
-                    runRule(rule)
-                }.launchIn(viewModelScope)
+                    pendingShortcutRepository.clearPendingPreviewRule()
+                    startPreview(rule)
+                }
+        }
+
+        /** Scans [rule] for the preview sheet, keeping a delete rule's file list for [runPreviewedRules]. */
+        private suspend fun simulateForPreview(
+            rule: Rule,
+            preparedDeleteEntries: MutableMap<Long, List<FileEntry>>,
+        ): List<PreviewFileResult> {
+            val prepared = simulateRuleUseCase.prepare(rule)
+            if (rule.operationMode == OperationMode.DELETE) {
+                preparedDeleteEntries[rule.id] = prepared.fileEntries
+            }
+            return prepared.previewResults
+        }
+
+        private fun beginPreviewRequest(): Long {
+            previewJob?.cancel()
+            previewRequestId += 1
+            previewPreparedDeleteEntries = emptyMap()
+            previewPreparedAtMillis = 0L
+            return previewRequestId
         }
 
         fun startPreview(rule: Rule) {
-            previewJob?.cancel()
-            previewRequestId += 1
-            val requestId = previewRequestId
+            val requestId = beginPreviewRequest()
             previewJob =
                 viewModelScope.launch {
                     if (DevMockFileMove.isMockRule(rule)) {
                         if (previewRequestId != requestId) return@launch
                         _previewState.value =
                             PreviewState(
-                                ruleName = rule.name,
                                 isLoading = false,
                                 results = mockFileMovePreviewResults(),
                                 ruleGroups =
@@ -396,12 +429,19 @@ class RulesViewModel
                         return@launch
                     }
                     if (previewRequestId != requestId) return@launch
-                    _previewState.value = PreviewState(ruleName = rule.name, isLoading = true)
-                    val results = simulateRuleUseCase(rule)
-                    if (previewRequestId != requestId) return@launch
                     _previewState.value =
                         PreviewState(
-                            ruleName = rule.name,
+                            isLoading = true,
+                            ruleGroups = listOf(rule.toPendingPreviewGroup()),
+                        )
+                    val scanStartedAtMillis = System.currentTimeMillis()
+                    val preparedDeleteEntries = mutableMapOf<Long, List<FileEntry>>()
+                    val results = simulateForPreview(rule, preparedDeleteEntries)
+                    if (previewRequestId != requestId) return@launch
+                    previewPreparedDeleteEntries = preparedDeleteEntries
+                    previewPreparedAtMillis = scanStartedAtMillis
+                    _previewState.value =
+                        PreviewState(
                             isLoading = false,
                             results = results,
                             ruleGroups =
@@ -420,25 +460,24 @@ class RulesViewModel
         fun startPreviewSelected() {
             val selectedRules = _rules.value.filter { rule -> rule.id in _selectedRuleIds.value }
             if (selectedRules.isEmpty()) return
-            previewJob?.cancel()
-            previewRequestId += 1
-            val requestId = previewRequestId
+            val requestId = beginPreviewRequest()
             previewJob =
                 viewModelScope.launch {
                     if (previewRequestId != requestId) return@launch
                     _previewState.value =
                         PreviewState(
-                            ruleName = "",
                             isLoading = true,
-                            selectedRuleCount = selectedRules.size,
+                            ruleGroups = selectedRules.map { rule -> rule.toPendingPreviewGroup() },
                         )
+                    val scanStartedAtMillis = System.currentTimeMillis()
+                    val preparedDeleteEntries = mutableMapOf<Long, List<FileEntry>>()
                     val ruleGroups =
                         selectedRules.map { rule ->
                             val results =
                                 if (DevMockFileMove.isMockRule(rule)) {
                                     mockFileMovePreviewResults()
                                 } else {
-                                    simulateRuleUseCase(rule)
+                                    simulateForPreview(rule, preparedDeleteEntries)
                                 }
                             PreviewRuleGroup(
                                 ruleId = rule.id,
@@ -448,24 +487,30 @@ class RulesViewModel
                             )
                         }
                     if (previewRequestId != requestId) return@launch
+                    previewPreparedDeleteEntries = preparedDeleteEntries
+                    previewPreparedAtMillis = scanStartedAtMillis
                     _previewState.value =
                         PreviewState(
-                            ruleName = "",
                             isLoading = false,
                             results = ruleGroups.flatMap { it.results },
-                            selectedRuleCount = selectedRules.size,
                             ruleGroups = ruleGroups,
                         )
                 }
         }
 
         fun dismissPreview() {
-            previewRequestId += 1
-            previewJob?.cancel()
+            beginPreviewRequest()
             previewJob = null
             _previewState.value = null
         }
 
+        /**
+         * The only manual-run entry point from the Rules screen: every manual run goes through the
+         * preview sheet first. For delete rules the sheet itself is the confirmation (it says
+         * "permanently deleted" and its button reads Delete in the error color), so the run deletes
+         * exactly the files the preview scanned instead of raising the separate delete dialog. A
+         * preview older than [DELETE_CONFIRMATION_MAX_AGE_MS] falls back to that dialog's fresh scan.
+         */
         fun runPreviewedRules() {
             val preview = _previewState.value ?: return
             val rulesById = _rules.value.associateBy { rule -> rule.id }
@@ -476,6 +521,8 @@ class RulesViewModel
                     .filter { rule -> rule.isEnabled }
             if (rulesToRun.isEmpty()) return
 
+            val preparedDeleteEntries = previewPreparedDeleteEntries
+            val previewAgeMillis = System.currentTimeMillis() - previewPreparedAtMillis
             dismissPreview()
             if (rulesToRun.size == 1 && DevMockFileMove.isMockRule(rulesToRun.first())) {
                 enqueueMockFileMoveRun(rulesToRun.first())
@@ -489,7 +536,25 @@ class RulesViewModel
                 } else {
                     ManualRunCancelAnchor.RunSelectedBar
                 }
-            enqueueManualRun(realRulesToRun, anchor, useCache = true)
+            val deleteRuleIds =
+                realRulesToRun
+                    .filter { rule -> rule.operationMode == OperationMode.DELETE }
+                    .map { rule -> rule.id }
+            val previewConfirmsDeletes =
+                deleteRuleIds.isNotEmpty() &&
+                    previewAgeMillis <= DELETE_CONFIRMATION_MAX_AGE_MS &&
+                    deleteRuleIds.all { ruleId -> ruleId in preparedDeleteEntries }
+            if (previewConfirmsDeletes) {
+                invalidateDeleteConfirmation()
+                startManualRun(
+                    rules = realRulesToRun,
+                    anchor = anchor,
+                    useCache = true,
+                    preparedFileEntriesByRuleId = preparedDeleteEntries.filterKeys { ruleId -> ruleId in deleteRuleIds },
+                )
+            } else {
+                enqueueManualRun(realRulesToRun, anchor, useCache = true)
+            }
         }
 
         fun isCardExpanded(
@@ -582,38 +647,10 @@ class RulesViewModel
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
             }
 
-        fun runSelected() {
-            val selected = _rules.value.filter { it.id in _selectedRuleIds.value && it.isEnabled }
-            if (selected.size == 1 && DevMockFileMove.isMockRule(selected.first())) {
-                enqueueMockFileMoveRun(selected.first())
-                return
-            }
-            enqueueManualRunAfterPreview(selected, ManualRunCancelAnchor.RunSelectedBar)
-        }
-
-        fun runRule(rule: Rule) {
-            if (!rule.isEnabled) return
-            if (DevMockFileMove.isMockRule(rule)) {
-                enqueueMockFileMoveRun(rule)
-                return
-            }
-            enqueueManualRunAfterPreview(listOf(rule), ManualRunCancelAnchor.SingleRule(rule.id))
-        }
-
-        private fun enqueueManualRunAfterPreview(
-            rules: List<Rule>,
-            anchor: ManualRunCancelAnchor,
-        ) {
-            val realRules = rules.filterNot(DevMockFileMove::isMockRule)
-            if (realRules.isEmpty()) return
-            enqueueManualRun(realRules, anchor, runSimulationCheck = true)
-        }
-
         private data class PendingManualRun(
             val rules: List<Rule>,
             val anchor: ManualRunCancelAnchor,
             val useCache: Boolean,
-            val runSimulationCheck: Boolean,
             val preparedFileEntriesByRuleId: Map<Long, List<FileEntry>>,
             val preparedAtMillis: Long,
         )
@@ -627,27 +664,25 @@ class RulesViewModel
             rules: List<Rule>,
             anchor: ManualRunCancelAnchor,
             useCache: Boolean = false,
-            runSimulationCheck: Boolean = false,
         ) {
             if (rules.isEmpty()) return
             if (rules.any { it.operationMode == OperationMode.DELETE }) {
-                requestDeleteConfirmation(rules, anchor, useCache, runSimulationCheck)
+                requestDeleteConfirmation(rules, anchor, useCache)
                 return
             }
             invalidateDeleteConfirmation()
-            startManualRun(rules, anchor, useCache, runSimulationCheck)
+            startManualRun(rules, anchor, useCache)
         }
 
         /**
          * Simulates the delete rules in [rules] to count/sample the files that would be permanently
          * removed, then raises a [PendingDeleteConfirmation] for the UI. If nothing would be deleted,
-         * the run proceeds normally (the existing simulation check surfaces any "no files" message).
+         * the run proceeds normally (its history row records "No changes").
          */
         private fun requestDeleteConfirmation(
             rules: List<Rule>,
             anchor: ManualRunCancelAnchor,
             useCache: Boolean,
-            runSimulationCheck: Boolean,
         ) {
             invalidateDeleteConfirmation()
             val requestId = deleteConfirmationRequestId
@@ -677,8 +712,8 @@ class RulesViewModel
 
                     val confirmation = deleteConfirmationFor(deleteRuleResults)
                     if (confirmation == null) {
-                        // Nothing to delete; run normally - the sim check emits the "no files" message.
-                        startManualRun(rules, anchor, useCache, runSimulationCheck)
+                        // Nothing to delete; run normally.
+                        startManualRun(rules, anchor, useCache)
                         return@launch
                     }
                     pendingManualRun =
@@ -686,7 +721,6 @@ class RulesViewModel
                             rules = rules,
                             anchor = anchor,
                             useCache = useCache,
-                            runSimulationCheck = runSimulationCheck,
                             preparedFileEntriesByRuleId = preparedFileEntriesByRuleId,
                             preparedAtMillis = scanStartedAtMillis,
                         )
@@ -703,7 +737,6 @@ class RulesViewModel
                     rules = pending.rules,
                     anchor = pending.anchor,
                     useCache = pending.useCache,
-                    runSimulationCheck = pending.runSimulationCheck,
                 )
                 return
             }
@@ -712,7 +745,6 @@ class RulesViewModel
                 rules = pending.rules,
                 anchor = pending.anchor,
                 useCache = pending.useCache,
-                runSimulationCheck = false,
                 preparedFileEntriesByRuleId = pending.preparedFileEntriesByRuleId,
             )
         }
@@ -741,7 +773,6 @@ class RulesViewModel
             rules: List<Rule>,
             anchor: ManualRunCancelAnchor,
             useCache: Boolean = false,
-            runSimulationCheck: Boolean = false,
             preparedFileEntriesByRuleId: Map<Long, List<FileEntry>> = emptyMap(),
         ) {
             if (rules.isEmpty()) return
@@ -764,45 +795,17 @@ class RulesViewModel
                         try {
                             // Every rule the user ran is executed, even one that matches nothing: that
                             // run is real, so it earns a history row ("No changes", where it can be
-                            // filtered by chip or deleted) and a last-run time for sorting. The
-                            // simulation now only picks the feedback - a run that affects no files
-                            // reports that instead of pulling the user into History.
-                            val affectsFiles =
-                                try {
-                                    !runSimulationCheck ||
-                                        rules.any { rule ->
-                                            simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
-                                        }
-                                } catch (e: CancellationException) {
-                                    withContext(NonCancellable) {
-                                        rules.forEach { rule ->
-                                            val hId =
-                                                runHistoryRepository.startRun(
-                                                    ruleId = rule.id,
-                                                    ruleName = rule.name,
-                                                    triggerType = TriggerType.MANUAL,
-                                                    operationMode = rule.operationMode,
-                                                )
-                                            runHistoryRepository.finishRunUserCancelled(hId, 0)
-                                        }
-                                    }
-                                    throw e
-                                }
-
+                            // filtered by chip or deleted) and a last-run time for sorting.
                             val results =
                                 executeRulesUseCase(
                                     rules,
                                     TriggerType.MANUAL,
-                                    useCache = useCache || runSimulationCheck,
+                                    useCache = useCache,
                                     preparedFileEntriesByRuleId = preparedFileEntriesByRuleId,
                                 ) { progress ->
                                     _progressMap.update { current -> current + (progress.ruleId to progress) }
                                 }
                             when {
-                                !affectsFiles -> {
-                                    postUserMessage(appContext.getString(R.string.history_no_files_affected))
-                                }
-
                                 results.size == 1 -> {
                                     _navigateAfterRun.emit(
                                         RulesRunNavigation.HistoryDetail(results.first().historyId),

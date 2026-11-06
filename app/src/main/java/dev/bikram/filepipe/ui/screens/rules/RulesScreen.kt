@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,11 +31,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Badge
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -48,6 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -88,6 +90,7 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.ui.common.AppBottomSheet
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.isLandscape
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
@@ -130,7 +133,7 @@ fun RulesScreen(
     onNavigateToRuleHistory: (Long) -> Unit,
     activeRuleId: Long? = null,
     onActivateRuleInDetailPane: ((Long) -> Unit)? = null,
-    onActivateRuleForRunInDetailPane: ((Long) -> Unit)? = null,
+    onActivateRuleForPreviewInDetailPane: ((Long) -> Unit)? = null,
     showPendingNewRuleInDetailPane: Boolean = false,
     showSelectionActionBar: Boolean = true,
     suppressBottomBlur: Boolean = false,
@@ -242,6 +245,10 @@ fun RulesScreen(
 
     BackHandler(enabled = hasSelection) {
         viewModel.clearSelection()
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.previewPendingShortcutRules()
     }
 
     LaunchedEffect(viewModel) {
@@ -451,7 +458,6 @@ fun RulesScreen(
                                     fadeOut(animationSpec = selectionBarFadeOutSpec),
                             ),
                     ) {
-                        val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
                         Box(
                             modifier =
                                 Modifier
@@ -494,30 +500,21 @@ fun RulesScreen(
                                     ) {
                                         FilePipeMaterialRoundedSymbol(name = "delete", contentDescription = deleteLabel)
                                     }
-                                    val previewSelectedLabel = stringResource(R.string.preview_selected_rules)
-                                    FilePipeFilledTonalIconButton(
-                                        onClick = { viewModel.startPreviewSelected() },
-                                        tooltipLabel = previewSelectedLabel,
-                                    ) {
-                                        FilePipeMaterialRoundedSymbol(
-                                            name = "visibility",
-                                            contentDescription = previewSelectedLabel,
-                                        )
-                                    }
+                                    // Every manual run goes through the preview sheet, whose Run button
+                                    // starts it - there is no blind "Run selected".
                                     FilePipeFilledTonalButton(
-                                        onClick = { viewModel.runSelected() },
-                                        enabled = enabledSelectedCount > 0,
+                                        onClick = { viewModel.startPreviewSelected() },
                                         shape = pillShape,
                                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                                     ) {
                                         Text(
-                                            text = stringResource(R.string.run_button),
+                                            text = stringResource(R.string.preview_title),
                                             style = MaterialTheme.typography.labelLarge.copy(platformStyle = PlatformTextStyle(includeFontPadding = false)),
                                             modifier = Modifier.align(Alignment.CenterVertically),
                                         )
                                         Spacer(Modifier.width(6.dp))
                                         FilePipeMaterialRoundedSymbol(
-                                            name = "play_arrow",
+                                            name = "visibility",
                                             contentDescription = null,
                                             size = 18.dp,
                                             modifier = Modifier.offset(x = 1.dp).align(Alignment.CenterVertically),
@@ -645,7 +642,6 @@ fun RulesScreen(
                             isSelectionMode = hasSelection,
                             isExpanded = isExpanded,
                             progress = progressMap[rule.id],
-                            isAnyRuleRunning = isRunning,
                             hasStaleFolder = rule.id in staleRuleIds,
                             folderIssueSeverity = folderIssueSeverity,
                             onStaleWarningClick = { onEditRule(rule.id) },
@@ -667,13 +663,12 @@ fun RulesScreen(
                             onToggleExpansion = { viewModel.toggleCardExpansion(rule.id) },
                             onDelete = { viewModel.deleteRule(rule) },
                             onDuplicate = { viewModel.duplicateRule(rule) },
-                            onRunRule = {
-                                onActivateRuleForRunInDetailPane?.invoke(rule.id)
-                                viewModel.runRule(rule)
-                            },
                             onCancelManualRun = { viewModel.cancelManualRun() },
                             showInlineProgressCancel = showInlineProgressCancel,
-                            onPreviewRule = { viewModel.startPreview(rule) },
+                            onPreviewRule = {
+                                onActivateRuleForPreviewInDetailPane?.invoke(rule.id)
+                                viewModel.startPreview(rule)
+                            },
                             onViewHistory = { onNavigateToRuleHistory(rule.id) },
                             onLeadingLongClick =
                                 if (reorderLongPressActive) {
@@ -733,23 +728,36 @@ fun RulesScreen(
     }
 
     previewState?.let { preview ->
-        val previewRunEnabled =
-            !isRunning &&
-                !preview.isLoading &&
-                preview.ruleGroups.any { ruleGroup ->
-                    ruleGroup.results.any { result -> !result.wouldSkip } &&
-                        rules.any { rule -> rule.id == ruleGroup.ruleId && rule.isEnabled }
-                }
-        val previewTitle =
-            preview.selectedRuleCount?.let { selectedRuleCount ->
-                pluralStringResource(
-                    R.plurals.preview_title_selected_rules,
-                    selectedRuleCount,
-                    selectedRuleCount,
-                )
-            } ?: stringResource(R.string.preview_title_for_rule, preview.ruleName)
+        // Same filter as RulesViewModel.runPreviewedRules: the groups the button would actually run.
+        val runnablePreviewGroups =
+            preview.ruleGroups.filter { ruleGroup ->
+                ruleGroup.results.any { result -> !result.wouldSkip } &&
+                    rules.any { rule -> rule.id == ruleGroup.ruleId && rule.isEnabled }
+            }
+        val previewRunEnabled = !isRunning && !preview.isLoading && runnablePreviewGroups.isNotEmpty()
+        // The button names the action it will take (Move / Copy / Delete); only a batch mixing actions
+        // says "Run". While nothing is runnable (button disabled) the label follows every previewed
+        // rule, so it doesn't fall back to "Run" for a single rule. The sheet is also the delete
+        // confirmation: any delete in the batch turns the button red.
+        val previewRunModes =
+            runnablePreviewGroups
+                .ifEmpty { preview.ruleGroups }
+                .map { ruleGroup -> ruleGroup.operationMode }
+                .toSet()
+        val previewRunDeletes = OperationMode.DELETE in previewRunModes
+        val previewRunLabelRes =
+            when (previewRunModes.singleOrNull()) {
+                OperationMode.MOVE -> R.string.operation_move
+                OperationMode.COPY -> R.string.operation_copy
+                OperationMode.DELETE -> R.string.operation_delete
+                null -> R.string.preview_run
+            }
         AppBottomSheet(
-            title = previewTitle,
+            // No visible title: the sheet only opens from buttons labelled "Preview", and every rule
+            // group below carries its own name. (The rule editor's preview sheet keeps its title -
+            // its trigger is an icon-only button.)
+            title = stringResource(R.string.preview_title),
+            showTitleBar = false,
             onDismiss = { viewModel.dismissPreview() },
             sheetState =
                 rememberBottomSheetState(
@@ -779,10 +787,13 @@ fun RulesScreen(
                     )
                 } else {
                     LazyColumn(
+                        // Grow with the list up to the sheet's own max height (no fixed cap) and only
+                        // scroll beyond that; fill = false keeps a short list short, and weighting
+                        // measures the Cancel/Run row first so it is never pushed off the sheet.
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 400.dp),
+                                .weight(1f, fill = false),
                     ) {
                         preview.ruleGroups.forEach { ruleGroup ->
                             item(key = "header_${ruleGroup.ruleId}") {
@@ -790,9 +801,16 @@ fun RulesScreen(
                                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
                                     verticalArrangement = Arrangement.spacedBy(2.dp),
                                 ) {
+                                    // Rule name is the sheet's top heading (the sheet hides its title bar);
+                                    // one step smaller in landscape, matching AppBottomSheet's title.
                                     Text(
                                         text = ruleGroup.ruleName,
-                                        style = MaterialTheme.typography.titleSmall,
+                                        style =
+                                            if (isLandscape()) {
+                                                MaterialTheme.typography.titleSmall
+                                            } else {
+                                                MaterialTheme.typography.titleMedium
+                                            },
                                     )
                                     Text(
                                         text =
@@ -806,7 +824,13 @@ fun RulesScreen(
                                                 ruleGroup.results.size,
                                             ),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        // "Permanently deleted" is a warning, so it takes the error color.
+                                        color =
+                                            if (ruleGroup.operationMode == OperationMode.DELETE) {
+                                                MaterialTheme.colorScheme.error
+                                            } else {
+                                                MaterialTheme.colorScheme.primary
+                                            },
                                     )
                                 }
                             }
@@ -892,23 +916,40 @@ fun RulesScreen(
                         }
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
+                // This row lives in the sheet content (not AppBottomSheet's `actions` slot, which a
+                // non-scrollable body would let the list push off-screen), so it mirrors that slot's
+                // landscape compaction itself: 36dp touch targets and a 4dp bottom gap.
+                val landscape = isLandscape()
+                CompositionLocalProvider(
+                    LocalMinimumInteractiveComponentSize provides if (landscape) 36.dp else 48.dp,
                 ) {
-                    FilePipeTextButton(onClick = { viewModel.dismissPreview() }) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    FilePipeButton(
-                        onClick = { viewModel.runPreviewedRules() },
-                        enabled = previewRunEnabled,
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(stringResource(R.string.preview_run))
+                        FilePipeTextButton(onClick = { viewModel.dismissPreview() }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        FilePipeButton(
+                            onClick = { viewModel.runPreviewedRules() },
+                            enabled = previewRunEnabled,
+                            colors =
+                                if (previewRunDeletes) {
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        contentColor = MaterialTheme.colorScheme.onError,
+                                    )
+                                } else {
+                                    ButtonDefaults.buttonColors()
+                                },
+                        ) {
+                            Text(stringResource(previewRunLabelRes))
+                        }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(if (landscape) 4.dp else 16.dp))
             }
         }
     }
@@ -964,7 +1005,6 @@ private fun SwipeToDismissRuleCard(
     isSelectionMode: Boolean,
     isExpanded: Boolean,
     progress: dev.bikram.filepipe.domain.model.RunProgress?,
-    isAnyRuleRunning: Boolean,
     hasStaleFolder: Boolean,
     folderIssueSeverity: RuleCardFolderIssueSeverity?,
     onStaleWarningClick: () -> Unit,
@@ -976,7 +1016,6 @@ private fun SwipeToDismissRuleCard(
     onToggleExpansion: () -> Unit,
     onDelete: () -> Unit,
     onDuplicate: () -> Unit,
-    onRunRule: () -> Unit,
     onCancelManualRun: () -> Unit,
     showInlineProgressCancel: Boolean,
     onPreviewRule: () -> Unit,
@@ -989,25 +1028,38 @@ private fun SwipeToDismissRuleCard(
     val cardShape = MaterialTheme.shapes.medium
     val isMockRule = DevMockFileMove.isMockRule(rule)
     val swipeAssigned = setOf(swipeStartToEnd, swipeEndToStart)
+    // Preview is the card's main button, so it never repeats in this row even when unassigned to a
+    // swipe; the Group action holds its slot instead (and always shows, whatever the swipe setup).
+    val groupLabel = stringResource(R.string.rule_card_group)
     val cardIconPairs: List<RuleCardAction> =
-        SwipeAction.entries
-            .filter { it !in swipeAssigned }
-            .filterNot { action -> isMockRule && action.isBlockedForMockRule() }
-            .map { action ->
-                RuleCardAction(
-                    iconName = action.materialSymbolName(isExpanded),
-                    label = action.label(isExpanded),
-                    onClick = {
-                        action.dispatch(
-                            onDelete = onDelete,
-                            onToggleExpansion = onToggleExpansion,
-                            onDuplicate = onDuplicate,
-                            onViewHistory = onViewHistory,
-                            onPreview = onPreviewRule,
-                        )
-                    },
-                )
+        SwipeAction.entries.mapNotNull { action ->
+            when {
+                action == SwipeAction.PREVIEW -> {
+                    // Placeholder: the Group feature isn't built yet.
+                    RuleCardAction(iconName = "stacks", label = groupLabel, onClick = {})
+                }
+
+                action in swipeAssigned || (isMockRule && action.isBlockedForMockRule()) -> {
+                    null
+                }
+
+                else -> {
+                    RuleCardAction(
+                        iconName = action.materialSymbolName(isExpanded),
+                        label = action.label(isExpanded),
+                        onClick = {
+                            action.dispatch(
+                                onDelete = onDelete,
+                                onToggleExpansion = onToggleExpansion,
+                                onDuplicate = onDuplicate,
+                                onViewHistory = onViewHistory,
+                                onPreview = onPreviewRule,
+                            )
+                        },
+                    )
+                }
             }
+        }
 
     DeliberateSwipeRevealCard(
         commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
@@ -1107,10 +1159,9 @@ private fun SwipeToDismissRuleCard(
             onLongClick = onLongClick,
             cardActions = cardIconPairs,
             onToggleEnabled = onToggleEnabled,
-            onRunClick = onRunRule,
+            onPreviewClick = onPreviewRule,
             onCancelRunClick = onCancelManualRun,
             showInlineProgressCancel = showInlineProgressCancel,
-            isAnyRuleRunning = isAnyRuleRunning,
             hasStaleFolder = hasStaleFolder,
             folderIssueSeverity = folderIssueSeverity,
             onStaleWarningClick = onStaleWarningClick,
@@ -1148,9 +1199,8 @@ private fun PendingNewRuleCard(
         onLongClick = {},
         cardActions = emptyList(),
         onToggleEnabled = {},
-        onRunClick = {},
+        onPreviewClick = {},
         onCancelRunClick = {},
-        isAnyRuleRunning = false,
         showOperationalControls = false,
         modifier = modifier,
     )

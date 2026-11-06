@@ -41,7 +41,7 @@
     <string name="rule_card_progress_no_matching_files">No matching files found</string>
     <string name="rule_card_progress_scanning">Scanning…</string>
     <string name="rule_card_progress_unknown_file">Unknown file</string>
-    <string name="shortcut_run_rule_label">Run: %1$s</string>
+    <string name="shortcut_preview_rule_label">Preview: %1$s</string>
 
     <!-- Rule detail screen -->
     <string name="rule_detail_redundant_subfolder_removed">Removed redundant subfolder(s): %1$s</string>
@@ -156,8 +156,6 @@
     <string name="run_select_all">Select all</string>
     <string name="run_deselect_all">Deselect all</string>
     <string name="run_cancel_selection">Cancel selection</string>
-    <string name="run_button">Run selected</string>
-    <string name="run_now">Run now</string>
 
     <!-- History screen -->
     <string name="history_no_files_affected">No files affected</string>
@@ -862,6 +860,8 @@
 
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>
+    <!-- Placeholder rule-card action; the Group feature itself is not built yet. -->
+    <string name="rule_card_group">Group</string>
     <string name="rule_scan_subdirs_label">Scan subfolders</string>
     <string name="rule_scan_subdirs_support">Subfolders will be scanned up to 32 levels deep for matching files</string>
     <string name="rule_recreate_subfolders_label">Mirror subfolders to destination</string>
@@ -893,12 +893,6 @@
 
     <!-- Preview sheet -->
     <string name="preview_title">Preview</string>
-    <string name="preview_title_for_rule">Preview — %1$s</string>
-    <plurals name="preview_title_selected_rules">
-        <item quantity="one">Preview — %1$d selected rule</item>
-        <item quantity="other">Preview — %1$d selected rules</item>
-    </plurals>
-    <string name="preview_selected_rules">Preview selected</string>
     <string name="preview_run">Run</string>
     <string name="preview_empty">No matching files found in the selected source folders</string>
     <string name="preview_would_skip">Would skip</string>
@@ -913,8 +907,8 @@
         <item quantity="other">%1$d files would be copied</item>
     </plurals>
     <plurals name="preview_files_would_delete">
-        <item quantity="one">%1$d file would be deleted</item>
-        <item quantity="other">%1$d files would be deleted</item>
+        <item quantity="one">%1$d file would be permanently deleted</item>
+        <item quantity="other">%1$d files would be permanently deleted</item>
     </plurals>
 
     <!-- Template picker -->
