@@ -3,7 +3,9 @@ package dev.bikram.filepipe.ui.screens.rules
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,9 +28,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ButtonDefaults
@@ -39,6 +45,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
@@ -56,25 +64,35 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.takeOrElse
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -97,6 +115,7 @@ import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeFilterChip
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.RuleCard
@@ -106,10 +125,13 @@ import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyRulesIllustration
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.previewSourceFolderDisplayPath
+import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
+import dev.bikram.filepipe.ui.feedback.performRejectHaptic
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalReducedMotion
 import dev.bikram.filepipe.ui.theme.LocalSnackbarHostState
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
@@ -120,6 +142,7 @@ import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -143,6 +166,13 @@ fun RulesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val rules = uiState.rules
+    val allRulesCount = uiState.allRulesCount
+    val availableGroups = uiState.availableGroups
+    val groupRuleCounts = uiState.groupRuleCounts
+    val ungroupedRuleCount = uiState.ungroupedRuleCount
+    val activeGroupFilter = uiState.activeGroupFilter
+    val showGroupFilterBar = availableGroups.isNotEmpty()
+    val headerItemCount = (if (showGroupFilterBar) 1 else 0) + (if (showPendingNewRuleInDetailPane) 1 else 0)
     val sortKey = uiState.sortKey
     val sortDirection = uiState.sortDirection
     val selectedRuleIds = uiState.selectedRuleIds
@@ -166,6 +196,9 @@ fun RulesScreen(
 
     var pendingDeleteSelected by remember { mutableStateOf(false) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var groupPickerRule by remember { mutableStateOf<Rule?>(null) }
+    var groupPickerBulkIds by remember { mutableStateOf<Set<Long>?>(null) }
+    var groupPickerBulkCommonGroup by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = LocalSnackbarHostState.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val hasSelection = selectedRuleIds.isNotEmpty()
@@ -230,14 +263,20 @@ fun RulesScreen(
             lazyListState.scrollToItem(0)
         }
     }
+    val currentHeaderItemCount = rememberUpdatedState(headerItemCount)
     val reorderableLazyListState =
         rememberReorderableLazyListState(lazyListState) { from, to ->
-            dragActuallyMoved = true
-            awaitingDraggedOrder = true
-            reorderableRules =
-                reorderableRules.toMutableList().apply {
-                    add(to.index, removeAt(from.index))
-                }
+            val offset = currentHeaderItemCount.value
+            val fromRuleIndex = from.index - offset
+            val toRuleIndex = to.index - offset
+            if (fromRuleIndex in reorderableRules.indices && toRuleIndex in reorderableRules.indices) {
+                dragActuallyMoved = true
+                awaitingDraggedOrder = true
+                reorderableRules =
+                    reorderableRules.toMutableList().apply {
+                        add(toRuleIndex, removeAt(fromRuleIndex))
+                    }
+            }
         }
     val sortKeyState = rememberUpdatedState(sortKey)
 
@@ -519,6 +558,21 @@ fun RulesScreen(
                                     ) {
                                         FilePipeMaterialRoundedSymbol(name = "delete", contentDescription = deleteLabel)
                                     }
+                                    val groupActionLabel = stringResource(R.string.rule_card_group)
+                                    FilePipeFilledTonalIconButton(
+                                        onClick = {
+                                            groupPickerBulkIds = selectedRuleIds
+                                            groupPickerBulkCommonGroup = uiState.selectedRulesCommonGroup
+                                        },
+                                        tooltipLabel = groupActionLabel,
+                                        colors =
+                                            IconButtonDefaults.filledTonalIconButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            ),
+                                    ) {
+                                        FilePipeMaterialRoundedSymbol(name = "stacks", contentDescription = groupActionLabel)
+                                    }
                                     // Every manual run goes through the preview sheet, whose Run button
                                     // starts it - there is no blind "Run selected".
                                     FilePipeFilledTonalButton(
@@ -547,7 +601,7 @@ fun RulesScreen(
             }
         },
     ) { innerPadding ->
-        if (rules.isEmpty() && !showPendingNewRuleInDetailPane) {
+        if (allRulesCount == 0 && !showPendingNewRuleInDetailPane) {
             RulesEmptyState(
                 onAddRule = {
                     onEditRule(Screen.RuleDetail.NEW_RULE_ID)
@@ -594,6 +648,18 @@ fun RulesScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 userScrollEnabled = listScrollEnabled,
             ) {
+                if (showGroupFilterBar) {
+                    item(key = "group_filter_bar") {
+                        RuleGroupFilterBar(
+                            availableGroups = availableGroups,
+                            groupRuleCounts = groupRuleCounts,
+                            ungroupedRuleCount = ungroupedRuleCount,
+                            activeFilter = activeGroupFilter,
+                            onSelectFilter = { filter -> viewModel.setGroupFilter(filter) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
                 if (showPendingNewRuleInDetailPane) {
                     item(key = "pending_new_rule") {
                         PendingNewRuleCard(
@@ -689,6 +755,7 @@ fun RulesScreen(
                                 viewModel.startPreview(rule)
                             },
                             onViewHistory = { onNavigateToRuleHistory(rule.id) },
+                            onAssignGroup = { groupPickerRule = rule },
                             onLeadingLongClick =
                                 if (reorderLongPressActive) {
                                     { viewModel.toggleSelection(rule.id) }
@@ -717,6 +784,38 @@ fun RulesScreen(
             },
             onDismiss = { pendingDeleteSelected = false },
             destructive = true,
+        )
+    }
+
+    if (groupPickerRule != null || groupPickerBulkIds != null) {
+        val singleRule = groupPickerRule
+        val bulkIds = groupPickerBulkIds
+        RuleGroupPickerSheet(
+            subtitleTemplate =
+                stringResource(
+                    if (singleRule != null) {
+                        R.string.rule_group_sheet_subtitle_single
+                    } else {
+                        R.string.rule_group_sheet_subtitle_multiple
+                    },
+                    RULE_GROUP_SUBTITLE_MARKER,
+                ),
+            subtitleHighlight = singleRule?.name ?: (bulkIds?.size ?: 0).toString(),
+            currentGroup = if (singleRule != null) singleRule.groupName else groupPickerBulkCommonGroup,
+            hasAnyGroupAssigned = singleRule?.groupName != null || bulkIds != null,
+            availableGroups = availableGroups,
+            onSelectGroup = { chosenGroup ->
+                if (singleRule != null) {
+                    viewModel.setRuleGroup(singleRule.id, chosenGroup)
+                } else if (bulkIds != null) {
+                    viewModel.setRulesGroup(bulkIds, chosenGroup)
+                }
+            },
+            onDismiss = {
+                groupPickerRule = null
+                groupPickerBulkIds = null
+                groupPickerBulkCommonGroup = null
+            },
         )
     }
 
@@ -1121,6 +1220,7 @@ private fun SwipeToDismissRuleCard(
     showInlineProgressCancel: Boolean,
     onPreviewRule: () -> Unit,
     onViewHistory: () -> Unit,
+    onAssignGroup: () -> Unit,
     modifier: Modifier = Modifier,
     onLeadingLongClick: (() -> Unit)? = null,
     reorderLongPressDrag: () -> Modifier = { Modifier },
@@ -1129,38 +1229,46 @@ private fun SwipeToDismissRuleCard(
     val cardShape = MaterialTheme.shapes.medium
     val isMockRule = DevMockFileMove.isMockRule(rule)
     val swipeAssigned = setOf(swipeStartToEnd, swipeEndToStart)
-    // Preview is the card's main button, so it never repeats in this row even when unassigned to a
-    // swipe; the Group action holds its slot instead (and always shows, whatever the swipe setup).
+    // Preview is the card's main button, so it never repeats in this row. The Group action always
+    // leads the row (whatever the swipe setup) and turns into a chip showing the group's name once
+    // the rule has one.
     val groupLabel = stringResource(R.string.rule_card_group)
     val cardIconPairs: List<RuleCardAction> =
-        SwipeAction.entries.mapNotNull { action ->
-            when {
-                action == SwipeAction.PREVIEW -> {
-                    // Placeholder: the Group feature isn't built yet.
-                    RuleCardAction(iconName = "stacks", label = groupLabel, onClick = {})
-                }
+        listOf(
+            RuleCardAction(
+                iconName = "stacks",
+                label = groupLabel,
+                onClick = onAssignGroup,
+                chipLabel = rule.groupName,
+            ),
+        ) +
+            SwipeAction.entries.mapNotNull { action ->
+                when {
+                    action == SwipeAction.PREVIEW -> {
+                        null
+                    }
 
-                action in swipeAssigned || (isMockRule && action.isBlockedForMockRule()) -> {
-                    null
-                }
+                    action in swipeAssigned || (isMockRule && action.isBlockedForMockRule()) -> {
+                        null
+                    }
 
-                else -> {
-                    RuleCardAction(
-                        iconName = action.materialSymbolName(isExpanded),
-                        label = action.label(isExpanded),
-                        onClick = {
-                            action.dispatch(
-                                onDelete = onDelete,
-                                onToggleExpansion = onToggleExpansion,
-                                onDuplicate = onDuplicate,
-                                onViewHistory = onViewHistory,
-                                onPreview = onPreviewRule,
-                            )
-                        },
-                    )
+                    else -> {
+                        RuleCardAction(
+                            iconName = action.materialSymbolName(isExpanded),
+                            label = action.label(isExpanded),
+                            onClick = {
+                                action.dispatch(
+                                    onDelete = onDelete,
+                                    onToggleExpansion = onToggleExpansion,
+                                    onDuplicate = onDuplicate,
+                                    onViewHistory = onViewHistory,
+                                    onPreview = onPreviewRule,
+                                )
+                            },
+                        )
+                    }
                 }
             }
-        }
 
     DeliberateSwipeRevealCard(
         commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
@@ -1463,6 +1571,274 @@ fun RulesEmptyState(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.rules_add_rule))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun RuleGroupFilterBar(
+    availableGroups: List<String>,
+    groupRuleCounts: Map<String, Int>,
+    ungroupedRuleCount: Int,
+    activeFilter: RuleGroupFilter,
+    onSelectFilter: (RuleGroupFilter) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        item(key = "group_filter_all") {
+            FilePipeFilterChip(
+                selected = activeFilter == RuleGroupFilter.All,
+                onClick = { onSelectFilter(RuleGroupFilter.All) },
+                label = { Text(stringResource(R.string.rule_group_filter_all)) },
+            )
+        }
+        items(availableGroups, key = { groupName -> "group_filter_$groupName" }) { groupName ->
+            val count = groupRuleCounts[groupName] ?: 0
+            FilePipeFilterChip(
+                selected = activeFilter == RuleGroupFilter.Group(groupName),
+                onClick = { onSelectFilter(RuleGroupFilter.Group(groupName)) },
+                label = {
+                    Text(stringResource(R.string.rule_group_filter_chip_count, groupName, count))
+                },
+            )
+        }
+        if (ungroupedRuleCount > 0) {
+            item(key = "group_filter_ungrouped") {
+                val ungroupedLabel = stringResource(R.string.rule_group_filter_ungrouped)
+                FilePipeFilterChip(
+                    selected = activeFilter == RuleGroupFilter.Ungrouped,
+                    onClick = { onSelectFilter(RuleGroupFilter.Ungrouped) },
+                    label = {
+                        Text(
+                            stringResource(
+                                R.string.rule_group_filter_chip_count,
+                                ungroupedLabel,
+                                ungroupedRuleCount,
+                            ),
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
+private const val RULE_GROUP_NAME_MAX_LENGTH = 10
+
+// Private-use character passed into the subtitle format string so the highlighted part (rule name
+// or count) can be located and bolded wherever the translation places it.
+private const val RULE_GROUP_SUBTITLE_MARKER = "\uE000"
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun RuleGroupPickerSheet(
+    subtitleTemplate: String,
+    subtitleHighlight: String,
+    currentGroup: String?,
+    hasAnyGroupAssigned: Boolean,
+    availableGroups: List<String>,
+    onSelectGroup: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val newGroupFieldState = rememberTextFieldState()
+    val trimmedNewGroup = newGroupFieldState.text.toString().trim()
+    val newGroupLength = newGroupFieldState.text.length
+    val pillShape = MaterialTheme.shapes.extraLarge
+    val newGroupFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        if (availableGroups.isEmpty()) {
+            newGroupFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
+    val view = LocalView.current
+    val hapticEnabled by rememberUpdatedState(LocalHapticEnabled.current)
+    val reducedMotion by rememberUpdatedState(LocalReducedMotion.current)
+    val sheetScope = rememberCoroutineScope()
+    val limitBuzzOffset = remember { Animatable(0f) }
+    val sheetState =
+        rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        )
+    // Picking a group must slide the sheet down like a swipe-dismiss; removing it from the
+    // composition straight away would make it vanish in a single frame.
+    val chooseGroup: (String?) -> Unit = { chosenGroup ->
+        onSelectGroup(chosenGroup)
+        sheetScope.launch {
+            sheetState.hide()
+            onDismiss()
+        }
+    }
+    // Cuts anything past the limit (typed or pasted), and buzzes whenever an edit grows the text
+    // to the limit or tries to grow it beyond the limit: a haptic reject plus the same tiny, fast
+    // horizontal jitter Remember's editor title field plays at its width limit (keep in parity).
+    val groupNameInputTransformation =
+        remember(view) {
+            InputTransformation {
+                val proposedLength = length
+                val growsText = proposedLength > originalText.length
+                if (proposedLength > RULE_GROUP_NAME_MAX_LENGTH) {
+                    replace(RULE_GROUP_NAME_MAX_LENGTH, proposedLength, "")
+                }
+                if (growsText && length >= RULE_GROUP_NAME_MAX_LENGTH) {
+                    if (hapticEnabled) {
+                        view.performRejectHaptic()
+                    }
+                    if (!reducedMotion) {
+                        sheetScope.launch {
+                            limitBuzzOffset.snapTo(0f)
+                            limitBuzzOffset.animateTo(targetValue = -3f, animationSpec = tween(durationMillis = 25))
+                            limitBuzzOffset.animateTo(targetValue = 3f, animationSpec = tween(durationMillis = 50))
+                            limitBuzzOffset.animateTo(targetValue = 0f, animationSpec = tween(durationMillis = 25))
+                        }
+                    }
+                }
+            }
+        }
+    val subtitleParts = subtitleTemplate.split(RULE_GROUP_SUBTITLE_MARKER)
+    val subtitleText =
+        buildAnnotatedString {
+            append(subtitleParts.first())
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(subtitleHighlight) }
+            append(subtitleParts.getOrElse(1) { "" })
+        }
+
+    AppBottomSheet(
+        title = stringResource(R.string.rule_group_sheet_title),
+        onDismiss = onDismiss,
+        sheetState = sheetState,
+        subtitleContent = {
+            Text(
+                text = subtitleText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        titleActions =
+            if (hasAnyGroupAssigned) {
+                {
+                    FilePipeTextButton(onClick = { chooseGroup(null) }) {
+                        Text(stringResource(R.string.rule_group_remove))
+                    }
+                }
+            } else {
+                null
+            },
+    ) {
+        // OutlinedTextField reserves extra space above its border for the floating label, so a
+        // centered Row would line the button up with that taller box instead of the visible
+        // border. Bottom-align instead (the border box ends at the field's bottom edge) and lift
+        // the button by half the height difference. The button is laid out at its touch-target
+        // height (its 40dp visual shape centered inside), so that height is what must be centered.
+        val createButtonLayoutHeight =
+            maxOf(
+                ButtonDefaults.MinHeight,
+                LocalMinimumInteractiveComponentSize.current.takeOrElse { ButtonDefaults.MinHeight },
+            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                state = newGroupFieldState,
+                label = { Text(stringResource(R.string.rule_group_new_label)) },
+                placeholder = { Text(stringResource(R.string.rule_group_new_placeholder)) },
+                lineLimits = TextFieldLineLimits.SingleLine,
+                inputTransformation = groupNameInputTransformation,
+                trailingIcon = {
+                    Text(
+                        text =
+                            stringResource(
+                                R.string.rule_group_name_counter,
+                                newGroupLength,
+                                RULE_GROUP_NAME_MAX_LENGTH,
+                            ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color =
+                            if (newGroupLength >= RULE_GROUP_NAME_MAX_LENGTH) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                    )
+                },
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .focusRequester(newGroupFocusRequester)
+                        .graphicsLayer { translationX = limitBuzzOffset.value },
+            )
+            FilePipeFilledTonalButton(
+                onClick = {
+                    if (trimmedNewGroup.isNotEmpty()) {
+                        chooseGroup(trimmedNewGroup)
+                    }
+                },
+                enabled = trimmedNewGroup.isNotEmpty(),
+                shape = pillShape,
+                modifier = Modifier.padding(bottom = (OutlinedTextFieldDefaults.MinHeight - createButtonLayoutHeight) / 2),
+            ) {
+                Text(stringResource(R.string.rule_group_create_and_assign))
+            }
+        }
+
+        if (availableGroups.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                availableGroups.forEach { groupName ->
+                    val isSelected = currentGroup == groupName
+                    Surface(
+                        onClick = { chooseGroup(groupName) },
+                        shape = MaterialTheme.shapes.medium,
+                        color =
+                            if (isSelected) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                            },
+                        contentColor =
+                            if (isSelected) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = groupName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (isSelected) {
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "check",
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                )
+                            }
+                        }
                     }
                 }
             }

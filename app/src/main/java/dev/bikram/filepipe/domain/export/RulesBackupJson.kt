@@ -26,7 +26,7 @@ import java.io.InputStream
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
  * (`@Database`); Room KSP does not allow that annotation to reference this constant.
  */
-const val APP_DATABASE_SCHEMA_VERSION = 12
+const val APP_DATABASE_SCHEMA_VERSION = 13
 
 /**
  * Root object for `filepipe_backup_*.json`.
@@ -58,6 +58,7 @@ data class RuleBackupDto(
     /** Null in backups written before the rule carried its own last-run time. */
     val lastRunStartedAt: Long? = null,
     val cardModeOverride: Boolean = false,
+    val groupName: String? = null,
     val schedule: ScheduleBackupDto? = null,
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
@@ -183,6 +184,7 @@ fun Rule.toBackupDto(): RuleBackupDto =
         sortOrder = sortOrder,
         lastRunStartedAt = lastRunStartedAt,
         cardModeOverride = cardModeOverride,
+        groupName = groupName?.trim()?.takeIf { it.isNotEmpty() },
         schedule = schedule?.toBackupDto(),
         conflictPolicy = conflictPolicy.name,
         operationMode = operationMode.name,
@@ -298,6 +300,7 @@ fun RuleBackupDto.toDomain(): Rule =
         sortOrder = sortOrder,
         lastRunStartedAt = lastRunStartedAt,
         cardModeOverride = cardModeOverride,
+        groupName = groupName?.trim()?.takeIf { it.isNotEmpty() },
         schedule = schedule?.toDomain(),
         conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
         operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),

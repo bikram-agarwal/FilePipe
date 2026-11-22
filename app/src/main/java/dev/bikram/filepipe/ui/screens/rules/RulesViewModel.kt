@@ -184,6 +184,17 @@ sealed interface ManualRunCancelAnchor {
     data object RunSelectedBar : ManualRunCancelAnchor
 }
 
+/** Active group filter for the Rules screen list. */
+sealed interface RuleGroupFilter {
+    data object All : RuleGroupFilter
+
+    data class Group(
+        val name: String,
+    ) : RuleGroupFilter
+
+    data object Ungrouped : RuleGroupFilter
+}
+
 /** A sorted rules list together with the sort selection that produced it. */
 private data class SortedRules(
     val rules: List<Rule>,
@@ -193,12 +204,18 @@ private data class SortedRules(
 
 data class RulesUiState(
     val rules: List<Rule> = emptyList(),
+    val allRulesCount: Int = 0,
+    val availableGroups: List<String> = emptyList(),
+    val groupRuleCounts: Map<String, Int> = emptyMap(),
+    val ungroupedRuleCount: Int = 0,
+    val activeGroupFilter: RuleGroupFilter = RuleGroupFilter.All,
     val staleRuleIds: Set<Long> = emptySet(),
     val staleRuleWarningIds: Set<Long> = emptySet(),
     val staleRuleErrorIds: Set<Long> = emptySet(),
     val swipeStartToEnd: SwipeAction = SwipeAction.EDIT,
     val swipeEndToStart: SwipeAction = SwipeAction.DELETE,
     val selectedRuleIds: Set<Long> = emptySet(),
+    val selectedRulesCommonGroup: String? = null,
     val progressMap: Map<Long, RunProgress> = emptyMap(),
     val isRunning: Boolean = false,
     val manualRunCancelAnchor: ManualRunCancelAnchor = ManualRunCancelAnchor.None,
@@ -235,6 +252,7 @@ class RulesViewModel
 
         private val _staleRuleIssues = MutableStateFlow<Map<Long, RuleFolderIssueSeverity>>(emptyMap())
         private val _selectedRuleIds = MutableStateFlow<Set<Long>>(emptySet())
+        private val _activeGroupFilter = MutableStateFlow<RuleGroupFilter>(RuleGroupFilter.All)
         private val _progressMap = MutableStateFlow<Map<Long, RunProgress>>(emptyMap())
         private val _previewState = MutableStateFlow<PreviewState?>(null)
         private var previewJob: Job? = null
@@ -329,6 +347,61 @@ class RulesViewModel
                     )
                 }.combine(_manualRunCancelAnchor) { state, anchor ->
                     state.copy(manualRunCancelAnchor = anchor)
+                }.combine(_activeGroupFilter) { state, requestedFilter ->
+                    val allRules = state.rules
+                    val availableGroups =
+                        allRules
+                            .mapNotNull { it.groupName }
+                            .distinct()
+                            .sortedWith(String.CASE_INSENSITIVE_ORDER)
+                    val groupRuleCounts =
+                        allRules
+                            .mapNotNull { it.groupName }
+                            .groupingBy { it }
+                            .eachCount()
+                    val ungroupedCount = allRules.count { it.groupName == null }
+                    val effectiveFilter =
+                        when (requestedFilter) {
+                            RuleGroupFilter.All -> {
+                                RuleGroupFilter.All
+                            }
+
+                            is RuleGroupFilter.Group -> {
+                                if (requestedFilter.name in availableGroups) {
+                                    requestedFilter
+                                } else {
+                                    RuleGroupFilter.All
+                                }
+                            }
+
+                            RuleGroupFilter.Ungrouped -> {
+                                if (availableGroups.isNotEmpty() && ungroupedCount > 0) {
+                                    RuleGroupFilter.Ungrouped
+                                } else {
+                                    RuleGroupFilter.All
+                                }
+                            }
+                        }
+                    val filteredRules =
+                        when (effectiveFilter) {
+                            RuleGroupFilter.All -> allRules
+                            is RuleGroupFilter.Group -> allRules.filter { it.groupName == effectiveFilter.name }
+                            RuleGroupFilter.Ungrouped -> allRules.filter { it.groupName == null }
+                        }
+                    state.copy(
+                        rules = filteredRules,
+                        selectedRulesCommonGroup =
+                            allRules
+                                .filter { rule -> rule.id in state.selectedRuleIds }
+                                .map { rule -> rule.groupName }
+                                .distinct()
+                                .singleOrNull(),
+                        allRulesCount = allRules.size,
+                        availableGroups = availableGroups,
+                        groupRuleCounts = groupRuleCounts,
+                        ungroupedRuleCount = ungroupedCount,
+                        activeGroupFilter = effectiveFilter,
+                    )
                 }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RulesUiState())
 
         private val _navigateAfterRun = MutableSharedFlow<RulesRunNavigation>(extraBufferCapacity = 1)
@@ -694,7 +767,34 @@ class RulesViewModel
         }
 
         fun selectAll() {
-            _selectedRuleIds.value = _rules.value.map { it.id }.toSet()
+            _selectedRuleIds.value =
+                uiState.value.rules
+                    .map { it.id }
+                    .toSet()
+        }
+
+        fun setGroupFilter(filter: RuleGroupFilter) {
+            if (_activeGroupFilter.value != filter) {
+                _activeGroupFilter.value = filter
+                _selectedRuleIds.value = emptySet()
+            }
+        }
+
+        fun setRuleGroup(
+            ruleId: Long,
+            groupName: String?,
+        ) = viewModelScope.launch(ioDispatcher) {
+            ruleRepository.updateRuleGroup(ruleId, groupName)
+            rulesAutoExportTrigger.maybeExportAfterRuleChange()
+        }
+
+        fun setRulesGroup(
+            ruleIds: Set<Long>,
+            groupName: String?,
+        ) = viewModelScope.launch(ioDispatcher) {
+            ruleRepository.updateRulesGroup(ruleIds, groupName)
+            rulesAutoExportTrigger.maybeExportAfterRuleChange()
+            _selectedRuleIds.value = emptySet()
         }
 
         fun setSort(
@@ -1260,7 +1360,22 @@ class RulesViewModel
             ordered: List<Rule>,
             alsoSwitchSortToMyOrder: Boolean,
         ) = viewModelScope.launch(ioDispatcher) {
-            persistSortOrderIndices(ordered)
+            val allInMyOrder = sortRulesList(_rules.value, HistorySortKey.MY_ORDER, HistorySortDirection.ASCENDING)
+            val fullOrdered =
+                if (ordered.size >= allInMyOrder.size) {
+                    ordered
+                } else {
+                    val reorderedIds = ordered.map { it.id }.toSet()
+                    val queue = ArrayDeque(ordered)
+                    allInMyOrder.map { existing ->
+                        if (existing.id in reorderedIds && queue.isNotEmpty()) {
+                            queue.removeFirst()
+                        } else {
+                            existing
+                        }
+                    }
+                }
+            persistSortOrderIndices(fullOrdered)
             rulesAutoExportTrigger.maybeExportAfterRuleChange()
             if (alsoSwitchSortToMyOrder) {
                 userPreferencesRepository.setRulesSort(

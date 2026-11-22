@@ -125,6 +125,13 @@ object DatabaseModule {
             }
         }
 
+    internal val migration12To13 =
+        object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE rules ADD COLUMN groupName TEXT")
+            }
+        }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -142,6 +149,7 @@ object DatabaseModule {
                 migration9To10,
                 migration10To11,
                 migration11To12,
+                migration12To13,
             )
             // Fail closed if a migration path is missing. Recreating this database would silently
             // erase rules and run history, while a failed open leaves the original file recoverable.

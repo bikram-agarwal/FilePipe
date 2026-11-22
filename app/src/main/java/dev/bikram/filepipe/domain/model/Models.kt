@@ -28,6 +28,8 @@ data class Rule(
     val lastRunStartedAt: Long? = null,
     /** Overrides the global expanded/collapsed display mode for this rule card. */
     val cardModeOverride: Boolean = false,
+    /** Optional user-defined group label for organizing and filtering rules. */
+    val groupName: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val trashedAt: Long? = null,

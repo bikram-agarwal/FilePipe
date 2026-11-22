@@ -64,6 +64,38 @@ class DatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun migration12To13AddsRuleGroupName() {
+        migrationHelper.createDatabase(TEST_DATABASE_NAME, 12).apply {
+            execSQL(
+                """
+                INSERT INTO rules
+                    (id, name, sourceFolderPaths, destinationFolderPath, fileExtensions, isEnabled,
+                     sortOrder, cardModeOverride, createdAt, updatedAt, conflictPolicy, operationMode,
+                     scanSubdirectories, recreateDestinationSubfolders, suppress_missing_source_folder_card,
+                     iconKey, excludePatterns, isRegexPattern, isExcludeRegexPattern)
+                VALUES
+                    (1, 'Existing Rule', '[]', '', '[]', 1, 0, 0, 1, 1, 'RENAME_SUFFIX', 'MOVE',
+                     0, 0, 0, 'DEFAULT', '[]', 0, 0)
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        val migratedDatabase =
+            migrationHelper.runMigrationsAndValidate(
+                TEST_DATABASE_NAME,
+                13,
+                true,
+                DatabaseModule.migration12To13,
+            )
+        val cursor = migratedDatabase.query("SELECT id, groupName FROM rules WHERE id = 1")
+        cursor.use {
+            check(it.moveToFirst())
+            assertEquals(null, it.getString(1))
+        }
+    }
+
     private companion object {
         const val TEST_DATABASE_NAME = "migration-test"
     }
