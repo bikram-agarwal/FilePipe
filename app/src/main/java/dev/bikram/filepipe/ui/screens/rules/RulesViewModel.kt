@@ -72,6 +72,12 @@ data class DeleteUndoEvent(
     val rules: List<Rule>,
 )
 
+/** A duplicate just created from the rules list; Undo removes it again (see undoDuplicate). */
+data class DuplicateUndoEvent(
+    val copyRuleId: Long,
+    val copyName: String,
+)
+
 data class PreviewState(
     val isLoading: Boolean = true,
     val results: List<PreviewFileResult> = emptyList(),
@@ -330,6 +336,9 @@ class RulesViewModel
 
         private val _deleteUndoEvent = MutableSharedFlow<DeleteUndoEvent>(extraBufferCapacity = 1)
         val deleteUndoEvent = _deleteUndoEvent.asSharedFlow()
+
+        private val _duplicateUndoEvent = MutableSharedFlow<DuplicateUndoEvent>(extraBufferCapacity = 1)
+        val duplicateUndoEvent = _duplicateUndoEvent.asSharedFlow()
 
         // One-shot snackbar messages: a Channel (not a StateFlow) so each message is delivered
         // exactly once — no replay on rotation, and identical/rapid messages aren't conflated.
@@ -1083,9 +1092,19 @@ class RulesViewModel
                         // and sort under "last run" as though it had.
                         lastRunStartedAt = null,
                     )
-                ruleRepository.saveRule(copy)
+                val copyRuleId = ruleRepository.saveRule(copy)
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
-                postUserMessage("\"${copy.name}\" created")
+                _duplicateUndoEvent.emit(DuplicateUndoEvent(copyRuleId, copy.name))
+            }
+
+        /**
+         * Removes a duplicate outright rather than trashing it: the copy is seconds old and was
+         * never run or scheduled (duplicates start disabled), so Trash would only hold clutter.
+         */
+        fun undoDuplicate(event: DuplicateUndoEvent) =
+            viewModelScope.launch {
+                ruleRepository.deleteRuleForever(event.copyRuleId)
+                rulesAutoExportTrigger.maybeExportAfterRuleChange()
             }
 
         private fun mockLargeFileNames(): List<String> =

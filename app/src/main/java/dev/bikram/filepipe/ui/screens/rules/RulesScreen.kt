@@ -285,6 +285,21 @@ fun RulesScreen(
         }
     }
 
+    // Same Undo snackbar as deleting a rule.
+    LaunchedEffect(viewModel) {
+        viewModel.duplicateUndoEvent.collect { event ->
+            val result =
+                snackbarHostState.showSnackbar(
+                    message = resources.getString(R.string.rule_duplicated, event.copyName),
+                    actionLabel = resources.getString(R.string.undo),
+                    duration = SnackbarDuration.Long,
+                )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoDuplicate(event)
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.userMessages.collect { msg ->
             snackbarHostState.showSnackbar(

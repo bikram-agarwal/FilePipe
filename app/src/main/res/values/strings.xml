@@ -203,6 +203,7 @@
     <string name="history_trash_empty_confirm_title">Delete all rules forever?</string>
     <string name="history_trash_empty_confirm_message">All rules in Trash will be permanently deleted and cannot be recovered.</string>
     <string name="rule_moved_to_trash">\"%1$s\" moved to Trash</string>
+    <string name="rule_duplicated">\"%1$s\" created</string>
     <plurals name="rules_moved_to_trash">
         <item quantity="one">%1$d rule moved to Trash</item>
         <item quantity="other">%1$d rules moved to Trash</item>
