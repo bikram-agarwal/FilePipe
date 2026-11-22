@@ -125,14 +125,14 @@ class FileScanOptimizationTest {
                     extensions = listOf("*"),
                     filenameRegexes = null,
                     isRegexPattern = false,
-                    excludeRegexes = buildExcludeRegexes(patterns, isRegexPattern = false),
+                    excludeRegexes = parseExcludePatterns(patterns, isRegexPattern = false).fileRegexes,
                     isExcludeRegexPattern = false,
                     minFileSizeBytes = null,
                     maxFileSizeBytes = null,
                     minAgeMs = null,
                     maxAgeMs = null,
                     nowMs = 0L,
-                    excludeFolderPatterns = buildExcludeFolderPatterns(patterns, isRegexPattern = false),
+                    excludeFolderPatterns = parseExcludePatterns(patterns, isRegexPattern = false).folderPatterns,
                 )
 
             val scannedFiles =

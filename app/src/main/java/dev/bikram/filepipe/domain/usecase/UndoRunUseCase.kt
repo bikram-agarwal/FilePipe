@@ -138,11 +138,7 @@ class UndoRunUseCase
                 runHistoryRepository
                     .getFilesForRunOnce(historyId)
                     .filter { fileMoved -> fileMoved.hasRecoverableDestination }
-            val pendingFiles =
-                movedFiles.filter { fileMoved ->
-                    shouldAttemptUndo(fileMoved.undoStatus) &&
-                        (selectedFileIds == null || fileMoved.id in selectedFileIds)
-                }
+            val pendingFiles = undoCandidates(movedFiles, selectedFileIds)
             val totalBytes = pendingFiles.sumOf { fileMoved -> fileMoved.fileSizeBytes.coerceAtLeast(0L) }
             var processedFiles = 0
             var processedBytes = 0L
@@ -172,7 +168,6 @@ class UndoRunUseCase
                     historyId = historyId,
                     movedFiles = pendingFiles,
                     totalBytes = totalBytes,
-                    markRunReversedWhenComplete = selectedFileIds == null,
                     onProgress = onProgress,
                 )
             }
@@ -327,19 +322,20 @@ class UndoRunUseCase
             }
         }
 
+        /**
+         * Marks each file UNDONE as it goes and leaves the run's own status to [syncRunUndoStatus] in
+         * [invoke]'s `finally`, as the real path does: Reversed once every file is undone, Partially
+         * undone after a selective undo that left some.
+         */
         private suspend fun undoMockRun(
             historyId: Long,
             movedFiles: List<FileMoved>,
             totalBytes: Long,
-            markRunReversedWhenComplete: Boolean = true,
             onProgress: (UndoProgress) -> Unit,
         ): UndoResult {
             if (movedFiles.isEmpty()) {
                 _activeUndoProgress.update { it + (historyId to 1f) }
                 onProgress(UndoProgress(0, 0, 0L, 0L))
-                if (markRunReversedWhenComplete) {
-                    runHistoryRepository.markRunReversed(historyId)
-                }
                 return UndoResult(
                     totalReversed = 0,
                     totalFailed = 0,
@@ -370,9 +366,6 @@ class UndoRunUseCase
                 )
             }
             _activeUndoProgress.update { it + (historyId to 1f) }
-            if (markRunReversedWhenComplete) {
-                runHistoryRepository.markRunReversed(historyId)
-            }
             return UndoResult(
                 totalReversed = movedFiles.size,
                 totalFailed = 0,
@@ -721,6 +714,26 @@ private data class UndoRestoreTarget(
 internal fun shouldAttemptUndo(undoStatus: FileUndoStatus): Boolean {
     return undoStatus != FileUndoStatus.UNDONE
 }
+
+/**
+ * Whether undo can still take this file back: the run left something at its destination
+ * ([hasRecoverableDestination]) and it isn't undone yet. The one definition shared by the undo
+ * itself, history detail's selectable files, and each file row's checkbox.
+ */
+internal val FileMoved.isUndoCandidate: Boolean
+    get() = hasRecoverableDestination && shouldAttemptUndo(undoStatus)
+
+/**
+ * The files an undo works through, in run order: every [isUndoCandidate] file, or for a selective
+ * undo only those also in [selectedFileIds] (null = the whole run).
+ */
+internal fun undoCandidates(
+    files: List<FileMoved>,
+    selectedFileIds: Set<Long>? = null,
+): List<FileMoved> =
+    files.filter { file ->
+        file.isUndoCandidate && (selectedFileIds == null || file.id in selectedFileIds)
+    }
 
 @Suppress("ktlint:standard:function-expression-body")
 internal fun undoStatusAfterFailure(physicalUndoCompleted: Boolean): FileUndoStatus {

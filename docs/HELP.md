@@ -123,12 +123,13 @@
 
 **Steps**
 1. In the **Source folders** section, turn on **Scan subfolders**. Folder exclusions only work when this is on, because FilePipe does not look inside subfolders otherwise.
-3. Scroll down and tap **Advanced filters** to expand it.
-4. In the **Exclude patterns** box, type the folder name followed by `/`, for example `cache/`. To add more patterns, separate them with commas, such as `.nomedia, cache/, .thumbnails/`.
-5. Tap **Save**. Tap **Preview** to check which files the rule would act on before you run it.
+2. Scroll down and tap **Advanced filters** to expand it.
+3. In the **Exclude patterns** box, type the folder name followed by `/`, for example `cache/`. To add more patterns, separate them with commas, such as `.nomedia, cache/, .thumbnails/`.
+4. Tap **Save**. Tap **Preview** to check which files the rule would act on before you run it.
 
 **What a pattern matches**
 - `cache/` skips every folder named `cache`, at any depth inside each source folder.
+- `/cache/` (starting with `/`) skips only a `cache` folder directly inside a source folder. Deeper folders named `cache` are not affected.
 - `DCIM/cache/` skips only the `cache` folder inside `DCIM`. Paths are counted from each source folder, and `/` separates folder names. Other folders named `cache` are not affected.
 - Wildcards work too. `thumb*/` skips any folder whose name starts with `thumb`.
 - A skipped folder is skipped along with everything inside it.

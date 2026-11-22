@@ -871,7 +871,6 @@
     <string name="rule_group_new_label">New group name</string>
     <string name="rule_group_new_placeholder">e.g. Documents, Music</string>
     <string name="rule_group_create_and_assign">Create</string>
-    <string name="rule_group_none">No group</string>
     <string name="rule_group_remove">Remove from group</string>
     <string name="rule_group_badge_cd">Group: %1$s</string>
     <string name="rule_scan_subdirs_label">Scan subfolders</string>
@@ -888,6 +887,7 @@
     <string name="operation_delete">Delete</string>
     <string name="file_operation_incomplete_copy">The destination file did not receive all source data</string>
     <string name="file_operation_source_changed_after_confirmation">The file changed after deletion was confirmed, so it was not deleted</string>
+    <string name="file_operation_source_changed_after_preview">The file changed after it was previewed, so it was left in place</string>
     <string name="file_operation_source_delete_failed">The source file could not be deleted after it was copied</string>
     <string name="rule_operation_delete_warning">CAUTION: FILES WILL BE PERMANENTLY DELETED, WITH NO UNDO OPTION ANYWHERE.</string>
     <string name="rule_delete_confirmation_scan_failed">Couldn\'t verify which files would be deleted. Nothing was changed.</string>

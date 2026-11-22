@@ -114,64 +114,62 @@ private fun isFolderExcludePattern(
     isRegexPattern: Boolean,
 ): Boolean = trimmed.endsWith("/") && (!isRegexPattern || !trimmed.endsWith("\\/"))
 
-private fun stripTrailingFolderSlash(trimmed: String): String = trimmed.trimEnd('/')
+/**
+ * A rule's exclude patterns, split into file and folder patterns and compiled. Either list is null when
+ * a RegEx pattern doesn't compile: the rule then excludes everything rather than run with part of its
+ * exclusions silently dropped ([shouldExclude] / [shouldExcludeFolder] treat null that way).
+ */
+internal data class ExcludePatterns(
+    val fileRegexes: List<Regex>?,
+    val folderPatterns: List<ExcludeFolderPattern>?,
+)
 
-internal fun buildExcludeRegexes(
+private val InvalidExcludePatterns = ExcludePatterns(fileRegexes = null, folderPatterns = null)
+
+/**
+ * Parses [excludePatterns] once, compiling each pattern once. A pattern ending in `/` is a folder
+ * pattern (see [isFolderExcludePattern]); anything else applies to file names. A folder pattern
+ * containing `/` matches the folder's path relative to the source folder rather than its name.
+ * A glob folder pattern may start with `/` to anchor it to the source folder (as in .gitignore):
+ * `/cache/` skips only a `cache` folder directly inside it, where `cache/` skips one at any depth.
+ * RegEx patterns anchor with `^` instead, so a leading `/` is left to mean a literal slash there.
+ */
+internal fun parseExcludePatterns(
     excludePatterns: List<String>,
     isRegexPattern: Boolean,
-): List<Regex>? {
-    val trimmed = excludePatterns.map { it.trim() }.filter { it.isNotEmpty() }
-    if (trimmed.isEmpty()) return emptyList()
-    if (isRegexPattern) {
-        val allValid =
-            trimmed.all { pattern ->
-                val raw = if (isFolderExcludePattern(pattern, true)) stripTrailingFolderSlash(pattern) else pattern
-                raw.isEmpty() || runCatching { Regex(raw, RegexOption.IGNORE_CASE) }.isSuccess
-            }
-        if (!allValid) return null
+): ExcludePatterns {
+    val fileRegexes = mutableListOf<Regex>()
+    val folderPatterns = mutableListOf<ExcludeFolderPattern>()
+    for (rawPattern in excludePatterns) {
+        val pattern = rawPattern.trim()
+        if (pattern.isEmpty()) continue
+        if (!isFolderExcludePattern(pattern, isRegexPattern)) {
+            fileRegexes += compileExcludePattern(pattern, isRegexPattern) ?: return InvalidExcludePatterns
+            continue
+        }
+        val folderPattern = pattern.trimEnd('/')
+        val anchoredAtRoot = !isRegexPattern && folderPattern.startsWith('/')
+        val unanchored = if (anchoredAtRoot) folderPattern.trimStart('/') else folderPattern
+        if (unanchored.isEmpty()) continue
+        folderPatterns +=
+            ExcludeFolderPattern(
+                regex = compileExcludePattern(unanchored, isRegexPattern) ?: return InvalidExcludePatterns,
+                matchRelativePath = anchoredAtRoot || unanchored.contains('/'),
+            )
     }
-    val filePatterns = trimmed.filterNot { isFolderExcludePattern(it, isRegexPattern) }
-    if (filePatterns.isEmpty()) return emptyList()
-    return if (isRegexPattern) {
-        filePatterns.map { pattern -> Regex(pattern, RegexOption.IGNORE_CASE) }
+    return ExcludePatterns(fileRegexes = fileRegexes, folderPatterns = folderPatterns)
+}
+
+/** Null only for a RegEx that doesn't compile; a glob always converts. */
+private fun compileExcludePattern(
+    pattern: String,
+    isRegexPattern: Boolean,
+): Regex? =
+    if (isRegexPattern) {
+        runCatching { Regex(pattern, RegexOption.IGNORE_CASE) }.getOrNull()
     } else {
-        filePatterns.map { pattern -> globToRegex(pattern) }
+        globToRegex(pattern)
     }
-}
-
-internal fun buildExcludeFolderPatterns(
-    excludePatterns: List<String>,
-    isRegexPattern: Boolean,
-): List<ExcludeFolderPattern>? {
-    val trimmed = excludePatterns.map { it.trim() }.filter { it.isNotEmpty() }
-    if (trimmed.isEmpty()) return emptyList()
-    if (isRegexPattern) {
-        val allValid =
-            trimmed.all { pattern ->
-                val raw = if (isFolderExcludePattern(pattern, true)) stripTrailingFolderSlash(pattern) else pattern
-                raw.isEmpty() || runCatching { Regex(raw, RegexOption.IGNORE_CASE) }.isSuccess
-            }
-        if (!allValid) return null
-    }
-    val folderPatterns =
-        trimmed
-            .filter { isFolderExcludePattern(it, isRegexPattern) }
-            .map { stripTrailingFolderSlash(it) }
-            .filter { it.isNotEmpty() }
-    if (folderPatterns.isEmpty()) return emptyList()
-    return folderPatterns.map { pattern ->
-        val regex =
-            if (isRegexPattern) {
-                Regex(pattern, RegexOption.IGNORE_CASE)
-            } else {
-                globToRegex(pattern)
-            }
-        ExcludeFolderPattern(
-            regex = regex,
-            matchRelativePath = pattern.contains('/'),
-        )
-    }
-}
 
 internal fun shouldExclude(
     name: String,

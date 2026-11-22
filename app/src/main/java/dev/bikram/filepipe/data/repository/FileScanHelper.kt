@@ -124,19 +124,20 @@ internal suspend fun FileOperationRepository.listMatchingFilesScan(
 
         if (!folder.exists() || !folder.canRead()) return@withContext emptyList()
 
+        val excludes = parseExcludePatterns(excludePatterns, isExcludeRegexPattern)
         val filterContext =
             FileScanFilterContext(
                 extensions = extensions,
                 filenameRegexes = buildFilenameRegexes(filenamePattern, isRegexPattern),
                 isRegexPattern = isRegexPattern,
-                excludeRegexes = buildExcludeRegexes(excludePatterns, isExcludeRegexPattern),
+                excludeRegexes = excludes.fileRegexes,
                 isExcludeRegexPattern = isExcludeRegexPattern,
                 minFileSizeBytes = minFileSizeBytes,
                 maxFileSizeBytes = maxFileSizeBytes,
                 minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
                 maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
                 nowMs = System.currentTimeMillis(),
-                excludeFolderPatterns = buildExcludeFolderPatterns(excludePatterns, isExcludeRegexPattern),
+                excludeFolderPatterns = excludes.folderPatterns,
             )
 
         val scanContext = currentCoroutineContext()
@@ -218,19 +219,20 @@ internal suspend fun FileOperationRepository.listMatchingFilesFromFilesystemRoot
     excludedDirPath: String? = null,
 ): List<FileEntry> {
     val scanContext = currentCoroutineContext()
+    val excludes = parseExcludePatterns(excludePatterns, isExcludeRegexPattern)
     val filterContext =
         FileScanFilterContext(
             extensions = extensions,
             filenameRegexes = buildFilenameRegexes(filenamePattern, isRegexPattern),
             isRegexPattern = isRegexPattern,
-            excludeRegexes = buildExcludeRegexes(excludePatterns, isExcludeRegexPattern),
+            excludeRegexes = excludes.fileRegexes,
             isExcludeRegexPattern = isExcludeRegexPattern,
             minFileSizeBytes = minFileSizeBytes,
             maxFileSizeBytes = maxFileSizeBytes,
             minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
             maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
             nowMs = System.currentTimeMillis(),
-            excludeFolderPatterns = buildExcludeFolderPatterns(excludePatterns, isExcludeRegexPattern),
+            excludeFolderPatterns = excludes.folderPatterns,
         )
     var depthTruncated = false
     val sequence: Sequence<Pair<File, List<String>>> =

@@ -176,8 +176,11 @@ import dev.bikram.filepipe.ui.screens.onboarding.OnboardingRuleWizardScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingTitleScreen
 import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
 import dev.bikram.filepipe.ui.screens.rules.ManualRunCancelAnchor
+import dev.bikram.filepipe.ui.screens.rules.RuleGroupPicker
+import dev.bikram.filepipe.ui.screens.rules.RuleGroupPickerTarget
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
 import dev.bikram.filepipe.ui.screens.rules.RulesViewModel
+import dev.bikram.filepipe.ui.screens.rules.selectionGroupPickerTarget
 import dev.bikram.filepipe.ui.screens.settings.FilePipeUpdateViewModel
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsSectionKey
@@ -1499,6 +1502,8 @@ private fun RulesTwoPaneRoute(
     var pendingSavedRuleId by rememberSaveable { mutableStateOf<Long?>(null) }
     var previousRuleIdBeforeNew by rememberSaveable { mutableStateOf<Long?>(null) }
     var pendingDeleteSelected by remember { mutableStateOf(false) }
+    // The selection pane's Group action; RulesScreen keeps its own for cards and the phone selection bar.
+    var selectionGroupPickerTarget by remember { mutableStateOf<RuleGroupPickerTarget.Selection?>(null) }
 
     // The detail pane has no FAB, so the list-pane FAB clearance in contentPadding would be
     // dead space here. Use a plain navigation-bar inset for detail-pane content instead.
@@ -1687,6 +1692,7 @@ private fun RulesTwoPaneRoute(
                             onClearSelection = viewModel::clearSelection,
                             onPreviewSelected = viewModel::startPreviewSelected,
                             onDeleteSelected = { pendingDeleteSelected = true },
+                            onGroupSelected = { selectionGroupPickerTarget = uiState.selectionGroupPickerTarget() },
                             onCancelRun = viewModel::cancelManualRun,
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -1735,6 +1741,15 @@ private fun RulesTwoPaneRoute(
         )
     }
 
+    selectionGroupPickerTarget?.let { target ->
+        RuleGroupPicker(
+            target = target,
+            availableGroups = uiState.availableGroups,
+            viewModel = viewModel,
+            onDismiss = { selectionGroupPickerTarget = null },
+        )
+    }
+
     if (pendingDeleteSelected) {
         val count = uiState.selectedRuleIds.size
         FilePipeConfirmDialog(
@@ -1761,6 +1776,7 @@ private fun RulesSelectionActionPane(
     onClearSelection: () -> Unit,
     onPreviewSelected: () -> Unit,
     onDeleteSelected: () -> Unit,
+    onGroupSelected: () -> Unit,
     onCancelRun: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1843,10 +1859,11 @@ private fun RulesSelectionActionPane(
                         label = stringResource(R.string.run_cancel_selection),
                     )
                 }
-                // Every manual run goes through the preview sheet, whose Run button starts it.
+                // Every manual run goes through the preview sheet, whose Run button starts it. Preview
+                // itself is read-only, so like the rule cards and the phone selection bar it stays
+                // available while a run is going; the sheet's Run button is what waits.
                 FilePipeButton(
                     onClick = onPreviewSelected,
-                    enabled = !isRunning,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = pillShape,
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
@@ -1854,6 +1871,20 @@ private fun RulesSelectionActionPane(
                     RulesSelectionActionContent(
                         iconName = "visibility",
                         label = stringResource(R.string.preview_title),
+                    )
+                }
+                // Same action as the phone selection bar's Group button (that bar is hidden in two-pane
+                // layouts). Off during a run like Select all and Delete; the phone bar is hidden then too.
+                FilePipeFilledTonalButton(
+                    onClick = onGroupSelected,
+                    enabled = !isRunning,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "stacks",
+                        label = stringResource(R.string.rule_card_group),
                     )
                 }
                 FilePipeButton(

@@ -158,6 +158,8 @@ class ExecuteRulesUseCase
                                     copyCreatedDestFolders
                                 },
                             filesystemAccessEnabled = filesystemAccessEnabled,
+                            // Prepared entries are a list the user confirmed (the delete dialog, or the
+                            // preview sheet for any mode): a file that changed since is refused, not acted on.
                             requireUnchangedSource = preparedFileEntries != null,
                             destinationFolderCache = destinationFolderCache,
                         )

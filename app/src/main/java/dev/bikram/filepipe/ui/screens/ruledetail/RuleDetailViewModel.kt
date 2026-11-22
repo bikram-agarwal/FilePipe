@@ -40,6 +40,9 @@ import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
 import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
 import dev.bikram.filepipe.domain.usecase.ValidateRuleUseCase
 import dev.bikram.filepipe.ui.navigation.Screen
+import dev.bikram.filepipe.ui.screens.rules.RuleGroupFilter
+import dev.bikram.filepipe.ui.screens.rules.RuleGroupFilterStore
+import dev.bikram.filepipe.ui.screens.rules.resolvedFor
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -257,12 +260,18 @@ class RuleDetailViewModel
         private val rulesAutoExportTrigger: RulesAutoExportTrigger,
         private val userPreferencesRepository: UserPreferencesRepository,
         private val fileOperationRepository: FileOperationRepository,
+        ruleGroupFilterStore: RuleGroupFilterStore,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
         @param:ApplicationContext private val appContext: Context,
     ) : ViewModel() {
         private val ruleId: Long = savedStateHandle[Screen.RuleDetail.ARG_RULE_ID] ?: Screen.RuleDetail.NEW_RULE_ID
         private val templateIndex: Int = savedStateHandle[Screen.RuleDetail.ARG_TEMPLATE_INDEX] ?: -1
         val isNewRule = ruleId == Screen.RuleDetail.NEW_RULE_ID
+
+        // The Rules list's group filter when this new rule was started; the rule joins that group on
+        // its first save (see newRuleGroupName). Captured now, not at save: in two-pane layouts the
+        // list stays usable while the editor is open, and the group the user created it from wins.
+        private val newRuleGroupFilter: RuleGroupFilter? = ruleGroupFilterStore.filter.value.takeIf { isNewRule }
         val showInitialTemplatePicker: Boolean = false
 
         private val _uiState = MutableStateFlow(RuleDetailUiState())
@@ -714,8 +723,11 @@ class RuleDetailViewModel
                         return@launch
                     }
 
-                    val savedId = ruleRepository.saveRule(rule)
-                    val savedRule = rule.copy(id = savedId)
+                    // The editor has no group field: a new rule's group comes from the list it was created
+                    // from, and saveRule keeps the stored group on every later save.
+                    val ruleToSave = if (rule.id == 0L) rule.copy(groupName = newRuleGroupName()) else rule
+                    val savedId = ruleRepository.saveRule(ruleToSave)
+                    val savedRule = ruleToSave.copy(id = savedId)
 
                     if (savedRule.isEnabled && savedRule.schedule != null) {
                         scheduleRulesUseCase.scheduleRule(savedRule)
@@ -734,6 +746,17 @@ class RuleDetailViewModel
                     saveMutex.unlock()
                 }
             }
+
+        /**
+         * The group a new rule joins: the one the Rules list was filtered to when the rule was started,
+         * if that group still has rules - resolved exactly as the list resolves it, so a filter that
+         * has since fallen back to All (its last rule left the group) doesn't revive the old name.
+         */
+        private suspend fun newRuleGroupName(): String? {
+            val filter = newRuleGroupFilter as? RuleGroupFilter.Group ?: return null
+            val currentRules = ruleRepository.getAllRules().first()
+            return (filter.resolvedFor(currentRules) as? RuleGroupFilter.Group)?.name
+        }
 
         fun restoreRule() =
             viewModelScope.launch {

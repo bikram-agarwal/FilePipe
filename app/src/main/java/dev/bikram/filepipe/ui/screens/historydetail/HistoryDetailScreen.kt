@@ -14,6 +14,7 @@ import android.util.LruCache
 import android.util.Size
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -92,10 +93,9 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.TriggerType
-import dev.bikram.filepipe.domain.model.hasRecoverableDestination
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import dev.bikram.filepipe.domain.model.isNoChangesRun
-import dev.bikram.filepipe.domain.usecase.shouldAttemptUndo
+import dev.bikram.filepipe.domain.usecase.isUndoCandidate
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
@@ -144,12 +144,17 @@ fun HistoryDetailScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
     val files = viewModel.filesPagingFlow.collectAsLazyPagingItems()
     val fileCount by viewModel.fileCount.collectAsStateWithLifecycle()
-    val undoableFileIds by viewModel.undoableFileIds.collectAsStateWithLifecycle()
+    val selectableFileIds by viewModel.selectableFileIds.collectAsStateWithLifecycle()
     val isUndoSelectionMode by viewModel.isUndoSelectionMode.collectAsStateWithLifecycle()
     val selectedFileIds by viewModel.selectedFileIds.collectAsStateWithLifecycle()
     val isUndoing by viewModel.isUndoing.collectAsStateWithLifecycle()
     val undoProgress by viewModel.undoProgress.collectAsStateWithLifecycle()
     val pendingHistoryUndoRequest by viewModel.pendingHistoryUndoRequest.collectAsStateWithLifecycle()
+    // Back leaves undo selection first, like Back with rules selected on the Rules screen; only a
+    // second Back leaves the screen.
+    BackHandler(enabled = isUndoSelectionMode) {
+        viewModel.cancelUndoSelectionMode()
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     val density = LocalDensity.current
@@ -235,14 +240,11 @@ fun HistoryDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 history?.let { h ->
-                    val undoableCount =
-                        if (undoableFileIds.isNotEmpty()) undoableFileIds.size else h.totalFilesMoved
                     val allUndoableSelected =
-                        undoableFileIds.isNotEmpty() && selectedFileIds.containsAll(undoableFileIds)
+                        selectableFileIds.isNotEmpty() && selectedFileIds.containsAll(selectableFileIds)
                     item {
                         RunSummaryCard(
                             history = h,
-                            undoableCount = undoableCount,
                             isUndoSelectionMode = isUndoSelectionMode,
                             selectedCount = selectedFileIds.size,
                             onEnterUndoSelection = viewModel::enterUndoSelectionMode,
@@ -274,7 +276,7 @@ fun HistoryDetailScreen(
                                     color = MaterialTheme.colorScheme.primary,
                                 )
                                 AnimatedVisibility(
-                                    visible = isUndoSelectionMode && !isUndoing && undoableFileIds.isNotEmpty(),
+                                    visible = isUndoSelectionMode && !isUndoing && selectableFileIds.isNotEmpty(),
                                     enter =
                                         fadeIn(
                                             animationSpec =
@@ -375,7 +377,6 @@ fun HistoryDetailScreen(
 @Composable
 private fun RunSummaryCard(
     history: RunHistory,
-    undoableCount: Int,
     isUndoSelectionMode: Boolean,
     selectedCount: Int,
     onEnterUndoSelection: () -> Unit,
@@ -537,9 +538,10 @@ private fun RunSummaryCard(
                         }
 
                         else -> {
+                            // Shown only for an undoable run (isRunUndoable: it moved or copied files); which
+                            // of them can still be undone is read when the selection opens.
                             FilePipeButton(
                                 onClick = onEnterUndoSelection,
-                                enabled = undoableCount > 0,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = pillShape,
                                 colors = undoButtonColors,
@@ -595,7 +597,7 @@ private fun FileMovedCard(
     val context = LocalContext.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val isSuccess = file.success && !file.skipped
-    val isFileUndoable = file.hasRecoverableDestination && shouldAttemptUndo(file.undoStatus)
+    val isFileUndoable = file.isUndoCandidate
     val showSelectionCheckbox = isUndoSelectionMode && isFileUndoable
     val iconColor =
         when {

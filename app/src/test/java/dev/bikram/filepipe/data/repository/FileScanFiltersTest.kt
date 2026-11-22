@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.data.repository
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,7 +22,7 @@ class FileScanFiltersTest {
 
     @Test
     fun invalidExcludeRegexExcludesEverything() {
-        val compiledPatterns = buildExcludeRegexes(listOf("["), isRegexPattern = true)
+        val compiledPatterns = parseExcludePatterns(listOf("["), isRegexPattern = true).fileRegexes
 
         assertTrue(shouldExclude("photo.jpg", compiledPatterns, isRegexPattern = true))
     }
@@ -33,7 +34,7 @@ class FileScanFiltersTest {
                 extensions = listOf("jpg"),
                 filenameRegexes = buildFilenameRegexes("holiday*", isRegexPattern = false),
                 isRegexPattern = false,
-                excludeRegexes = buildExcludeRegexes(listOf("*private*"), isRegexPattern = false),
+                excludeRegexes = parseExcludePatterns(listOf("*private*"), isRegexPattern = false).fileRegexes,
                 isExcludeRegexPattern = false,
                 minFileSizeBytes = 100L,
                 maxFileSizeBytes = 1_000L,
@@ -67,7 +68,7 @@ class FileScanFiltersTest {
         val invalidExcludeFilters =
             invalidFilenameFilters.copy(
                 filenameRegexes = null,
-                excludeRegexes = buildExcludeRegexes(listOf("["), isRegexPattern = true),
+                excludeRegexes = parseExcludePatterns(listOf("["), isRegexPattern = true).fileRegexes,
                 isExcludeRegexPattern = true,
             )
 
@@ -78,8 +79,8 @@ class FileScanFiltersTest {
     @Test
     fun trailingSlashExcludePatternsMatchFoldersOnlyAndNotFiles() {
         val patterns = listOf(".thumbnails/", "thumbnails/", "cache/", "thumb*.*")
-        val fileRegexes = buildExcludeRegexes(patterns, isRegexPattern = false)
-        val folderPatterns = buildExcludeFolderPatterns(patterns, isRegexPattern = false)
+        val fileRegexes = parseExcludePatterns(patterns, isRegexPattern = false).fileRegexes
+        val folderPatterns = parseExcludePatterns(patterns, isRegexPattern = false).folderPatterns
 
         // File exclude pattern matches thumb*.* only, not files named cache or genuine photos
         assertTrue(shouldExclude("thumb_01.jpg", fileRegexes, isRegexPattern = false))
@@ -97,23 +98,43 @@ class FileScanFiltersTest {
     @Test
     fun relativePathFolderExcludePatternMatchesNestedRelativePath() {
         val patterns = listOf("DCIM/cache/")
-        val folderPatterns = buildExcludeFolderPatterns(patterns, isRegexPattern = false)
+        val folderPatterns = parseExcludePatterns(patterns, isRegexPattern = false).folderPatterns
 
         assertTrue(shouldExcludeFolder(listOf("DCIM", "cache"), folderPatterns, isRegexPattern = false))
         assertFalse(shouldExcludeFolder(listOf("Pictures", "cache"), folderPatterns, isRegexPattern = false))
     }
 
     @Test
+    fun leadingSlashAnchorsGlobFolderPatternToTheSourceFolder() {
+        val anchored = parseExcludePatterns(listOf("/cache/"), isRegexPattern = false).folderPatterns
+        assertTrue(shouldExcludeFolder(listOf("cache"), anchored, isRegexPattern = false))
+        assertFalse(shouldExcludeFolder(listOf("Movies", "cache"), anchored, isRegexPattern = false))
+
+        val anchoredPath = parseExcludePatterns(listOf("/DCIM/cache/"), isRegexPattern = false).folderPatterns
+        assertTrue(shouldExcludeFolder(listOf("DCIM", "cache"), anchoredPath, isRegexPattern = false))
+
+        // A lone "/" names no folder: nothing to exclude, and not an error.
+        assertEquals(emptyList<ExcludeFolderPattern>(), parseExcludePatterns(listOf("/"), isRegexPattern = false).folderPatterns)
+    }
+
+    @Test
+    fun filePatternsAndFolderPatternsAreSplitInOnePass() {
+        val excludes = parseExcludePatterns(listOf(" .nomedia ", "cache/", "", "*.tmp"), isRegexPattern = false)
+        assertEquals(2, excludes.fileRegexes?.size)
+        assertEquals(1, excludes.folderPatterns?.size)
+    }
+
+    @Test
     fun regexFolderExcludePatternSupportsTrailingSlashAndFailsClosedOnInvalidRegex() {
-        val valid = buildExcludeFolderPatterns(listOf("""\.thumbnails/""", "cache/"), isRegexPattern = true)
+        val valid = parseExcludePatterns(listOf("""\.thumbnails/""", "cache/"), isRegexPattern = true).folderPatterns
         assertTrue(shouldExcludeFolder(listOf(".thumbnails"), valid, isRegexPattern = true))
         assertTrue(shouldExcludeFolder(listOf("app_cache"), valid, isRegexPattern = true))
         assertFalse(shouldExcludeFolder(listOf("Camera"), valid, isRegexPattern = true))
 
-        val invalidFolder = buildExcludeFolderPatterns(listOf("["), isRegexPattern = true)
+        val invalidFolder = parseExcludePatterns(listOf("["), isRegexPattern = true).folderPatterns
         assertTrue(shouldExcludeFolder(listOf("Camera"), invalidFolder, isRegexPattern = true))
 
-        val invalidMixed = buildExcludeRegexes(listOf("thumb.*", "[/"), isRegexPattern = true)
+        val invalidMixed = parseExcludePatterns(listOf("thumb.*", "[/"), isRegexPattern = true).fileRegexes
         assertTrue(shouldExclude("photo.jpg", invalidMixed, isRegexPattern = true))
     }
 

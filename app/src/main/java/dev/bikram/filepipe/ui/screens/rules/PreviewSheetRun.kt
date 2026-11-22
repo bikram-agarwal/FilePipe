@@ -124,9 +124,9 @@ internal fun previewGroupRunLine(
     run.outcome?.ruleErrors?.get(group.ruleId)?.let { error ->
         return stringResource(R.string.rule_card_progress_error, error) to MaterialTheme.colorScheme.error
     }
-    val statuses = run.fileStatuses[group.ruleId].orEmpty().values
-    val done = statuses.count { status -> status == PreviewFileRunStatus.DONE }
-    val failed = statuses.count { status -> status == PreviewFileRunStatus.FAILED }
+    val tally = run.tallies[group.ruleId] ?: PreviewRuleRunTally()
+    val done = tally.done
+    val failed = tally.failed
     val total = group.results.size
     val pluralRes =
         when (group.operationMode) {
@@ -135,7 +135,7 @@ internal fun previewGroupRunLine(
             OperationMode.DELETE -> R.plurals.rule_card_progress_files_deleted_summary
         }
     // Files a Cancel stopped the run from reaching (the interrupted file's spinner is already dropped).
-    val cancelled = if (run.outcome?.cancelled == true) total - statuses.size else 0
+    val cancelled = if (run.outcome?.cancelled == true) total - tally.settled else 0
     val suffixes =
         buildList {
             if (failed > 0) add(pluralStringResource(R.plurals.preview_run_status_failed, failed, failed))
@@ -165,12 +165,7 @@ internal fun PreviewSheetRunFooter(
     if (outcome == null) {
         val runGroups = ruleGroups.filter { group -> group.ruleId in run.ruleIds }
         val total = runGroups.sumOf { group -> group.results.size }
-        val processed =
-            runGroups.sumOf { group ->
-                run.fileStatuses[group.ruleId].orEmpty().values.count { status ->
-                    status != PreviewFileRunStatus.IN_PROGRESS
-                }
-            }
+        val processed = runGroups.sumOf { group -> run.tallies[group.ruleId]?.settled ?: 0 }
         val progress by animateFloatAsState(
             targetValue = if (total > 0) processed.toFloat() / total else 0f,
             animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec()),

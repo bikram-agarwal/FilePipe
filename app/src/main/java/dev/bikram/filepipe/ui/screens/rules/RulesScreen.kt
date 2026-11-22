@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +68,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -79,6 +81,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -196,9 +199,7 @@ fun RulesScreen(
 
     var pendingDeleteSelected by remember { mutableStateOf(false) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
-    var groupPickerRule by remember { mutableStateOf<Rule?>(null) }
-    var groupPickerBulkIds by remember { mutableStateOf<Set<Long>?>(null) }
-    var groupPickerBulkCommonGroup by remember { mutableStateOf<String?>(null) }
+    var groupPickerTarget by remember { mutableStateOf<RuleGroupPickerTarget?>(null) }
     val snackbarHostState = LocalSnackbarHostState.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val hasSelection = selectedRuleIds.isNotEmpty()
@@ -560,10 +561,7 @@ fun RulesScreen(
                                     }
                                     val groupActionLabel = stringResource(R.string.rule_card_group)
                                     FilePipeFilledTonalIconButton(
-                                        onClick = {
-                                            groupPickerBulkIds = selectedRuleIds
-                                            groupPickerBulkCommonGroup = uiState.selectedRulesCommonGroup
-                                        },
+                                        onClick = { groupPickerTarget = uiState.selectionGroupPickerTarget() },
                                         tooltipLabel = groupActionLabel,
                                         colors =
                                             IconButtonDefaults.filledTonalIconButtonColors(
@@ -755,7 +753,7 @@ fun RulesScreen(
                                 viewModel.startPreview(rule)
                             },
                             onViewHistory = { onNavigateToRuleHistory(rule.id) },
-                            onAssignGroup = { groupPickerRule = rule },
+                            onAssignGroup = { groupPickerTarget = RuleGroupPickerTarget.SingleRule(rule) },
                             onLeadingLongClick =
                                 if (reorderLongPressActive) {
                                     { viewModel.toggleSelection(rule.id) }
@@ -787,35 +785,12 @@ fun RulesScreen(
         )
     }
 
-    if (groupPickerRule != null || groupPickerBulkIds != null) {
-        val singleRule = groupPickerRule
-        val bulkIds = groupPickerBulkIds
-        RuleGroupPickerSheet(
-            subtitleTemplate =
-                stringResource(
-                    if (singleRule != null) {
-                        R.string.rule_group_sheet_subtitle_single
-                    } else {
-                        R.string.rule_group_sheet_subtitle_multiple
-                    },
-                    RULE_GROUP_SUBTITLE_MARKER,
-                ),
-            subtitleHighlight = singleRule?.name ?: (bulkIds?.size ?: 0).toString(),
-            currentGroup = if (singleRule != null) singleRule.groupName else groupPickerBulkCommonGroup,
-            hasAnyGroupAssigned = singleRule?.groupName != null || bulkIds != null,
+    groupPickerTarget?.let { target ->
+        RuleGroupPicker(
+            target = target,
             availableGroups = availableGroups,
-            onSelectGroup = { chosenGroup ->
-                if (singleRule != null) {
-                    viewModel.setRuleGroup(singleRule.id, chosenGroup)
-                } else if (bulkIds != null) {
-                    viewModel.setRulesGroup(bulkIds, chosenGroup)
-                }
-            },
-            onDismiss = {
-                groupPickerRule = null
-                groupPickerBulkIds = null
-                groupPickerBulkCommonGroup = null
-            },
+            viewModel = viewModel,
+            onDismiss = { groupPickerTarget = null },
         )
     }
 
@@ -846,12 +821,9 @@ fun RulesScreen(
     }
 
     previewState?.let { preview ->
-        // Same filter as RulesViewModel.runPreviewedRules: the groups the button would actually run.
-        val runnablePreviewGroups =
-            preview.ruleGroups.filter { ruleGroup ->
-                ruleGroup.results.any { result -> !result.wouldSkip } &&
-                    rules.any { rule -> rule.id == ruleGroup.ruleId && rule.isEnabled }
-            }
+        // The groups the button would actually run - the same check RulesViewModel.runPreviewedRules
+        // makes, against every enabled rule rather than the group-filtered `rules` on screen.
+        val runnablePreviewGroups = preview.runnableRuleGroups(uiState.enabledRuleIds)
         val previewRunEnabled = !isRunning && !preview.isLoading && runnablePreviewGroups.isNotEmpty()
         // The button names the action it will take (Move / Copy / Delete); only a batch mixing actions
         // says "Run". While nothing is runnable (button disabled) the label follows every previewed
@@ -918,14 +890,33 @@ fun RulesScreen(
                                     }
                             }
                         }
-                    val previewListState = rememberLazyListState()
-                    // Follow the run: keep the file being processed in view, unless the user is scrolling.
-                    val currentFileKey =
-                        sheetRun?.fileStatuses?.firstNotNullOfOrNull { (ruleId, statuses) ->
-                            statuses.entries
-                                .firstOrNull { (_, status) -> status == PreviewFileRunStatus.IN_PROGRESS }
-                                ?.let { (sourcePath, _) -> "${ruleId}_$sourcePath" }
+                    // Each file row's position in the LazyColumn below, built once per preview (it must list
+                    // the items in the same order the LazyColumn emits them), so following the run is a
+                    // lookup rather than a rebuild of every key per processed file.
+                    val fileItemIndexByKey =
+                        remember(groupedPreview) {
+                            buildMap {
+                                var index = 0
+                                groupedPreview.forEach { (ruleGroup, sections) ->
+                                    index++ // header_<ruleId>
+                                    sections.forEach { (_, sourceFiles) ->
+                                        index++ // source_<ruleId>_<folder>
+                                        sourceFiles.forEach { file -> put("${ruleGroup.ruleId}_${file.sourcePath}", index++) }
+                                    }
+                                }
+                            }
                         }
+                    val previewListState = rememberLazyListState()
+                    // Follow the run: keep the file being processed in view. Dragging the list stops that,
+                    // so the next file doesn't pull the list back from wherever the user scrolled to; it
+                    // resumes once the file being processed is on screen again (they scrolled back to it).
+                    var followRun by remember { mutableStateOf(true) }
+                    LaunchedEffect(previewListState) {
+                        previewListState.interactionSource.interactions.collect { interaction ->
+                            if (interaction is DragInteraction.Start) followRun = false
+                        }
+                    }
+                    val currentFileKey = sheetRun?.currentFile?.let { file -> "${file.ruleId}_${file.sourcePath}" }
                     LaunchedEffect(currentFileKey) {
                         val key = currentFileKey ?: return@LaunchedEffect
                         if (previewListState.isScrollInProgress) return@LaunchedEffect
@@ -935,18 +926,14 @@ fun RulesScreen(
                             index != null &&
                                 index.offset >= layoutInfo.viewportStartOffset &&
                                 index.offset + index.size <= layoutInfo.viewportEndOffset
-                        if (fullyVisible) return@LaunchedEffect
-                        val itemKeys =
-                            groupedPreview.flatMap { (ruleGroup, sections) ->
-                                listOf<Any>("header_${ruleGroup.ruleId}") +
-                                    sections.flatMap { (sourceFolder, sourceFiles) ->
-                                        listOf<Any>("source_${ruleGroup.ruleId}_$sourceFolder") +
-                                            sourceFiles.map { file -> "${ruleGroup.ruleId}_${file.sourcePath}" }
-                                    }
-                            }
-                        val targetIndex = itemKeys.indexOf(key)
+                        if (fullyVisible) {
+                            followRun = true
+                            return@LaunchedEffect
+                        }
+                        if (!followRun) return@LaunchedEffect
+                        val targetIndex = fileItemIndexByKey[key] ?: return@LaunchedEffect
                         // Land it a couple of rows down so the files just finished stay visible above it.
-                        if (targetIndex >= 0) previewListState.animateScrollToItem((targetIndex - 2).coerceAtLeast(0))
+                        previewListState.animateScrollToItem((targetIndex - 2).coerceAtLeast(0))
                     }
                     LazyColumn(
                         // Grow with the list up to the sheet's own max height (no fixed cap) and only
@@ -1037,7 +1024,7 @@ fun RulesScreen(
                                                 PreviewRowStatusSlot(
                                                     status =
                                                         if (sheetRun != null && groupInRun) {
-                                                            sheetRun.fileStatuses[ruleGroup.ruleId]?.get(result.sourcePath)
+                                                            sheetRun.fileStatuses[ruleGroup.ruleId, result.sourcePath]
                                                         } else {
                                                             null
                                                         },
@@ -1631,7 +1618,70 @@ private fun RuleGroupFilterBar(
     }
 }
 
-private const val RULE_GROUP_NAME_MAX_LENGTH = 10
+/**
+ * What the rule-group sheet is open for, captured when it opens. Each place that offers the Group
+ * action keeps one of these and shows [RuleGroupPicker] for it: RulesScreen for a card and for the
+ * phone selection bar, the two-pane route for its selection pane (like their delete confirmations).
+ */
+internal sealed interface RuleGroupPickerTarget {
+    data class SingleRule(
+        val rule: Rule,
+    ) : RuleGroupPickerTarget
+
+    data class Selection(
+        val ruleIds: Set<Long>,
+        /** The group every selected rule is in, if they share one (shown checked). */
+        val commonGroup: String?,
+        /** Whether any selected rule is in a group (Remove from group is offered only then). */
+        val anyGrouped: Boolean,
+    ) : RuleGroupPickerTarget
+}
+
+/** The Group action's target for the current rule selection. */
+internal fun RulesUiState.selectionGroupPickerTarget(): RuleGroupPickerTarget.Selection =
+    RuleGroupPickerTarget.Selection(
+        ruleIds = selectedRuleIds,
+        commonGroup = selectedRulesCommonGroup,
+        anyGrouped = selectedRulesHaveGroup,
+    )
+
+/** The rule-group sheet for [target]; assigning a group (or removing it) goes through [viewModel]. */
+@Composable
+internal fun RuleGroupPicker(
+    target: RuleGroupPickerTarget,
+    availableGroups: List<String>,
+    viewModel: RulesViewModel,
+    onDismiss: () -> Unit,
+) {
+    when (target) {
+        is RuleGroupPickerTarget.SingleRule -> {
+            RuleGroupPickerSheet(
+                subtitleTemplate = stringResource(R.string.rule_group_sheet_subtitle_single, RULE_GROUP_SUBTITLE_MARKER),
+                subtitleHighlight = target.rule.name,
+                currentGroup = target.rule.groupName,
+                hasAnyGroupAssigned = target.rule.groupName != null,
+                availableGroups = availableGroups,
+                onSelectGroup = { chosenGroup -> viewModel.setRuleGroup(target.rule.id, chosenGroup) },
+                onDismiss = onDismiss,
+            )
+        }
+
+        is RuleGroupPickerTarget.Selection -> {
+            RuleGroupPickerSheet(
+                subtitleTemplate = stringResource(R.string.rule_group_sheet_subtitle_multiple, RULE_GROUP_SUBTITLE_MARKER),
+                subtitleHighlight = target.ruleIds.size.toString(),
+                currentGroup = target.commonGroup,
+                // Remove from group only when there is a group to remove.
+                hasAnyGroupAssigned = target.anyGrouped,
+                availableGroups = availableGroups,
+                onSelectGroup = { chosenGroup -> viewModel.setRulesGroup(target.ruleIds, chosenGroup) },
+                onDismiss = onDismiss,
+            )
+        }
+    }
+}
+
+private const val RULE_GROUP_NAME_MAX_LENGTH = 12
 
 // Private-use character passed into the subtitle format string so the highlighted part (rule name
 // or count) can be located and bolded wherever the translation places it.
@@ -1653,13 +1703,6 @@ private fun RuleGroupPickerSheet(
     val newGroupLength = newGroupFieldState.text.length
     val pillShape = MaterialTheme.shapes.extraLarge
     val newGroupFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    LaunchedEffect(Unit) {
-        if (availableGroups.isEmpty()) {
-            newGroupFocusRequester.requestFocus()
-            keyboardController?.show()
-        }
-    }
 
     val view = LocalView.current
     val hapticEnabled by rememberUpdatedState(LocalHapticEnabled.current)
@@ -1736,6 +1779,20 @@ private fun RuleGroupPickerSheet(
                 null
             },
     ) {
+        // With no groups yet, creating one is the only thing to do here, so open on the name field.
+        // This lives inside the sheet's content, not around the sheet: the sheet composes into its own
+        // window, usually a frame or more after the code around it, so an effect out there could run
+        // before the field's focusRequester was attached (no focus, no keyboard). In here the field is
+        // attached by the time the effect runs; waiting for the sheet's window to gain focus also lets
+        // the keyboard request land, since an IME request from an unfocused window is dropped.
+        val windowInfo = LocalWindowInfo.current
+        val keyboardController = LocalSoftwareKeyboardController.current
+        LaunchedEffect(Unit) {
+            if (availableGroups.isNotEmpty()) return@LaunchedEffect
+            snapshotFlow { windowInfo.isWindowFocused }.first { focused -> focused }
+            newGroupFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
         // OutlinedTextField reserves extra space above its border for the floating label, so a
         // centered Row would line the button up with that taller box instead of the visible
         // border. Bottom-align instead (the border box ends at the field's bottom edge) and lift
