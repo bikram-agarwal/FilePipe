@@ -136,6 +136,7 @@ internal suspend fun FileOperationRepository.listMatchingFilesScan(
                 minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
                 maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
                 nowMs = System.currentTimeMillis(),
+                excludeFolderPatterns = buildExcludeFolderPatterns(excludePatterns, isExcludeRegexPattern),
             )
 
         val scanContext = currentCoroutineContext()
@@ -150,6 +151,13 @@ internal suspend fun FileOperationRepository.listMatchingFilesScan(
                     scanSubdirectories = scanSubdirectories,
                     maxDepth = maxDepth,
                     excludedDocumentId = safExcludedDocumentId(treeUri, effectiveExcludedFolder),
+                    shouldExcludeDirectory = { relativeSegments ->
+                        shouldExcludeFolder(
+                            relativeSegments = relativeSegments,
+                            excludeFolderPatterns = filterContext.excludeFolderPatterns,
+                            isRegexPattern = isExcludeRegexPattern,
+                        )
+                    },
                     includeFile = { document ->
                         passesCheapScanFilters(
                             fileName = document.name,
@@ -222,6 +230,7 @@ internal suspend fun FileOperationRepository.listMatchingFilesFromFilesystemRoot
             minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
             maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
             nowMs = System.currentTimeMillis(),
+            excludeFolderPatterns = buildExcludeFolderPatterns(excludePatterns, isExcludeRegexPattern),
         )
     var depthTruncated = false
     val sequence: Sequence<Pair<File, List<String>>> =
@@ -232,6 +241,13 @@ internal suspend fun FileOperationRepository.listMatchingFilesFromFilesystemRoot
                 relativeParentSegments = emptyList(),
                 onDepthLimitReached = { depthTruncated = true },
                 excludedDirPath = excludedDirPath,
+                shouldExcludeDirectory = { relativeSegments ->
+                    shouldExcludeFolder(
+                        relativeSegments = relativeSegments,
+                        excludeFolderPatterns = filterContext.excludeFolderPatterns,
+                        isRegexPattern = isExcludeRegexPattern,
+                    )
+                },
             )
         } else {
             (rootDir.listFiles()?.asSequence() ?: emptySequence())
@@ -285,6 +301,7 @@ internal fun walkDiskFilesWithRelativeParents(
     relativeParentSegments: List<String>,
     onDepthLimitReached: (() -> Unit)? = null,
     excludedDirPath: String? = null,
+    shouldExcludeDirectory: (List<String>) -> Boolean = { false },
 ): Sequence<Pair<File, List<String>>> =
     sequence {
         if (maxDepth <= 0) return@sequence
@@ -294,6 +311,8 @@ internal fun walkDiskFilesWithRelativeParents(
                 yield(child to relativeParentSegments)
             } else if (child.isDirectory && segment.isNotEmpty() && segment != "." && segment != "..") {
                 if (child.path == excludedDirPath) return@forEach
+                val nextRelativeParents = relativeParentSegments + segment
+                if (shouldExcludeDirectory(nextRelativeParents)) return@forEach
                 if (maxDepth <= 1) {
                     onDepthLimitReached?.invoke()
                 } else {
@@ -301,9 +320,10 @@ internal fun walkDiskFilesWithRelativeParents(
                         walkDiskFilesWithRelativeParents(
                             child,
                             maxDepth - 1,
-                            relativeParentSegments + segment,
+                            nextRelativeParents,
                             onDepthLimitReached,
                             excludedDirPath,
+                            shouldExcludeDirectory,
                         ),
                     )
                 }
@@ -436,6 +456,7 @@ internal suspend fun FileOperationRepository.collectSafFiles(
     scanSubdirectories: Boolean,
     maxDepth: Int,
     excludedDocumentId: String? = null,
+    shouldExcludeDirectory: (List<String>) -> Boolean = { false },
     includeFile: (SafDocEntry) -> Boolean = { true },
     onDepthLimitReached: (() -> Unit)? = null,
 ): List<Pair<SafDocEntry, List<String>>> {
@@ -455,10 +476,12 @@ internal suspend fun FileOperationRepository.collectSafFiles(
             } else if (scanSubdirectories && child.isDirectory && child.documentId != excludedDocumentId) {
                 val segment = child.name.trim()
                 if (segment.isNotEmpty() && segment != "." && segment != "..") {
+                    val nextRelativeParents = relativeParents + segment
+                    if (shouldExcludeDirectory(nextRelativeParents)) continue
                     if (depth <= 1) {
                         onDepthLimitReached?.invoke()
                     } else {
-                        visit(child.documentId, relativeParents + segment, depth - 1)
+                        visit(child.documentId, nextRelativeParents, depth - 1)
                     }
                 }
             }

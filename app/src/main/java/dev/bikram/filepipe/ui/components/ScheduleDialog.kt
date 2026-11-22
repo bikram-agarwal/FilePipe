@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -42,12 +45,14 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,7 +70,9 @@ import dev.bikram.filepipe.domain.formatTimeOfDay
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.rememberHoistedStringTextFieldState
 import dev.bikram.filepipe.ui.theme.compactControlShape
+import kotlinx.coroutines.flow.drop
 import java.util.Calendar
 
 private const val TIME_PICKER_MIN_DENSITY_SCALE = 0.74f
@@ -93,11 +100,10 @@ fun ScheduleDialog(
         )
     }
 
-    var intervalText by remember {
-        mutableStateOf(
-            (initialSchedule?.repeatInterval ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL).toString(),
+    val intervalFieldState =
+        rememberTextFieldState(
+            initialText = (initialSchedule?.repeatInterval ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL).toString(),
         )
-    }
     var intervalFieldError by remember { mutableStateOf(false) }
 
     var typeExpanded by remember { mutableStateOf(false) }
@@ -108,7 +114,7 @@ fun ScheduleDialog(
 
     fun isIntervalTextValid(
         type: ScheduleType,
-        text: String = intervalText,
+        text: String = intervalFieldState.text.toString(),
     ): Boolean {
         val parsed = text.toIntOrNull()
         return RuleSchedule.isRepeatIntervalValid(type, parsed)
@@ -118,6 +124,12 @@ fun ScheduleDialog(
         val valid = isIntervalTextValid(scheduleType)
         intervalFieldError = !valid
         return valid
+    }
+
+    LaunchedEffect(intervalFieldState) {
+        snapshotFlow { intervalFieldState.text.toString() }
+            .drop(1)
+            .collect { text -> intervalFieldError = !isIntervalTextValid(scheduleType, text) }
     }
 
     if (showTimePicker) {
@@ -167,15 +179,18 @@ fun ScheduleDialog(
                 ) {
                     val inputContent = @Composable { modifier1: Modifier, modifier2: Modifier ->
                         OutlinedTextField(
-                            value = intervalText,
-                            onValueChange = { newValue ->
-                                val filteredText = newValue.filter { character -> character.isDigit() }.take(3)
-                                intervalText = filteredText
-                                intervalFieldError = !isIntervalTextValid(scheduleType, filteredText)
-                            },
+                            state = intervalFieldState,
+                            inputTransformation =
+                                InputTransformation {
+                                    val originalText = asCharSequence().toString()
+                                    val digitsOnly = originalText.filter { character -> character.isDigit() }.take(3)
+                                    if (digitsOnly != originalText) {
+                                        replace(0, length, digitsOnly)
+                                    }
+                                },
                             isError = intervalFieldError,
                             label = { Text(stringResource(R.string.schedule_every)) },
-                            singleLine = true,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = modifier1,
                         )
@@ -193,9 +208,13 @@ fun ScheduleDialog(
                                         ScheduleType.WEEKLY -> R.string.schedule_unit_weeks
                                     },
                                 )
+                            val selectedLabelFieldState =
+                                rememberHoistedStringTextFieldState(
+                                    text = selectedLabel,
+                                    onTextChange = {},
+                                )
                             OutlinedTextField(
-                                value = selectedLabel,
-                                onValueChange = {},
+                                state = selectedLabelFieldState,
                                 readOnly = true,
                                 label = { Text(stringResource(R.string.schedule_frequency)) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeExpanded) },
@@ -367,7 +386,7 @@ fun ScheduleDialog(
                     val validInterval = validateIntervalText()
                     val validDays = scheduleType != ScheduleType.WEEKLY || selectedDays.isNotEmpty()
                     if (validInterval && validDays) {
-                        val intervalParsed = intervalText.toIntOrNull() ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL
+                        val intervalParsed = intervalFieldState.text.toString().toIntOrNull() ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL
                         onSave(
                             RuleSchedule(
                                 type = scheduleType,

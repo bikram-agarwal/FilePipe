@@ -11,6 +11,11 @@ import dev.bikram.filepipe.domain.model.isNoExtensionToken
  * as module-internal top-level functions in the same package.
  */
 
+internal data class ExcludeFolderPattern(
+    val regex: Regex,
+    val matchRelativePath: Boolean,
+)
+
 internal data class FileScanFilterContext(
     val extensions: List<String>,
     val filenameRegexes: List<Regex>?,
@@ -22,6 +27,7 @@ internal data class FileScanFilterContext(
     val minAgeMs: Long?,
     val maxAgeMs: Long?,
     val nowMs: Long,
+    val excludeFolderPatterns: List<ExcludeFolderPattern>? = emptyList(),
 )
 
 internal fun passesCheapScanFilters(
@@ -103,22 +109,67 @@ internal fun matchesFilename(
     }
 }
 
+private fun isFolderExcludePattern(
+    trimmed: String,
+    isRegexPattern: Boolean,
+): Boolean = trimmed.endsWith("/") && (!isRegexPattern || !trimmed.endsWith("\\/"))
+
+private fun stripTrailingFolderSlash(trimmed: String): String = trimmed.trimEnd('/')
+
 internal fun buildExcludeRegexes(
     excludePatterns: List<String>,
     isRegexPattern: Boolean,
 ): List<Regex>? {
-    val nonBlank = excludePatterns.filter { it.isNotBlank() }
-    if (nonBlank.isEmpty()) return emptyList()
-    return if (isRegexPattern) {
-        runCatching {
-            nonBlank.map { pattern ->
-                Regex(pattern.trim(), RegexOption.IGNORE_CASE)
+    val trimmed = excludePatterns.map { it.trim() }.filter { it.isNotEmpty() }
+    if (trimmed.isEmpty()) return emptyList()
+    if (isRegexPattern) {
+        val allValid =
+            trimmed.all { pattern ->
+                val raw = if (isFolderExcludePattern(pattern, true)) stripTrailingFolderSlash(pattern) else pattern
+                raw.isEmpty() || runCatching { Regex(raw, RegexOption.IGNORE_CASE) }.isSuccess
             }
-        }.getOrNull()
+        if (!allValid) return null
+    }
+    val filePatterns = trimmed.filterNot { isFolderExcludePattern(it, isRegexPattern) }
+    if (filePatterns.isEmpty()) return emptyList()
+    return if (isRegexPattern) {
+        filePatterns.map { pattern -> Regex(pattern, RegexOption.IGNORE_CASE) }
     } else {
-        nonBlank.map { pattern ->
-            globToRegex(pattern.trim())
-        }
+        filePatterns.map { pattern -> globToRegex(pattern) }
+    }
+}
+
+internal fun buildExcludeFolderPatterns(
+    excludePatterns: List<String>,
+    isRegexPattern: Boolean,
+): List<ExcludeFolderPattern>? {
+    val trimmed = excludePatterns.map { it.trim() }.filter { it.isNotEmpty() }
+    if (trimmed.isEmpty()) return emptyList()
+    if (isRegexPattern) {
+        val allValid =
+            trimmed.all { pattern ->
+                val raw = if (isFolderExcludePattern(pattern, true)) stripTrailingFolderSlash(pattern) else pattern
+                raw.isEmpty() || runCatching { Regex(raw, RegexOption.IGNORE_CASE) }.isSuccess
+            }
+        if (!allValid) return null
+    }
+    val folderPatterns =
+        trimmed
+            .filter { isFolderExcludePattern(it, isRegexPattern) }
+            .map { stripTrailingFolderSlash(it) }
+            .filter { it.isNotEmpty() }
+    if (folderPatterns.isEmpty()) return emptyList()
+    return folderPatterns.map { pattern ->
+        val regex =
+            if (isRegexPattern) {
+                Regex(pattern, RegexOption.IGNORE_CASE)
+            } else {
+                globToRegex(pattern)
+            }
+        ExcludeFolderPattern(
+            regex = regex,
+            matchRelativePath = pattern.contains('/'),
+        )
     }
 }
 
@@ -133,6 +184,25 @@ internal fun shouldExclude(
         excludeRegexes.any { it.containsMatchIn(name) }
     } else {
         excludeRegexes.any { it.matches(name) }
+    }
+}
+
+internal fun shouldExcludeFolder(
+    relativeSegments: List<String>,
+    excludeFolderPatterns: List<ExcludeFolderPattern>?,
+    isRegexPattern: Boolean,
+): Boolean {
+    if (excludeFolderPatterns == null) return true
+    if (excludeFolderPatterns.isEmpty() || relativeSegments.isEmpty()) return false
+    val folderName = relativeSegments.last()
+    val relativePath by lazy(LazyThreadSafetyMode.NONE) { relativeSegments.joinToString("/") }
+    return excludeFolderPatterns.any { entry ->
+        val target = if (entry.matchRelativePath) relativePath else folderName
+        if (isRegexPattern) {
+            entry.regex.containsMatchIn(target)
+        } else {
+            entry.regex.matches(target)
+        }
     }
 }
 

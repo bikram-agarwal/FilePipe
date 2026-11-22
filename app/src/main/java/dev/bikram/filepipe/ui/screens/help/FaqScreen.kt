@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -73,6 +74,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.rememberHoistedStringTextFieldState
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
@@ -513,11 +515,15 @@ fun FaqScreen(
                                 }
                             }
                         }
+                        val searchFieldState =
+                            rememberHoistedStringTextFieldState(
+                                text = searchQuery,
+                                onTextChange = faqViewModel::setSearchQuery,
+                            )
                         OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = faqViewModel::setSearchQuery,
+                            state = searchFieldState,
                             modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             shape = MaterialTheme.shapes.extraExtraLarge,
                             placeholder = { Text(stringResource(R.string.faq_search_hint)) },
                             leadingIcon = {

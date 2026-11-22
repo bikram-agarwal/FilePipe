@@ -969,7 +969,7 @@
     <string name="rule_error_age_out_of_range" tools:ignore="PluralsCandidate">Age must be between 1 and %1$d days</string>
     <string name="rule_error_minimum_age_exceeds_maximum">Minimum age cannot be greater than maximum age</string>
     <string name="advanced_exclude_patterns_label">Exclude patterns, comma separated</string>
-    <string name="advanced_exclude_placeholder">e.g. .nomedia</string>
+    <string name="advanced_exclude_placeholder">e.g. .nomedia, cache/</string>
     <string name="advanced_exclude_patterns_regex_label">Exclude RegEx pattern</string>
     <string name="advanced_exclude_patterns_regex_placeholder">e.g. \\.nomedia|.*\\.tmp</string>
     <string name="advanced_exclude_patterns_regex_error">Invalid regular expression syntax in exclude pattern</string>

@@ -161,6 +161,7 @@ import dev.bikram.filepipe.ui.common.AppBottomSheet
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.FilePipePredictiveBackHandler
 import dev.bikram.filepipe.ui.common.isSmallLandscape
+import dev.bikram.filepipe.ui.common.rememberHoistedStringTextFieldState
 import dev.bikram.filepipe.ui.components.CenteredTooltipText
 import dev.bikram.filepipe.ui.components.FileExtensionChips
 import dev.bikram.filepipe.ui.components.FilePipeButton
@@ -1025,12 +1026,16 @@ fun RuleDetailScreen(
                                 )
                             }
                         }
+                        val nameFieldState =
+                            rememberHoistedStringTextFieldState(
+                                text = state.name,
+                                onTextChange = viewModel::setName,
+                            )
                         OutlinedTextField(
-                            value = state.name,
-                            onValueChange = viewModel::setName,
+                            state = nameFieldState,
                             label = { Text(stringResource(R.string.rule_name_label)) },
                             placeholder = { Text(stringResource(R.string.rule_name_placeholder)) },
-                            singleLine = true,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             enabled = !isReadOnly,
                             isError = nameHasError,
                             modifier =
@@ -1839,9 +1844,13 @@ fun RuleDetailScreen(
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                     modifier = Modifier.padding(top = 16.dp),
                                 ) {
+                                    val filenamePatternFieldState =
+                                        rememberHoistedStringTextFieldState(
+                                            text = state.filenamePattern,
+                                            onTextChange = viewModel::setFilenamePattern,
+                                        )
                                     OutlinedTextField(
-                                        value = state.filenamePattern,
-                                        onValueChange = viewModel::setFilenamePattern,
+                                        state = filenamePatternFieldState,
                                         label = {
                                             Text(
                                                 text =
@@ -1881,7 +1890,7 @@ fun RuleDetailScreen(
                                                 modifier = Modifier.padding(end = 4.dp),
                                             )
                                         },
-                                        singleLine = true,
+                                        lineLimits = TextFieldLineLimits.SingleLine,
                                         enabled = !isReadOnly,
                                         isError = state.isFilenamePatternInvalidRegex,
                                         supportingText =
@@ -1897,20 +1906,28 @@ fun RuleDetailScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
+                                        val minFileSizeFieldState =
+                                            rememberHoistedStringTextFieldState(
+                                                text = state.minFileSizeMb,
+                                                onTextChange = viewModel::setMinFileSizeMb,
+                                            )
                                         OutlinedTextField(
-                                            value = state.minFileSizeMb,
-                                            onValueChange = viewModel::setMinFileSizeMb,
+                                            state = minFileSizeFieldState,
                                             label = { Text(stringResource(R.string.advanced_min_size_label)) },
-                                            singleLine = true,
+                                            lineLimits = TextFieldLineLimits.SingleLine,
                                             enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                             modifier = Modifier.weight(1f),
                                         )
+                                        val maxFileSizeFieldState =
+                                            rememberHoistedStringTextFieldState(
+                                                text = state.maxFileSizeMb,
+                                                onTextChange = viewModel::setMaxFileSizeMb,
+                                            )
                                         OutlinedTextField(
-                                            value = state.maxFileSizeMb,
-                                            onValueChange = viewModel::setMaxFileSizeMb,
+                                            state = maxFileSizeFieldState,
                                             label = { Text(stringResource(R.string.advanced_max_size_label)) },
-                                            singleLine = true,
+                                            lineLimits = TextFieldLineLimits.SingleLine,
                                             enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                             modifier = Modifier.weight(1f),
@@ -1921,29 +1938,41 @@ fun RuleDetailScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
+                                        val minAgeFieldState =
+                                            rememberHoistedStringTextFieldState(
+                                                text = state.minAgeDays,
+                                                onTextChange = viewModel::setMinAgeDays,
+                                            )
                                         OutlinedTextField(
-                                            value = state.minAgeDays,
-                                            onValueChange = viewModel::setMinAgeDays,
+                                            state = minAgeFieldState,
                                             label = { Text(stringResource(R.string.advanced_min_age_label)) },
-                                            singleLine = true,
+                                            lineLimits = TextFieldLineLimits.SingleLine,
                                             enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
+                                        val maxAgeFieldState =
+                                            rememberHoistedStringTextFieldState(
+                                                text = state.maxAgeDays,
+                                                onTextChange = viewModel::setMaxAgeDays,
+                                            )
                                         OutlinedTextField(
-                                            value = state.maxAgeDays,
-                                            onValueChange = viewModel::setMaxAgeDays,
+                                            state = maxAgeFieldState,
                                             label = { Text(stringResource(R.string.advanced_max_age_label)) },
-                                            singleLine = true,
+                                            lineLimits = TextFieldLineLimits.SingleLine,
                                             enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
                                     }
 
+                                    val excludePatternsFieldState =
+                                        rememberHoistedStringTextFieldState(
+                                            text = state.excludePatternsText,
+                                            onTextChange = viewModel::setExcludePatternsText,
+                                        )
                                     OutlinedTextField(
-                                        value = state.excludePatternsText,
-                                        onValueChange = viewModel::setExcludePatternsText,
+                                        state = excludePatternsFieldState,
                                         label = {
                                             Text(
                                                 text =
@@ -1990,7 +2019,7 @@ fun RuleDetailScreen(
                                             } else {
                                                 null
                                             },
-                                        singleLine = true,
+                                        lineLimits = TextFieldLineLimits.SingleLine,
                                         enabled = !isReadOnly,
                                         modifier = Modifier.fillMaxWidth(),
                                     )
@@ -2008,9 +2037,13 @@ fun RuleDetailScreen(
                                                     FileOrientation.LANDSCAPE -> stringResource(R.string.advanced_orientation_landscape)
                                                     null -> stringResource(R.string.advanced_orientation_any)
                                                 }
+                                            val orientationFieldState =
+                                                rememberHoistedStringTextFieldState(
+                                                    text = displayValue,
+                                                    onTextChange = {},
+                                                )
                                             OutlinedTextField(
-                                                value = displayValue,
-                                                onValueChange = {},
+                                                state = orientationFieldState,
                                                 readOnly = true,
                                                 label = { Text(stringResource(R.string.advanced_orientation_label)) },
                                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(orientationExpanded) },

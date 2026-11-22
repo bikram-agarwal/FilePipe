@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.InputChipDefaults
@@ -141,7 +143,7 @@ private fun AddExtensionDialog(
     onDismiss: () -> Unit,
     onAdd: (String) -> Unit,
 ) {
-    var text by remember { mutableStateOf("") }
+    val textFieldState = rememberTextFieldState()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -159,12 +161,11 @@ private fun AddExtensionDialog(
         text = {
             Column {
                 OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
+                    state = textFieldState,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.file_type_dialog_label)) },
                     placeholder = { Text(stringResource(R.string.file_type_dialog_placeholder)) },
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
@@ -191,7 +192,8 @@ private fun AddExtensionDialog(
             FilePipeTextButton(
                 onClick = {
                     val extensions =
-                        text
+                        textFieldState.text
+                            .toString()
                             .split(Regex("[,;\\s]+"))
                             .map { it.trim() }
                             .filter { it.isNotEmpty() }
@@ -208,7 +210,7 @@ private fun AddExtensionDialog(
                             }
                     extensions.forEach { onAdd(it) }
                 },
-                enabled = text.isNotBlank(),
+                enabled = textFieldState.text.isNotBlank(),
             ) {
                 Text(stringResource(R.string.file_type_dialog_add))
             }

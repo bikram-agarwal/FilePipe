@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -34,6 +36,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,6 +55,7 @@ import dev.bikram.filepipe.ui.common.isLandscape
 import dev.bikram.filepipe.ui.common.supportsMultiPaneLayout
 import dev.bikram.filepipe.ui.feedback.appClickable
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -225,8 +229,13 @@ fun FilesystemFolderPickerSheetContent(
     var currentPath by remember(startPath) { mutableStateOf(startPath) }
     var childListRefreshKey by remember(startPath) { mutableIntStateOf(0) }
     var showNewFolderDialog by remember { mutableStateOf(false) }
-    var newFolderNameInput by remember { mutableStateOf("") }
+    val newFolderNameState = rememberTextFieldState()
     var newFolderDialogErrorResId by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(newFolderNameState) {
+        snapshotFlow { newFolderNameState.text.toString() }
+            .drop(1)
+            .collect { newFolderDialogErrorResId = null }
+    }
 
     val breadcrumbSegments =
         remember(currentPath, primaryRoot, internalStorageLabel, sdCardLabel, devicesLabel) {
@@ -281,19 +290,15 @@ fun FilesystemFolderPickerSheetContent(
         AlertDialog(
             onDismissRequest = {
                 showNewFolderDialog = false
-                newFolderNameInput = ""
+                newFolderNameState.edit { replace(0, length, "") }
                 newFolderDialogErrorResId = null
             },
             title = { Text(stringResource(R.string.filesystem_folder_picker_new_folder_title)) },
             text = {
                 OutlinedTextField(
-                    value = newFolderNameInput,
-                    onValueChange = { typed ->
-                        newFolderNameInput = typed
-                        newFolderDialogErrorResId = null
-                    },
+                    state = newFolderNameState,
                     label = { Text(stringResource(R.string.filesystem_folder_picker_new_folder_name_label)) },
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     isError = newFolderDialogErrorResId != null,
                     supportingText =
                         if (newFolderDialogErrorResId != null) {
@@ -307,7 +312,7 @@ fun FilesystemFolderPickerSheetContent(
             confirmButton = {
                 FilePipeTextButton(
                     onClick = {
-                        val trimmed = newFolderNameInput.trim()
+                        val trimmed = newFolderNameState.text.toString().trim()
                         val validationError = validationMessageForNewFolderName(trimmed)
                         if (validationError != null) {
                             newFolderDialogErrorResId = validationError
@@ -349,7 +354,7 @@ fun FilesystemFolderPickerSheetContent(
                             return@FilePipeTextButton
                         }
                         showNewFolderDialog = false
-                        newFolderNameInput = ""
+                        newFolderNameState.edit { replace(0, length, "") }
                         newFolderDialogErrorResId = null
                         childListRefreshKey++
                         currentPath = normalizedNew
@@ -362,7 +367,7 @@ fun FilesystemFolderPickerSheetContent(
                 FilePipeTextButton(
                     onClick = {
                         showNewFolderDialog = false
-                        newFolderNameInput = ""
+                        newFolderNameState.edit { replace(0, length, "") }
                         newFolderDialogErrorResId = null
                     },
                 ) {
@@ -510,7 +515,7 @@ fun FilesystemFolderPickerSheetContent(
                     }
                     FilePipeOutlinedButton(
                         onClick = {
-                            newFolderNameInput = ""
+                            newFolderNameState.edit { replace(0, length, "") }
                             newFolderDialogErrorResId = null
                             showNewFolderDialog = true
                         },
@@ -578,7 +583,7 @@ fun FilesystemFolderPickerSheetContent(
                     }
                     FilePipeOutlinedButton(
                         onClick = {
-                            newFolderNameInput = ""
+                            newFolderNameState.edit { replace(0, length, "") }
                             newFolderDialogErrorResId = null
                             showNewFolderDialog = true
                         },
@@ -624,7 +629,7 @@ fun FilesystemFolderPickerSheetContent(
                 ) {
                     FilePipeOutlinedButton(
                         onClick = {
-                            newFolderNameInput = ""
+                            newFolderNameState.edit { replace(0, length, "") }
                             newFolderDialogErrorResId = null
                             showNewFolderDialog = true
                         },

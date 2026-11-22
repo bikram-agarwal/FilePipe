@@ -26,7 +26,7 @@
 ### Files not moving?
 - Confirm the rule is enabled and has a schedule set.
 - Check folder access — tap any highlighted path in the rule editor and grant access again or pick a replacement folder.
-- Review advanced filters: size, age, or filename pattern may be excluding files you expect to match.
+- Review advanced filters: size, age, filename pattern, or exclude patterns may be excluding files you expect to match. An exclude pattern ending in `/` can skip an entire subfolder.
 - Check battery restrictions for FilePipe in Android settings.
 
 ---
@@ -106,6 +106,7 @@
 
 ### Why is my rule skipping files?
 - The file may not match the extensions or advanced filters.
+- An exclude pattern may match the file, or a folder the file is inside if the pattern ends in `/` (see **How do I exclude folders?**).
 - For **Move** and **Copy**, **Conflict setting** controls what happens when a file with the same name already exists in the destination: **Skip** leaves it untouched, **Overwrite** replaces it, **Rename** keeps both by adding a suffix to the incoming filename.
 - Lost folder access can hide files until you grant access again.
 
@@ -115,8 +116,28 @@
 - Use it to check filters, destination (for **Move** and **Copy**), and access before you rely on the rule.
 
 ### Can rules scan subfolders?
-- Yes — enable **Include subfolders** on a source folder in the rule editor.
-- For **Move** and **Copy**, the destination can optionally recreate the source subfolder structure so files land in matching subdirectories.
+- Yes. In the rule editor, turn on **Scan subfolders** in the **Source folders** section. This applies to the whole rule. Subfolders are scanned up to 32 levels deep.
+- For **Move** and **Copy**, turn on **Mirror subfolders to destination** to recreate the source subfolder structure in the destination, so files land in matching subdirectories.
+
+### How do I exclude a folder?
+
+**Steps**
+1. In the **Source folders** section, turn on **Scan subfolders**. Folder exclusions only work when this is on, because FilePipe does not look inside subfolders otherwise.
+3. Scroll down and tap **Advanced filters** to expand it.
+4. In the **Exclude patterns** box, type the folder name followed by `/`, for example `cache/`. To add more patterns, separate them with commas, such as `.nomedia, cache/, .thumbnails/`.
+5. Tap **Save**. Tap **Preview** to check which files the rule would act on before you run it.
+
+**What a pattern matches**
+- `cache/` skips every folder named `cache`, at any depth inside each source folder.
+- `DCIM/cache/` skips only the `cache` folder inside `DCIM`. Paths are counted from each source folder, and `/` separates folder names. Other folders named `cache` are not affected.
+- Wildcards work too. `thumb*/` skips any folder whose name starts with `thumb`.
+- A skipped folder is skipped along with everything inside it.
+- Without a trailing `/`, a pattern applies to files only. For example, `cache` does not skip a folder named `cache`.
+
+**RegEx mode**
+- Tap the **RegEx** chip on the **Exclude patterns** box first.
+- A trailing `/` still marks a folder pattern (for example `\.thumbnails/`).
+- A RegEx folder pattern matches anywhere in the folder name, so `cache/` also skips `app_cache`. To match the whole name only, use `^cache$/`.
 
 ### How do RegEx filters work?
 - Tap the **RegEx** chip inside the **Filename pattern** or **Exclude pattern** text box to switch that field to regular expression mode.

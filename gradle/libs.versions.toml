@@ -1,11 +1,11 @@
 [versions]
 # BOM material3 is older; this line tracks the expressive build used by the app (override BOM for this artifact).
 activityCompose = "1.13.0"
-agp = "9.6.0-alpha02"
+agp = "9.6.0-alpha05"
 appcompat = "1.8.0"
-composeBom = "2026.10.01"
+composeBom = "2026.11.01"
 composeMaterial3Adaptive = "1.3.0"
-composeMaterial3Expressive = "1.5.0-beta02"
+composeMaterial3Expressive = "1.6.0-alpha01"
 coreKtx = "1.19.1"
 coroutines = "1.11.0"
 datastore = "1.3.0"
@@ -18,18 +18,18 @@ hiltNav = "1.4.0"
 java = "21"
 junit = "4.13.2"
 kotlin = "2.4.21"
-kotlinLogging = "8.0.4"
-ksp = "2.3.13"
+kotlinLogging = "8.0.7"
+ksp = "2.3.14"
 ktlint = "1.8.0"
 ktlintGradle = "14.2.0"
-lifecycle = "2.11.0"
+lifecycle = "2.11.1"
 materialKolor = "5.0.1"
 nav = "2.10.2"
 paging = "3.5.3"
 reorderable = "3.1.0"
 room = "2.8.5"
 sarif4k = "0.8.0"
-serialization = "1.12.0"
+serialization = "1.13.0"
 splashscreen = "1.2.0"
 testCore = "1.7.0"
 testExtJunit = "1.3.0"
@@ -57,7 +57,7 @@ datastore-preferences = { module = "androidx.datastore:datastore-preferences", v
 detekt-sarif4k = { module = "io.github.detekt.sarif4k:sarif4k", version.ref = "sarif4k" }
 detekt-sarif4k-jvm = { module = "io.github.detekt.sarif4k:sarif4k-jvm", version.ref = "sarif4k" }
 documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
-errorprone-annotations = "com.google.errorprone:error_prone_annotations:2.52.0"
+errorprone-annotations = "com.google.errorprone:error_prone_annotations:2.53.0"
 exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }

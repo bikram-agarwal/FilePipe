@@ -76,6 +76,48 @@ class FileScanFiltersTest {
     }
 
     @Test
+    fun trailingSlashExcludePatternsMatchFoldersOnlyAndNotFiles() {
+        val patterns = listOf(".thumbnails/", "thumbnails/", "cache/", "thumb*.*")
+        val fileRegexes = buildExcludeRegexes(patterns, isRegexPattern = false)
+        val folderPatterns = buildExcludeFolderPatterns(patterns, isRegexPattern = false)
+
+        // File exclude pattern matches thumb*.* only, not files named cache or genuine photos
+        assertTrue(shouldExclude("thumb_01.jpg", fileRegexes, isRegexPattern = false))
+        assertFalse(shouldExclude("cache", fileRegexes, isRegexPattern = false))
+        assertFalse(shouldExclude("IMG_1234.jpg", fileRegexes, isRegexPattern = false))
+
+        // Folder exclude patterns match folder segments at any depth, case-insensitively
+        assertTrue(shouldExcludeFolder(listOf(".thumbnails"), folderPatterns, isRegexPattern = false))
+        assertTrue(shouldExcludeFolder(listOf("Instagram", "Thumbnails"), folderPatterns, isRegexPattern = false))
+        assertTrue(shouldExcludeFolder(listOf("Sub", "CACHE"), folderPatterns, isRegexPattern = false))
+        assertFalse(shouldExcludeFolder(listOf("Camera"), folderPatterns, isRegexPattern = false))
+        assertFalse(shouldExcludeFolder(listOf("thumb.backup"), folderPatterns, isRegexPattern = false))
+    }
+
+    @Test
+    fun relativePathFolderExcludePatternMatchesNestedRelativePath() {
+        val patterns = listOf("DCIM/cache/")
+        val folderPatterns = buildExcludeFolderPatterns(patterns, isRegexPattern = false)
+
+        assertTrue(shouldExcludeFolder(listOf("DCIM", "cache"), folderPatterns, isRegexPattern = false))
+        assertFalse(shouldExcludeFolder(listOf("Pictures", "cache"), folderPatterns, isRegexPattern = false))
+    }
+
+    @Test
+    fun regexFolderExcludePatternSupportsTrailingSlashAndFailsClosedOnInvalidRegex() {
+        val valid = buildExcludeFolderPatterns(listOf("""\.thumbnails/""", "cache/"), isRegexPattern = true)
+        assertTrue(shouldExcludeFolder(listOf(".thumbnails"), valid, isRegexPattern = true))
+        assertTrue(shouldExcludeFolder(listOf("app_cache"), valid, isRegexPattern = true))
+        assertFalse(shouldExcludeFolder(listOf("Camera"), valid, isRegexPattern = true))
+
+        val invalidFolder = buildExcludeFolderPatterns(listOf("["), isRegexPattern = true)
+        assertTrue(shouldExcludeFolder(listOf("Camera"), invalidFolder, isRegexPattern = true))
+
+        val invalidMixed = buildExcludeRegexes(listOf("thumb.*", "[/"), isRegexPattern = true)
+        assertTrue(shouldExclude("photo.jpg", invalidMixed, isRegexPattern = true))
+    }
+
+    @Test
     fun incompleteKnownSizeCopyIsRejected() {
         assertFalse(isCompleteCopy(expectedBytes = 100L, copiedBytes = 99L))
         assertTrue(isCompleteCopy(expectedBytes = 100L, copiedBytes = 100L))
