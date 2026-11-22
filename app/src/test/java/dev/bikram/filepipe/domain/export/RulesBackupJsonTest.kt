@@ -175,6 +175,53 @@ class RulesBackupJsonTest {
     }
 
     @Test
+    fun olderBackupWildcardFilenamePatternBecomesOnePerLine() {
+        // Written before patterns were one per line: no marker field, and every comma split the box.
+        val legacy =
+            RuleBackupDto(
+                name = "Legacy glob",
+                sourceFolderPaths = listOf("content://source"),
+                destinationFolderPath = "content://destination",
+                fileExtensions = listOf("jpg"),
+                filenamePattern = "IMG_*, PXL_*",
+            ).toDomain()
+
+        assertEquals("IMG_*\nPXL_*", legacy.filenamePattern)
+    }
+
+    @Test
+    fun olderBackupRegexFilenamePatternIsAlreadyOneLine() {
+        // A RegEx was one expression, where its commas were literal; it stays exactly as it was.
+        val legacy =
+            RuleBackupDto(
+                name = "Legacy regex",
+                sourceFolderPaths = listOf("content://source"),
+                destinationFolderPath = "content://destination",
+                fileExtensions = listOf("jpg"),
+                filenamePattern = "^backup, old \\d{2,4}",
+                isRegexPattern = true,
+            ).toDomain()
+
+        assertEquals("^backup, old \\d{2,4}", legacy.filenamePattern)
+    }
+
+    @Test
+    fun newBackupRoundTripsLinesAndCommasUnchanged() {
+        val rule =
+            Rule(
+                name = "Two patterns",
+                sourceFolderPaths = listOf("content://source"),
+                destinationFolderPath = "content://destination",
+                fileExtensions = listOf("pdf"),
+                filenamePattern = "Invoice, *\nReceipt*",
+            )
+
+        val dto = rule.toBackupDto()
+        assertTrue(dto.patternsOnePerLine)
+        assertEquals("Invoice, *\nReceipt*", dto.toDomain().filenamePattern)
+    }
+
+    @Test
     fun malformedLegacyRuleFieldsFallbackToSafeDefaults() {
         val domainRule =
             RuleBackupDto(

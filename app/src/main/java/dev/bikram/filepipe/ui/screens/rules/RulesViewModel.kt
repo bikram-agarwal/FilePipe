@@ -564,7 +564,6 @@ class RulesViewModel
             // The group filter lives in a singleton only so the rule editor can read it; it still
             // lasts as long as this list does (leaving the app and coming back starts on All).
             ruleGroupFilterStore.setFilter(RuleGroupFilter.All)
-            super.onCleared()
         }
 
         /**

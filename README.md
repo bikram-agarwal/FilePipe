@@ -41,7 +41,7 @@ See [the differences between the Play Store, F-Droid, and GitHub versions](docs/
 ### 📂 Rule-Based Automation
 
 - **Templates**: Get started instantly with presets for screenshots, images, video, music, downloads, documents, and more.
-- **Advanced Filtering**: Go beyond extensions with name patterns, wildcards, regular expressions, file size limits, media orientation (portrait/landscape), and age-based rules.
+- **Advanced Filtering**: Go beyond extensions with include/exclude patterns, wildcards, regular expressions, file size limits, media orientation (portrait/landscape), and age-based rules. You can skip whole folders too.
 - **Recursive Scanning**: Deep-dive into subfolders to find every matching file. Optionally mirror folder structure at the destination.
 - **Action Control**: Choose your action (move, copy, or delete) and conflict resolution method (skip, overwrite, or rename).
 
@@ -49,14 +49,15 @@ See [the differences between the Play Store, F-Droid, and GitHub versions](docs/
 
 - **Scheduled Job Notifications**: Background jobs post summary notifications with a quick result preview and a one-tap Undo button.
 - **Swipe Shortcuts**: Fully configurable gestures on rule cards for quick editing, duplicating, or checking history.
-- **Home Screen Shortcuts**: Run your favorite rules instantly with long-press Launcher shortcuts.
+- **Home Screen Shortcuts**: Run your favorite rules directly from long-press Launcher shortcuts.
 - **Backup & Restore/Import**: Export all your rules and settings to local or cloud storage. Auto-export ensures you never lose your setup, making importing or restoring seamless.
 
 ### 📊 Visibility & Control
 
 - **Detailed History**: Every run is logged. Filter by success, failure, or outcome to see exactly what happened. And group by date, rule, or status.
 - **Drag-and-Drop**: Organize your rules exactly how you want them with a custom sort order.
-- **Batch Actions**: Long-press to enter multi-select mode and preview, run or delete multiple rules at once.
+- **Rule Groups**: Sort rules into groups, then filter the list with one tap on a group chip.
+- **Batch Actions**: Long-press to enter multi-select mode and preview, run, group or delete multiple rules at once.
 - **Smart Updates**: Built-in smart update checker that detects hotfixes (newer assets) even when the version number stays the same.
 - **FAQ & Help**: Searchable help page covering common questions, grouped by topic with deep links into Settings.
 
@@ -65,7 +66,7 @@ See [the differences between the Play Store, F-Droid, and GitHub versions](docs/
 - **Preview Mode**: See exactly which files will be affected before a single byte is moved. Works in batch mode too.
 - **Cancel Mid-Run**: Stop any operation instantly mid-batch if you change your mind.
 - **Rule Trash** - Deleted rules go to Trash for 30 days, restore from History.
-- **Undo After the Fact**: Made a mistake? Reverse moves or delete copies directly from the history log.
+- **Undo After the Fact**: Made a mistake? Reverse moves or delete copies directly from the history log, for a whole run or just the files you pick.
 - **Background Resiliency**: Manual runs survive app switching. FilePipe keeps working and keeps you updated via notifications.
 
 ### 🎨 Your App, Your Aesthetic

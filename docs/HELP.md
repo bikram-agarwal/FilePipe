@@ -26,7 +26,7 @@
 ### Files not moving?
 - Confirm the rule is enabled and has a schedule set.
 - Check folder access — tap any highlighted path in the rule editor and grant access again or pick a replacement folder.
-- Review advanced filters: size, age, filename pattern, or exclude patterns may be excluding files you expect to match. An exclude pattern ending in `/` can skip an entire subfolder.
+- Review advanced filters: size, age, include patterns, or exclude patterns may be leaving out files you expect to match. An exclude pattern ending in `/` skips whole subfolders.
 - Check battery restrictions for FilePipe in Android settings.
 
 ---
@@ -38,7 +38,7 @@
 - Pick source folders, file types (enter manually or use template), and an operation: **Move**, **Copy**, or **Delete**.
 - For **Move** and **Copy**, pick a destination folder and set how to handle duplicate files there.
 - **Delete** rules do not use a destination or conflict settings — matched files are removed from their source folders.
-- Use advanced filters to match by filename pattern, size range, or file age.
+- Use advanced filters to match by name (include and exclude patterns), size range, or file age.
 - Save, then tap **Preview** 👁️ to see which files would be affected before committing.
 - Add a schedule if you want the rule to run automatically in the background.
 
@@ -49,17 +49,19 @@
 
 ### What are "All files" and "No extension" file types?
 - These are special file types you can add from **Add type** on the rule editor (quick chips in the dialog) or from the **Use template** list. They are NOT the same as **All files access** in Settings.
-- **All files** matches every file in your source folders, regardless of extension. Advanced filters still apply — filename pattern, exclude pattern, size, and age can narrow the match.
+- **All files** matches every file in your source folders, regardless of extension. Advanced filters still apply — include and exclude patterns, size, and age can narrow the match.
 - Adding **All files** replaces every other file type on the rule. You cannot combine it with specific types such as `jpg` or `pdf`; only the **All files** chip remains.
 - **No extension** matches files that have no extension — names with no dot, names that are only a dot and suffix (such as `.gitignore`), or names ending in a trailing dot (such as `README.`).
 - Files like `.config.json` or `.env.local` do count as having an extension (`json`, `local`) and are not matched by **No extension** alone.
 - **No extension** can be combined with normal types (for example `jpg` and **No extension** together). **All files** cannot be combined with anything else.
-- If a filename pattern requires a specific extension (such as `*.pdf`) but your file types do not include it — or you only selected **No extension** — the rule editor shows a warning because no files would match.
+- If every file include pattern requires a specific extension (such as `*.pdf`) but your file types do not include it — or you only selected **No extension** — the rule editor shows a warning because no files would match.
 
 ### How do I run a rule manually?
-- Tap a rule on the Rules tab and use the **Run** action.
-- Use **Preview** first if you want to see which files match before the rule acts on them.
-- **Delete** rules (and batches that include one) show a confirmation dialog before any files are removed. (Only when run manually.)
+- Tap **Preview** on a rule card. A sheet lists the files the rule would act on.
+- Tap the sheet's **Move**, **Copy**, or **Delete** button to run it. The run progess is shown in the sheet, file by file, and you can **Cancel** it there. When it ends, tap **Done**, or **View in History** to see what happened.
+- To run several rules at once, long-press a rule card to start selecting, pick the others, then tap **Preview**. If the rules do different things, the button reads **Run**.
+- The run acts on exactly the files the sheet listed. A listed file that changed since then is left alone, and a file that appeared since then waits for the next run.
+- If you close the sheet while it runs, the run keeps going and its progress shows on the rule card.
 
 ---
 
@@ -101,12 +103,13 @@
 - **Delete** permanently removes matched files from your source folders. There is no destination folder and no undo anywhere in the app.
 - The rule editor shows a warning when **Delete** is selected. Use **Preview** first and narrow your filters carefully before you run or schedule the rule.
 - **Conflict setting** does not apply to **Delete** — it is only used for **Move** and **Copy**.
-- When you tap **Run** on a delete rule (or run a batch that includes one), FilePipe asks you to confirm before anything is deleted. (Only when run manually.)
-- Scheduled delete rules run automatically in the background without that extra confirmation — double-check filters and schedules before enabling them.
+- When you run it yourself, the preview sheet is the confirmation: it says the files would be **permanently deleted**, and its button turns red (reading **Delete**, or **Run** if the batch mixes in other rules). Only the files it lists are deleted, and a listed file that changed since is kept.
+- If the sheet has been open for more than 5 minutes, tapping **Delete** closes it, scans again, and asks you to confirm in a dialog instead.
+- Scheduled delete rules run automatically in the background with no confirmation at all. Double-check filters and schedules before turning them on.
 
 ### Why is my rule skipping files?
 - The file may not match the extensions or advanced filters.
-- An exclude pattern may match the file, or a folder the file is inside if the pattern ends in `/` (see **How do I exclude folders?**).
+- An exclude pattern may match the file, or a folder the file is inside if the pattern ends in `/` (see **How do include and exclude patterns work?**).
 - For **Move** and **Copy**, **Conflict setting** controls what happens when a file with the same name already exists in the destination: **Skip** leaves it untouched, **Overwrite** replaces it, **Rename** keeps both by adding a suffix to the incoming filename.
 - Lost folder access can hide files until you grant access again.
 
@@ -119,32 +122,49 @@
 - Yes. In the rule editor, turn on **Scan subfolders** in the **Source folders** section. This applies to the whole rule. Subfolders are scanned up to 32 levels deep.
 - For **Move** and **Copy**, turn on **Mirror subfolders to destination** to recreate the source subfolder structure in the destination, so files land in matching subdirectories.
 
-### How do I exclude a folder?
+### How do include and exclude patterns work?
+Under **Advanced filters** in the rule editor, two boxes narrow down which files a rule acts on. Put one pattern per line. A file only has to match one line.
 
-**Steps**
-1. In the **Source folders** section, turn on **Scan subfolders**. Folder exclusions only work when this is on, because FilePipe does not look inside subfolders otherwise.
-2. Scroll down and tap **Advanced filters** to expand it.
-3. In the **Exclude patterns** box, type the folder name followed by `/`, for example `cache/`. To add more patterns, separate them with commas, such as `.nomedia, cache/, .thumbnails/`.
-4. Tap **Save**. Tap **Preview** to check which files the rule would act on before you run it.
+**File include patterns**
+- Only files whose names match a line are acted on. Leave the box empty to act on every file of the rule's types.
+- For example, `Screenshot_*` on one line and `IMG_*` on the next limit the rule to screenshots and camera photos.
 
-**What a pattern matches**
+**Exclude patterns**
+- Files whose names match a line are skipped.
+- A line ending in `/` skips a whole folder. FilePipe doesn't look inside it at all.
+- A file is acted on only if its name matches an include pattern (when there are any) and no exclude pattern. So a name that matches both boxes is skipped.
+
+**Writing a pattern**
+- `*` matches any text and `?` any single character.
+- A pattern has to match the whole name: `cache` matches only `cache`, while `*cache*` matches any name containing it.
+- Upper and lower case don't matter.
+- Commas are ordinary characters, so `Invoice, *.pdf` matches `Invoice, March.pdf`.
+
+**Skipping a folder**
+1. In the **Source folders** section, turn on **Scan subfolders**. Folder patterns only work when this is on, because FilePipe does not look inside subfolders otherwise.
+2. Under **Advanced filters**, type the folder name followed by `/` on its own line in **Exclude patterns**, for example `cache/`.
+3. Tap **Save**, then **Preview** to check which files the rule would act on.
+
+**What a folder pattern matches**
 - `cache/` skips every folder named `cache`, at any depth inside each source folder.
-- `/cache/` (starting with `/`) skips only a `cache` folder directly inside a source folder. Deeper folders named `cache` are not affected.
-- `DCIM/cache/` skips only the `cache` folder inside `DCIM`. Paths are counted from each source folder, and `/` separates folder names. Other folders named `cache` are not affected.
-- Wildcards work too. `thumb*/` skips any folder whose name starts with `thumb`.
-- A skipped folder is skipped along with everything inside it.
-- Without a trailing `/`, a pattern applies to files only. For example, `cache` does not skip a folder named `cache`.
+- `/cache/` (starting with `/`) skips only a `cache` folder directly inside a source folder.
+- `DCIM/cache/` skips only the `cache` folder inside `DCIM`. Paths start at each source folder.
+- `thumb*/` skips every folder whose name starts with `thumb`.
+- Without the trailing `/`, a pattern applies to file names only: `cache` skips a file named `cache`, not a folder.
 
-**RegEx mode**
-- Tap the **RegEx** chip on the **Exclude patterns** box first.
-- A trailing `/` still marks a folder pattern (for example `\.thumbnails/`).
-- A RegEx folder pattern matches anywhere in the folder name, so `cache/` also skips `app_cache`. To match the whole name only, use `^cache$/`.
+To use regular expressions instead, tap **RegEx Off** next to a box's label (it then reads **RegEx On**). See **How do RegEx filters work?**
 
 ### How do RegEx filters work?
-- Tap the **RegEx** chip inside the **Filename pattern** or **Exclude pattern** text box to switch that field to regular expression mode.
-- In wildcard mode (default), use `*` to match any text (e.g. `Screenshot_*`) or separate multiple patterns with commas.
-- In RegEx mode, enter regular expression syntax (e.g. `^IMG_\d{4}\.(jpg|png)$` or `\.nomedia|.*\.tmp`). RegEx matching is case-insensitive.
-- If a regular expression has invalid syntax (such as an unclosed bracket), an error message will display and the rule cannot be saved until corrected.
+Each pattern box has a **RegEx Off** button next to its label. Tap it to switch that box to regular expressions; it then reads **RegEx On**. Everything in **How do include and exclude patterns work?** still applies, including one pattern per line. What changes is how a single pattern matches:
+- A pattern matches anywhere in the name unless you anchor it: `cache` also matches `app_cache`, while `^cache$` matches only `cache`.
+- For example, `^IMG_\d{4}\.(jpg|png)$` matches `IMG_1234.jpg` and `IMG_1234.png`.
+- Upper and lower case don't matter.
+- In **Exclude patterns**, a trailing `/` still makes a folder pattern, matched against the folder's name. For example, `\.thumbnails/` skips any folder with `.thumbnails` in its name, and `^cache$/` skips only folders named exactly `cache`. A pattern with `/` inside, such as `DCIM/cache/`, is matched against the folder's path from the source folder. A `/` at the start does the same as with wildcards: `/^cache$/` skips only a `cache` folder directly inside a source folder.
+- If a line isn't a valid regular expression (such as an unclosed bracket), the rule editor names that line, and the rule can't be saved until you fix it.
+
+**Switching between wildcards and RegEx**
+- Switching rewrites the box's patterns so the rule still matches exactly the same files. Turning RegEx on turns `IMG_*` into `^IMG_.*$` and `cache/` into `^cache$/`; turning it off turns them back. Tap **Undo** on the message that appears to put the box back as it was.
+- A regular expression that has no wildcard equivalent (such as `\d{4}` or `(jpg|png)`) can't be turned back. FilePipe names those lines and asks before switching. If you switch anyway, they stay as typed, and as wildcards they only match a name spelled exactly like them.
 
 ---
 

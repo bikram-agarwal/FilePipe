@@ -62,6 +62,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -92,21 +93,82 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 private const val SECTION_STORAGE_ACCESS_MODES = "storage_access_modes"
+private const val ITEM_REGEX_FILTERS = "regex_filters"
+private const val ITEM_PATTERNS = "include_exclude_patterns"
 
-private fun parseDoubleAsteriskEmphasis(text: String): AnnotatedString {
-    val parts = text.split("**")
-    return buildAnnotatedString {
-        parts.forEachIndexed { index, part ->
-            if (index % 2 == 1) {
-                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                    append(part)
+/**
+ * What opening the FAQ at a focus key ([Screen.Faq.createRoute]) shows: the items to expand, and the
+ * row to bring to the top - an item, or a whole section by its header. One entry per deep-link
+ * target, the same shape as Remember's `helpFocusSubsectionTitles`, so a new link is a table row
+ * rather than another branch in the screen.
+ */
+private data class FaqFocusTarget(
+    val expandItemIds: List<String>,
+    val scrollToItemId: String? = null,
+    val scrollToSectionId: String? = null,
+)
+
+private val regexFocusTarget = FaqFocusTarget(listOf(ITEM_REGEX_FILTERS), scrollToItemId = ITEM_REGEX_FILTERS)
+
+private val faqFocusTargets: Map<String, FaqFocusTarget> =
+    mapOf(
+        Screen.Faq.FOCUS_STORAGE_ACCESS to
+            FaqFocusTarget(
+                expandItemIds = listOf("storage_all_files", "storage_selective"),
+                scrollToSectionId = SECTION_STORAGE_ACCESS_MODES,
+            ),
+        Screen.Faq.FOCUS_REGEX to regexFocusTarget,
+        // Also accepted by its item id, as before this table.
+        ITEM_REGEX_FILTERS to regexFocusTarget,
+        Screen.Faq.FOCUS_PATTERNS to FaqFocusTarget(listOf(ITEM_PATTERNS), scrollToItemId = ITEM_PATTERNS),
+    )
+
+/**
+ * HELP.md's inline markdown as the FAQ shows it: `**bold**` and `` `code` ``. Code is styled like
+ * inline code in Remember's MarkdownText (monospace on surfaceVariant at 70%), which renders
+ * Remember's Help; FilePipe's FAQ needs only these two inline forms, not that whole engine.
+ */
+@Composable
+private fun faqInlineText(text: String): AnnotatedString {
+    val codeBackground = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+    return remember(text, codeBackground) { parseFaqInlineMarkdown(text, codeBackground) }
+}
+
+/**
+ * Inside a code span everything is literal (a `**` there stays as typed). A backtick with no closing
+ * one is shown as typed; an unclosed `**` bolds to the end of the line, as before code spans existed.
+ */
+internal fun parseFaqInlineMarkdown(
+    text: String,
+    codeBackground: Color,
+): AnnotatedString =
+    buildAnnotatedString {
+        var bold = false
+        var index = 0
+        while (index < text.length) {
+            when {
+                text[index] == '`' && text.indexOf('`', index + 1) > index -> {
+                    val close = text.indexOf('`', index + 1)
+                    withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = codeBackground)) {
+                        append(text, index + 1, close)
+                    }
+                    index = close + 1
                 }
-            } else {
-                append(part)
+
+                text.startsWith("**", index) -> {
+                    if (bold) pop() else pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                    bold = !bold
+                    index += 2
+                }
+
+                else -> {
+                    append(text[index])
+                    index++
+                }
             }
         }
+        if (bold) pop()
     }
-}
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -149,7 +211,7 @@ private fun FaqTopicListItem(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = parseDoubleAsteriskEmphasis(itemContent.question),
+                    text = faqInlineText(itemContent.question),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
@@ -200,7 +262,7 @@ private fun FaqTopicListItem(
                         val topSpacing = if (index > 0 && !line.isBullet) 10.dp else 0.dp
                         if (line.isHeading) {
                             Text(
-                                text = parseDoubleAsteriskEmphasis(line.text),
+                                text = faqInlineText(line.text),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -211,7 +273,7 @@ private fun FaqTopicListItem(
                                 text =
                                     buildAnnotatedString {
                                         if (line.isBullet) append("• ")
-                                        append(parseDoubleAsteriskEmphasis(line.text))
+                                        append(faqInlineText(line.text))
                                     },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -386,30 +448,30 @@ fun FaqScreen(
     // Apply the focus once per visit: the flag is saveable, so rotating or searching afterwards
     // does not re-expand the section and jump back to it. Set only once the scroll is done, so a
     // run cancelled midway is retried. Remember's HelpScreen guards its focus the same way.
+    // Unlike Remember's HelpScreen there is no old search to clear first: this screen's query lives
+    // in FaqViewModel (not FaqUiStateStore), so every visit starts unfiltered. And the top bar here
+    // doesn't collapse, so there's no app-bar offset to sync after the jump either.
     var focusHandled by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(initialFocusSectionId, filteredSections) {
         if (focusHandled || filteredSections.isEmpty()) return@LaunchedEffect
-        if (initialFocusSectionId == Screen.Faq.FOCUS_STORAGE_ACCESS) {
-            if (!expandedItemIds.contains("storage_all_files")) {
-                faqViewModel.setItemExpanded("storage_all_files", true)
-            }
-            if (!expandedItemIds.contains("storage_selective")) {
-                faqViewModel.setItemExpanded("storage_selective", true)
-            }
+        faqFocusTargets[initialFocusSectionId]?.let { target ->
+            target.expandItemIds
+                .filterNot { itemId -> itemId in expandedItemIds }
+                .forEach { itemId -> faqViewModel.setItemExpanded(itemId, true) }
             val scrollIndex =
-                computeLazyIndexForSectionHeader(
-                    focusSectionId = SECTION_STORAGE_ACCESS_MODES,
-                    filteredSections = filteredSections,
-                )
-            if (scrollIndex >= 0) {
-                delay(120)
-                listState.scrollToItem(scrollIndex)
-            }
-        } else if (initialFocusSectionId == Screen.Faq.FOCUS_REGEX || initialFocusSectionId == "regex_filters") {
-            if (!expandedItemIds.contains("regex_filters")) {
-                faqViewModel.setItemExpanded("regex_filters", true)
-            }
-            val scrollIndex = computeLazyIndexForItem("regex_filters", filteredSections)
+                when {
+                    target.scrollToSectionId != null -> {
+                        computeLazyIndexForSectionHeader(target.scrollToSectionId, filteredSections)
+                    }
+
+                    target.scrollToItemId != null -> {
+                        computeLazyIndexForItem(target.scrollToItemId, filteredSections)
+                    }
+
+                    else -> {
+                        -1
+                    }
+                }
             if (scrollIndex >= 0) {
                 delay(120)
                 listState.scrollToItem(scrollIndex)
@@ -611,7 +673,7 @@ fun FaqScreen(
                                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
                                 ) {
                                     Text(
-                                        text = parseDoubleAsteriskEmphasis(calloutText),
+                                        text = faqInlineText(calloutText),
                                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer,

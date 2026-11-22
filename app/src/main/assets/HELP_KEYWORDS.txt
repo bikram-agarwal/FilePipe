@@ -35,6 +35,16 @@ rename -> rule_skipping_files
 subfolder -> subfolders
 subfolders -> subfolders
 recursive -> subfolders
+exclude -> include_exclude_patterns|regex_filters|rule_skipping_files
+excluding -> include_exclude_patterns|regex_filters|rule_skipping_files
+skip folder -> include_exclude_patterns
+ignore folder -> include_exclude_patterns
+nomedia -> include_exclude_patterns
+thumbnails -> include_exclude_patterns
+cache folder -> include_exclude_patterns
+include -> include_exclude_patterns
+wildcard -> include_exclude_patterns|regex_filters
+filename pattern -> include_exclude_patterns
 template -> templates
 templates -> templates
 shortcut -> run_manually
@@ -63,8 +73,9 @@ blur -> visual_effects
 appearance -> theme_appearance|colors|visual_effects
 regex -> regex_filters
 regular expression -> regex_filters
-pattern -> regex_filters
+pattern -> include_exclude_patterns|regex_filters
 invalid regex -> regex_filters
+convert -> regex_filters
 offline -> offline_flavor_differences
 no internet -> offline_flavor_differences
 without internet -> offline_flavor_differences

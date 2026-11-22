@@ -71,7 +71,7 @@ class RuleConflictDetectorTest {
         val rule =
             baseRule().copy(
                 fileExtensions = listOf("pdf"),
-                filenamePattern = "*.pdf, *.png",
+                filenamePattern = "*.pdf\n*.png",
                 isRegexPattern = false,
             )
         val conflicts = RuleConflictDetector.detectConflicts(rule)
@@ -84,7 +84,7 @@ class RuleConflictDetectorTest {
         val rule =
             baseRule().copy(
                 fileExtensions = listOf("jpg"),
-                filenamePattern = "*.pdf, *.png",
+                filenamePattern = "*.pdf\n*.png",
                 isRegexPattern = false,
             )
         val conflicts = RuleConflictDetector.detectConflicts(rule)
@@ -98,7 +98,7 @@ class RuleConflictDetectorTest {
         val rule =
             baseRule().copy(
                 fileExtensions = listOf("pdf"),
-                filenamePattern = "*.png, IMG_*",
+                filenamePattern = "*.png\nIMG_*",
                 isRegexPattern = false,
             )
         val conflicts = RuleConflictDetector.detectConflicts(rule)
@@ -140,6 +140,16 @@ class RuleConflictDetectorTest {
 
         assertEquals(1, conflicts.size)
         assertTrue(conflicts.first() is RuleConflict.ExcludeAllPattern)
+    }
+
+    @Test
+    fun regexFilenamePatternsAreAlternativesLikeWildcards() {
+        // One per line like a wildcard box: one line matching pdf means no conflict.
+        val matching = baseRule().copy(filenamePattern = "\\.pdf$\n\\.png$", isRegexPattern = true)
+        assertTrue(RuleConflictDetector.detectConflicts(matching).none { it is RuleConflict.ExtensionPatternMismatch })
+
+        val mismatched = baseRule().copy(filenamePattern = "\\.jpg$\n\\.png$", isRegexPattern = true)
+        assertTrue(RuleConflictDetector.detectConflicts(mismatched).any { it is RuleConflict.ExtensionPatternMismatch })
     }
 
     private fun baseRule(): Rule =

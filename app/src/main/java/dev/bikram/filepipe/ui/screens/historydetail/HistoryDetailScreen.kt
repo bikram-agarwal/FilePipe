@@ -589,10 +589,10 @@ private fun SummaryRow(
 @Composable
 private fun FileMovedCard(
     file: FileMoved,
+    modifier: Modifier = Modifier,
     isUndoSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onToggleSelect: () -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)

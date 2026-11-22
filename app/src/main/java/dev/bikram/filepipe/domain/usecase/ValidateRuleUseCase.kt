@@ -1,5 +1,7 @@
 package dev.bikram.filepipe.domain.usecase
 
+import dev.bikram.filepipe.data.repository.areExcludePatternsValid
+import dev.bikram.filepipe.data.repository.isFilenameRegexValid
 import dev.bikram.filepipe.data.repository.normalizeSourcePath
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
@@ -72,12 +74,12 @@ class ValidateRuleUseCase
                             }
                         }
                     }
-                    if (rule.isRegexPattern && !rule.filenamePattern.isNullOrBlank()) {
-                        if (runCatching { Regex(rule.filenamePattern) }.isFailure) {
-                            add("Invalid regular expression syntax")
-                        }
+                    // Split and compiled exactly as a scan and the editor's field check do.
+                    if (rule.isRegexPattern && !isFilenameRegexValid(rule.filenamePattern)) {
+                        add("Invalid regular expression syntax")
                     }
-                    if (rule.isExcludeRegexPattern && rule.excludePatterns.any { it.isNotBlank() && runCatching { Regex(it.trim()) }.isFailure }) {
+                    // The same check as the editor's live field error and the scan itself.
+                    if (rule.isExcludeRegexPattern && !areExcludePatternsValid(rule.excludePatterns, isRegexPattern = true)) {
                         add("Invalid regular expression syntax in exclude patterns")
                     }
                 }

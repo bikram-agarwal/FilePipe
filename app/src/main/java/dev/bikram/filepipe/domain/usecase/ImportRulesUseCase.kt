@@ -8,6 +8,8 @@ import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.BackupSnapshot
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
+import dev.bikram.filepipe.data.repository.areExcludePatternsValid
+import dev.bikram.filepipe.data.repository.isFilenameRegexValid
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.export.AppBackup
 import dev.bikram.filepipe.domain.export.RunHistoryBackupDto
@@ -46,15 +48,9 @@ class InvalidBackupRuleRegexException(
 internal fun findRulesWithInvalidRegexPatterns(rules: List<Rule>): List<String> =
     rules
         .filter { rule ->
-            val invalidFilenameRegex =
-                rule.isRegexPattern &&
-                    !rule.filenamePattern.isNullOrBlank() &&
-                    runCatching { Regex(rule.filenamePattern) }.isFailure
-            val invalidExcludeRegex =
-                rule.isExcludeRegexPattern &&
-                    rule.excludePatterns.any { pattern ->
-                        pattern.isNotBlank() && runCatching { Regex(pattern.trim()) }.isFailure
-                    }
+            // The same checks as the rule editor and save-time validation.
+            val invalidFilenameRegex = rule.isRegexPattern && !isFilenameRegexValid(rule.filenamePattern)
+            val invalidExcludeRegex = rule.isExcludeRegexPattern && !areExcludePatternsValid(rule.excludePatterns, isRegexPattern = true)
             invalidFilenameRegex || invalidExcludeRegex
         }.map { rule -> rule.name }
 

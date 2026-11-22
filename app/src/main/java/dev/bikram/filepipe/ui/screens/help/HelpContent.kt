@@ -82,6 +82,9 @@ private val itemOptionsByTitle =
         "What does Delete do?" to ItemOptions("delete_operation"),
         "What does preview do?" to ItemOptions("what_preview_does"),
         "Can rules scan subfolders?" to ItemOptions("subfolders"),
+        // Deep-linked from the rule editor's pattern box help icon (Screen.Faq.FOCUS_PATTERNS): keep
+        // this id when rewording the heading.
+        "How do include and exclude patterns work?" to ItemOptions("include_exclude_patterns"),
         "How do RegEx filters work?" to ItemOptions("regex_filters"),
         "How do regular expression (RegEx) filters work?" to ItemOptions("regex_filters"),
         "What is in History?" to ItemOptions("history_contents"),

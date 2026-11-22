@@ -5,6 +5,7 @@ package dev.bikram.filepipe.domain.export
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.SwipeAction
+import dev.bikram.filepipe.data.repository.legacyFilenamePatternAsLines
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FileOrientation
@@ -76,6 +77,14 @@ data class RuleBackupDto(
     val orientation: String? = null,
     val isRegexPattern: Boolean = false,
     val isExcludeRegexPattern: Boolean = false,
+    /**
+     * True in backups written since pattern boxes hold one pattern per line. Absent - so false - in
+     * older backups, whose wildcard [filenamePattern] was comma separated: import rewrites it as lines
+     * (legacyFilenamePatternAsLines) so the rule matches what it did, as the 12 -> 13 database
+     * migration does. [excludePatterns] needs nothing; it was always a list. Not inferred from
+     * [AppBackup.version], which older backups don't reliably carry.
+     */
+    val patternsOnePerLine: Boolean = false,
 )
 
 @Serializable
@@ -202,6 +211,7 @@ fun Rule.toBackupDto(): RuleBackupDto =
         orientation = orientation?.name,
         isRegexPattern = isRegexPattern,
         isExcludeRegexPattern = isExcludeRegexPattern,
+        patternsOnePerLine = true,
     )
 
 fun RuleSchedule.toBackupDto(): ScheduleBackupDto =
@@ -309,7 +319,12 @@ fun RuleBackupDto.toDomain(): Rule =
         suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
         icon = RuleIcon.fromStored(iconKey),
         iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
-        filenamePattern = filenamePattern,
+        filenamePattern =
+            if (patternsOnePerLine) {
+                filenamePattern
+            } else {
+                filenamePattern?.let { pattern -> legacyFilenamePatternAsLines(pattern, isRegexPattern) }
+            },
         minFileSizeBytes = minFileSizeBytes,
         maxFileSizeBytes = maxFileSizeBytes,
         minAgeDays = minAgeDays,
