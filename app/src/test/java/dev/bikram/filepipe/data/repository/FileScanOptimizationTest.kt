@@ -104,8 +104,16 @@ class FileScanOptimizationTest {
 
             listOf(
                 rootDirectory.resolve(".thumbnails").resolve("a.jpg"),
-                rootDirectory.resolve("Camera").resolve("thumbnails").resolve("nested").resolve("b.jpg"),
-                rootDirectory.resolve("Movies").resolve("cache").resolve("deep").resolve("c.mp4"),
+                rootDirectory
+                    .resolve("Camera")
+                    .resolve("thumbnails")
+                    .resolve("nested")
+                    .resolve("b.jpg"),
+                rootDirectory
+                    .resolve("Movies")
+                    .resolve("cache")
+                    .resolve("deep")
+                    .resolve("c.mp4"),
             ).forEach { excludedFile ->
                 excludedFile.parentFile!!.mkdirs()
                 excludedFile.writeText("excluded")

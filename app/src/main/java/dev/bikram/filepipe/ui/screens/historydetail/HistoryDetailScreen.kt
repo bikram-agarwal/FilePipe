@@ -14,7 +14,15 @@ import android.util.LruCache
 import android.util.Size
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +36,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,10 +44,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -55,14 +67,15 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.takeOrElse
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -74,15 +87,20 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.TriggerType
+import dev.bikram.filepipe.domain.model.hasRecoverableDestination
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import dev.bikram.filepipe.domain.model.isNoChangesRun
+import dev.bikram.filepipe.domain.usecase.shouldAttemptUndo
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
+import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
+import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.StatusChip
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.formatTime
@@ -126,6 +144,9 @@ fun HistoryDetailScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
     val files = viewModel.filesPagingFlow.collectAsLazyPagingItems()
     val fileCount by viewModel.fileCount.collectAsStateWithLifecycle()
+    val undoableFileIds by viewModel.undoableFileIds.collectAsStateWithLifecycle()
+    val isUndoSelectionMode by viewModel.isUndoSelectionMode.collectAsStateWithLifecycle()
+    val selectedFileIds by viewModel.selectedFileIds.collectAsStateWithLifecycle()
     val isUndoing by viewModel.isUndoing.collectAsStateWithLifecycle()
     val undoProgress by viewModel.undoProgress.collectAsStateWithLifecycle()
     val pendingHistoryUndoRequest by viewModel.pendingHistoryUndoRequest.collectAsStateWithLifecycle()
@@ -214,29 +235,96 @@ fun HistoryDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 history?.let { h ->
+                    val undoableCount =
+                        if (undoableFileIds.isNotEmpty()) undoableFileIds.size else h.totalFilesMoved
+                    val allUndoableSelected =
+                        undoableFileIds.isNotEmpty() && selectedFileIds.containsAll(undoableFileIds)
                     item {
                         RunSummaryCard(
                             history = h,
-                            onUndo = viewModel::undoRun,
+                            undoableCount = undoableCount,
+                            isUndoSelectionMode = isUndoSelectionMode,
+                            selectedCount = selectedFileIds.size,
+                            onEnterUndoSelection = viewModel::enterUndoSelectionMode,
+                            onCancelUndoSelection = viewModel::cancelUndoSelectionMode,
+                            onConfirmSelectedUndo = viewModel::confirmSelectedUndo,
                             isUndoing = isUndoing,
                             undoProgress = undoProgress,
                         )
                     }
                     if (fileCount > 0) {
                         item {
-                            Text(
-                                stringResource(R.string.history_detail_files_header, fileCount),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-                            )
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp, bottom = 4.dp)
+                                        .heightIn(
+                                            min =
+                                                LocalMinimumInteractiveComponentSize.current.takeOrElse {
+                                                    ButtonDefaults.MinHeight
+                                                },
+                                        ),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    stringResource(R.string.history_detail_files_header, fileCount),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                AnimatedVisibility(
+                                    visible = isUndoSelectionMode && !isUndoing && undoableFileIds.isNotEmpty(),
+                                    enter =
+                                        fadeIn(
+                                            animationSpec =
+                                                reducedMotionAwareSpec(
+                                                    MaterialTheme.motionScheme.defaultEffectsSpec(),
+                                                ),
+                                        ),
+                                    exit =
+                                        fadeOut(
+                                            animationSpec =
+                                                reducedMotionAwareSpec(
+                                                    MaterialTheme.motionScheme.defaultEffectsSpec(),
+                                                ),
+                                        ),
+                                ) {
+                                    FilePipeTextButton(
+                                        onClick = viewModel::toggleSelectAllUndoFiles,
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    ) {
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = if (allUndoableSelected) "deselect" else "select_all",
+                                            contentDescription = null,
+                                            size = 18.dp,
+                                        )
+                                        Spacer(Modifier.size(6.dp))
+                                        Text(
+                                            stringResource(
+                                                if (allUndoableSelected) {
+                                                    R.string.run_deselect_all
+                                                } else {
+                                                    R.string.run_select_all
+                                                },
+                                            ),
+                                        )
+                                    }
+                                }
+                            }
                         }
                         items(
                             count = files.itemCount,
                             key = files.itemKey { file -> file.id },
                         ) { fileIndex ->
                             files[fileIndex]?.let { file ->
-                                FileMovedCard(file, modifier = Modifier.animateItem())
+                                FileMovedCard(
+                                    file = file,
+                                    isUndoSelectionMode = isUndoSelectionMode && !isUndoing,
+                                    isSelected = file.id in selectedFileIds,
+                                    onToggleSelect = { viewModel.toggleFileSelection(file.id) },
+                                    modifier = Modifier.animateItem(),
+                                )
                             }
                         }
                     } else {
@@ -287,7 +375,12 @@ fun HistoryDetailScreen(
 @Composable
 private fun RunSummaryCard(
     history: RunHistory,
-    onUndo: () -> Unit,
+    undoableCount: Int,
+    isUndoSelectionMode: Boolean,
+    selectedCount: Int,
+    onEnterUndoSelection: () -> Unit,
+    onCancelUndoSelection: () -> Unit,
+    onConfirmSelectedUndo: () -> Unit,
     isUndoing: Boolean,
     undoProgress: Float?,
 ) {
@@ -361,41 +454,106 @@ private fun RunSummaryCard(
                 )
             } else if (isRunUndoable(history)) {
                 Spacer(Modifier.height(8.dp))
-                FilePipeButton(
-                    onClick = onUndo,
-                    enabled = !isUndoing,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = pillShape,
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            disabledContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        ),
-                ) {
-                    if (isUndoing) {
-                        LinearWavyProgressIndicator(
-                            progress = { animatedUndoProgress },
-                            modifier = Modifier.fillMaxWidth().height(8.dp),
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            trackColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.24f),
-                        )
-                    } else {
-                        FilePipeMaterialRoundedSymbol(
-                            name = "undo",
-                            contentDescription = null,
-                            size = 20.dp,
-                            autoMirror = true,
-                        )
-                        Spacer(Modifier.size(6.dp))
-                        Text(
-                            pluralStringResource(
-                                R.plurals.history_detail_undo_files,
-                                history.totalFilesMoved,
-                                history.totalFilesMoved,
-                            ),
-                        )
+                val undoButtonColors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        disabledContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                val motionEffects = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+                AnimatedContent(
+                    targetState =
+                        when {
+                            isUndoing -> 2
+                            isUndoSelectionMode -> 1
+                            else -> 0
+                        },
+                    transitionSpec = {
+                        fadeIn(animationSpec = motionEffects) togetherWith fadeOut(animationSpec = motionEffects)
+                    },
+                    label = "undoActions",
+                ) { mode ->
+                    when (mode) {
+                        2 -> {
+                            FilePipeButton(
+                                onClick = {},
+                                enabled = false,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = pillShape,
+                                colors = undoButtonColors,
+                            ) {
+                                LinearWavyProgressIndicator(
+                                    progress = { animatedUndoProgress },
+                                    modifier = Modifier.fillMaxWidth().height(8.dp),
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    trackColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.24f),
+                                )
+                            }
+                        }
+
+                        1 -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                FilePipeOutlinedButton(
+                                    onClick = onCancelUndoSelection,
+                                    modifier = Modifier.weight(0.42f),
+                                    shape = pillShape,
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.cancel),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                FilePipeButton(
+                                    onClick = onConfirmSelectedUndo,
+                                    enabled = selectedCount > 0,
+                                    modifier = Modifier.weight(0.58f),
+                                    shape = pillShape,
+                                    colors =
+                                        ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        ),
+                                ) {
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "undo",
+                                        contentDescription = null,
+                                        size = 20.dp,
+                                        autoMirror = true,
+                                    )
+                                    Spacer(Modifier.size(6.dp))
+                                    Text(
+                                        text = stringResource(R.string.history_detail_run_undo, selectedCount),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+
+                        else -> {
+                            FilePipeButton(
+                                onClick = onEnterUndoSelection,
+                                enabled = undoableCount > 0,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = pillShape,
+                                colors = undoButtonColors,
+                            ) {
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "undo",
+                                    contentDescription = null,
+                                    size = 20.dp,
+                                    autoMirror = true,
+                                )
+                                Spacer(Modifier.size(6.dp))
+                                Text(stringResource(R.string.history_detail_undo_prompt))
+                            }
+                        }
                     }
                 }
             }
@@ -429,11 +587,16 @@ private fun SummaryRow(
 @Composable
 private fun FileMovedCard(
     file: FileMoved,
+    isUndoSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelect: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val isSuccess = file.success && !file.skipped
+    val isFileUndoable = file.hasRecoverableDestination && shouldAttemptUndo(file.undoStatus)
+    val showSelectionCheckbox = isUndoSelectionMode && isFileUndoable
     val iconColor =
         when {
             file.skipped -> MaterialTheme.colorScheme.outline
@@ -441,12 +604,22 @@ private fun FileMovedCard(
             else -> MaterialTheme.colorScheme.error
         }
     val listCardSurface = elevatedCardColors()
-    val containerColor =
+    val baseContainerColor =
         when {
             file.skipped -> listCardSurface.containerColor
             !file.success -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
             else -> listCardSurface.containerColor
         }
+    val containerColor by animateColorAsState(
+        targetValue =
+            if (showSelectionCheckbox && isSelected) {
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
+            } else {
+                baseContainerColor
+            },
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec()),
+        label = "fileCardSelectionColor",
+    )
     val rowContentColor =
         if (file.success || file.skipped) {
             listCardSurface.contentColor
@@ -459,12 +632,20 @@ private fun FileMovedCard(
             modifier
                 .fillMaxWidth()
                 .then(
-                    if (isSuccess) {
-                        Modifier.appClickable {
-                            openFileWithDefaultApp(context, file.destinationUri)
+                    when {
+                        showSelectionCheckbox -> {
+                            Modifier.appClickable(onClick = onToggleSelect)
                         }
-                    } else {
-                        Modifier
+
+                        !isUndoSelectionMode && isSuccess -> {
+                            Modifier.appClickable {
+                                openFileWithDefaultApp(context, file.destinationUri)
+                            }
+                        }
+
+                        else -> {
+                            Modifier
+                        }
                     },
                 ),
         shape = compactControlShape,
@@ -477,7 +658,12 @@ private fun FileMovedCard(
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            FileThumbnailOrIcon(file = file, isSuccess = isSuccess)
+            FileThumbnailOrIcon(
+                file = file,
+                isSuccess = isSuccess,
+                showSelectionCheckbox = showSelectionCheckbox,
+                isSelected = isSelected,
+            )
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(
@@ -492,10 +678,9 @@ private fun FileMovedCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    FilePipeMaterialRoundedSymbol(
-                        name = if (isSuccess) "check_circle" else "warning",
-                        contentDescription = null,
-                        size = 16.dp,
+                    FileStatusIcon(
+                        isSuccess = isSuccess,
+                        isHidden = showSelectionCheckbox,
                         tint = iconColor,
                     )
                 }
@@ -538,6 +723,12 @@ private fun FileMovedCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline,
                         )
+                    } else if (file.undoStatus == FileUndoStatus.UNDONE) {
+                        Text(
+                            stringResource(R.string.history_detail_file_undone),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
                     }
                     file.errorMessage?.let { err ->
                         Text(
@@ -555,9 +746,34 @@ private fun FileMovedCard(
 }
 
 @Composable
+private fun FileStatusIcon(
+    isSuccess: Boolean,
+    isHidden: Boolean,
+    tint: Color,
+) {
+    val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    Box(modifier = Modifier.size(16.dp)) {
+        AnimatedVisibility(
+            visible = !isHidden,
+            enter = fadeIn(animationSpec = effectsSpec),
+            exit = fadeOut(animationSpec = effectsSpec),
+        ) {
+            FilePipeMaterialRoundedSymbol(
+                name = if (isSuccess) "check_circle" else "warning",
+                contentDescription = null,
+                size = 16.dp,
+                tint = tint,
+            )
+        }
+    }
+}
+
+@Composable
 private fun FileThumbnailOrIcon(
     file: FileMoved,
     isSuccess: Boolean,
+    showSelectionCheckbox: Boolean = false,
+    isSelected: Boolean = false,
 ) {
     val context = LocalContext.current
     val thumbnailSize = 40.dp
@@ -581,36 +797,74 @@ private fun FileThumbnailOrIcon(
     }
 
     val bitmap = thumbnailBitmap
-    if (bitmap != null) {
-        Surface(
-            shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            modifier = Modifier.size(thumbnailSize),
-        ) {
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+    Box(
+        modifier = Modifier.size(thumbnailSize),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bitmap != null) {
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.secondaryContainer,
                 modifier = Modifier.fillMaxSize(),
-            )
+            ) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        } else {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = MaterialTheme.shapes.small,
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                FilePipeMaterialRoundedSymbol(
+                    name = fileTypeSymbolName(file.fileName),
+                    contentDescription = null,
+                    size = 24.dp,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
         }
-    } else {
-        Box(
-            modifier =
-                Modifier
-                    .size(thumbnailSize)
-                    .background(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = MaterialTheme.shapes.small,
-                    ),
-            contentAlignment = Alignment.Center,
+
+        val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+        val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
+        AnimatedVisibility(
+            visible = showSelectionCheckbox,
+            enter = fadeIn(animationSpec = effectsSpec) + scaleIn(animationSpec = spatialSpec, initialScale = 0.8f),
+            exit = fadeOut(animationSpec = effectsSpec) + scaleOut(animationSpec = spatialSpec, targetScale = 0.8f),
         ) {
-            FilePipeMaterialRoundedSymbol(
-                name = fileTypeSymbolName(file.fileName),
-                contentDescription = null,
-                size = 24.dp,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            color =
+                                MaterialTheme.colorScheme.surface.copy(
+                                    alpha = if (isSelected) 0.78f else 0.62f,
+                                ),
+                            shape = MaterialTheme.shapes.small,
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = null,
+                    colors =
+                        CheckboxDefaults.colors(
+                            checkedColor = MaterialTheme.colorScheme.primary,
+                            uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            checkmarkColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                )
+            }
         }
     }
 }

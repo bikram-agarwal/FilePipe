@@ -176,10 +176,9 @@
     <string name="history_detail_files_moved_label">Files moved</string>
     <string name="history_detail_files_copied_label">Files copied</string>
     <string name="history_detail_files_deleted_label">Files deleted</string>
-    <plurals name="history_detail_undo_files">
-        <item quantity="one">Undo (%d file)</item>
-        <item quantity="other">Undo (%d files)</item>
-    </plurals>
+    <string name="history_detail_undo_prompt">Undo?</string>
+    <string name="history_detail_run_undo">Run Undo (%1$d)</string>
+    <string name="history_detail_file_undone">Undone</string>
     <string name="history_detail_not_processed_cancelled_label">Not processed (cancelled)</string>
     <string name="history_empty_title">No history yet</string>
     <string name="history_empty_subtitle">Run some rules to see your file move history here</string>

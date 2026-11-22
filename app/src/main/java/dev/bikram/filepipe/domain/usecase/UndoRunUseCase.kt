@@ -79,6 +79,7 @@ class UndoRunUseCase
 
         suspend operator fun invoke(
             historyId: Long,
+            selectedFileIds: Set<Long>? = null,
             onProgress: (UndoProgress) -> Unit = {},
         ): UndoResult =
             withContext(ioDispatcher) {
@@ -92,7 +93,7 @@ class UndoRunUseCase
                 }
                 _activeUndoProgress.update { it + (historyId to 0f) }
                 try {
-                    performUndo(historyId, onProgress)
+                    performUndo(historyId, selectedFileIds, onProgress)
                 } finally {
                     try {
                         withContext(NonCancellable) {
@@ -107,6 +108,7 @@ class UndoRunUseCase
 
         private suspend fun performUndo(
             historyId: Long,
+            selectedFileIds: Set<Long>?,
             onProgress: (UndoProgress) -> Unit,
         ): UndoResult {
             val history =
@@ -136,7 +138,11 @@ class UndoRunUseCase
                 runHistoryRepository
                     .getFilesForRunOnce(historyId)
                     .filter { fileMoved -> fileMoved.hasRecoverableDestination }
-            val pendingFiles = movedFiles.filter { shouldAttemptUndo(it.undoStatus) }
+            val pendingFiles =
+                movedFiles.filter { fileMoved ->
+                    shouldAttemptUndo(fileMoved.undoStatus) &&
+                        (selectedFileIds == null || fileMoved.id in selectedFileIds)
+                }
             val totalBytes = pendingFiles.sumOf { fileMoved -> fileMoved.fileSizeBytes.coerceAtLeast(0L) }
             var processedFiles = 0
             var processedBytes = 0L
@@ -150,7 +156,9 @@ class UndoRunUseCase
             )
 
             if (pendingFiles.isEmpty()) {
-                runHistoryRepository.markRunReversed(historyId)
+                if (selectedFileIds == null) {
+                    runHistoryRepository.markRunReversed(historyId)
+                }
                 return UndoResult(
                     totalReversed = 0,
                     totalFailed = 0,
@@ -164,6 +172,7 @@ class UndoRunUseCase
                     historyId = historyId,
                     movedFiles = pendingFiles,
                     totalBytes = totalBytes,
+                    markRunReversedWhenComplete = selectedFileIds == null,
                     onProgress = onProgress,
                 )
             }
@@ -322,12 +331,15 @@ class UndoRunUseCase
             historyId: Long,
             movedFiles: List<FileMoved>,
             totalBytes: Long,
+            markRunReversedWhenComplete: Boolean = true,
             onProgress: (UndoProgress) -> Unit,
         ): UndoResult {
             if (movedFiles.isEmpty()) {
                 _activeUndoProgress.update { it + (historyId to 1f) }
                 onProgress(UndoProgress(0, 0, 0L, 0L))
-                runHistoryRepository.markRunReversed(historyId)
+                if (markRunReversedWhenComplete) {
+                    runHistoryRepository.markRunReversed(historyId)
+                }
                 return UndoResult(
                     totalReversed = 0,
                     totalFailed = 0,
@@ -358,7 +370,9 @@ class UndoRunUseCase
                 )
             }
             _activeUndoProgress.update { it + (historyId to 1f) }
-            runHistoryRepository.markRunReversed(historyId)
+            if (markRunReversedWhenComplete) {
+                runHistoryRepository.markRunReversed(historyId)
+            }
             return UndoResult(
                 totalReversed = movedFiles.size,
                 totalFailed = 0,
