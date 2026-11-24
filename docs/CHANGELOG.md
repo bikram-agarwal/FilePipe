@@ -8,7 +8,7 @@
 ### 🛠 Improved Features
 - Running a rule by hand now always starts from the Preview sheet, so you always know which files will be affected. 
 - Include and exclude patterns are now one per line, and a comma is just a comma in a pattern, not pattern separator. 
-- You can now convert include/exclued patterns from wildcard to regex or vice-versa. 
+- You can now convert include/exclude patterns from wildcard to regex or vice-versa. 
 - Delete previews now say clearly that files will be permanently deleted.
 - Help and FAQ have a new guide to include and exclude patterns and folder skipping.
 
