@@ -48,6 +48,7 @@ compose-material3-adaptive-navigation-suite = { module = "androidx.compose.mater
 compose-material3-expressive = { module = "androidx.compose.material3:material3", version.ref = "composeMaterial3Expressive" }
 compose-ui = { module = "androidx.compose.ui:ui" }
 compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
+compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }

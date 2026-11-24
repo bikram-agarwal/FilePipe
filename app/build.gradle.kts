@@ -63,6 +63,13 @@ val hasReleaseSigning =
 val previewVersionSuffix =
     providers.gradleProperty("previewVersionSuffix").orNull?.takeIf { it.isNotBlank() }
 
+// ../capture_screenshots.ps1 shoots the store screenshots on the release-type devRelease build:
+// with -PscreenshotsOnDevRelease=true the androidTest suite targets devRelease, and that build alone
+// gets the keep rules the screenshot tests need (proguard-screenshots.pro). Off by default, so normal
+// builds and their R8 output are unchanged. Kept in parity with Remember.
+val screenshotsOnDevRelease =
+    providers.gradleProperty("screenshotsOnDevRelease").map { it.toBoolean() }.getOrElse(false)
+
 extensions.configure<ApplicationExtension>("android") {
     namespace = filePipeApplicationId
     compileSdk {
@@ -135,8 +142,16 @@ extensions.configure<ApplicationExtension>("android") {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (screenshotsOnDevRelease) {
+                proguardFiles("proguard-screenshots.pro")
+                testProguardFiles("proguard-screenshots-test.pro")
+            }
             matchingFallbacks += listOf("release")
         }
+    }
+
+    if (screenshotsOnDevRelease) {
+        testBuildType = "devRelease"
     }
 
     compileOptions {
@@ -313,6 +328,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.coroutines.test)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.test.core)
     androidTestImplementation(libs.test.ext.junit)
