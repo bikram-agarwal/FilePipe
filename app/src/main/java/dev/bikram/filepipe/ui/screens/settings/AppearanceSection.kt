@@ -126,6 +126,7 @@ import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.feedback.appCombinedClickable
 import dev.bikram.filepipe.ui.feedback.performRejectHaptic
+import dev.bikram.filepipe.ui.theme.forAppliedScheme
 import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
 import dev.bikram.filepipe.ui.theme.normalizeSeedHexOrNull
 import dev.bikram.filepipe.ui.theme.parseCustomTriplet
@@ -218,7 +219,7 @@ fun ThemeAccentRow(
                 } else {
                     MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
                 }
-            val triplet = runCatching { parseCustomTriplet(storedHex) }.getOrNull()
+            val triplet = runCatching { parseCustomTriplet(storedHex) }.getOrNull()?.forAppliedScheme()
             val fillColor =
                 parseSeedColorHexToColorOrNull(storedHex.split("|").first())
                     ?: MaterialTheme.colorScheme.surfaceVariant
@@ -320,7 +321,7 @@ private fun ThemeAccentCircleContent(source: AppColorSource) {
         }
 
         else -> {
-            val triplet = source.curatedTriplet()
+            val triplet = source.curatedTriplet()?.forAppliedScheme()
             if (triplet != null) {
                 CuratedTripletSwatch(
                     primary = triplet.primary,

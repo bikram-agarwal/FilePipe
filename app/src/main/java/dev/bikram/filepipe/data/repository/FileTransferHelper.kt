@@ -3,6 +3,7 @@ package dev.bikram.filepipe.data.repository
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.annotation.StringRes
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import dev.bikram.filepipe.R
@@ -765,25 +766,8 @@ internal fun FileOperationRepository.deleteFile(
                 errorMessage = "Source file not accessible",
             )
         }
-        val sourceChanged =
-            requireUnchangedSource &&
-                (
-                    sourceFile.length() != sourceEntry.size ||
-                        (
-                            sourceEntry.lastModifiedMs > 0L &&
-                                sourceFile.lastModified() != sourceEntry.lastModifiedMs
-                        )
-                )
-        if (sourceChanged) {
-            return FileMoved(
-                fileName = sourceEntry.name,
-                sourceUri = sourceEntry.uri.toString(),
-                destinationUri = "",
-                fileSizeBytes = sourceEntry.size,
-                relativeParentSegments = sourceEntry.relativeParentSegments,
-                success = false,
-                errorMessage = context.getString(R.string.file_operation_source_changed_after_confirmation),
-            )
+        if (requireUnchangedSource && sourceChangedSinceScan(sourceEntry)) {
+            return sourceChangedResult(sourceEntry, R.string.file_operation_source_changed_after_confirmation)
         }
         val deleted =
             try {
@@ -819,24 +803,8 @@ internal fun FileOperationRepository.deleteFile(
                 errorMessage = "Source document not accessible",
             )
         }
-        if (requireUnchangedSource) {
-            val meta = queryDocumentMetadata(sourceEntry.uri)
-            val docSize = meta?.size
-            val docModified = meta?.lastModifiedMs
-            val sizeChanged = docSize != null && docSize != sourceEntry.size
-            val modChanged =
-                sourceEntry.lastModifiedMs > 0L && docModified != null && docModified > 0L && docModified != sourceEntry.lastModifiedMs
-            if (sizeChanged || modChanged) {
-                return FileMoved(
-                    fileName = sourceEntry.name,
-                    sourceUri = sourceEntry.uri.toString(),
-                    destinationUri = "",
-                    fileSizeBytes = sourceEntry.size,
-                    relativeParentSegments = sourceEntry.relativeParentSegments,
-                    success = false,
-                    errorMessage = context.getString(R.string.file_operation_source_changed_after_confirmation),
-                )
-            }
+        if (requireUnchangedSource && sourceChangedSinceScan(sourceEntry)) {
+            return sourceChangedResult(sourceEntry, R.string.file_operation_source_changed_after_confirmation)
         }
         val deleted =
             try {
@@ -855,6 +823,47 @@ internal fun FileOperationRepository.deleteFile(
         )
     }
 }
+
+/**
+ * Whether the file behind [sourceEntry] no longer matches what the scan that produced the entry saw:
+ * its size, or its modification time when the scan knew one. A run acting on a file list the user
+ * confirmed (the delete dialog, or the Rules preview sheet) refuses such a file rather than act on
+ * content they never saw - or on a stale entry, whose size the copy's completeness check and whose
+ * time the destination's timestamp would otherwise trust. False when the file's current metadata
+ * can't be read: the operation itself then reports the missing or unreadable source.
+ */
+internal fun FileOperationRepository.sourceChangedSinceScan(sourceEntry: FileEntry): Boolean {
+    if (sourceEntry.uri.scheme == "file") {
+        val path = sourceEntry.uri.path
+        if (path.isNullOrBlank()) return false
+        val sourceFile = File(path)
+        if (!sourceFile.isFile) return false
+        return sourceFile.length() != sourceEntry.size ||
+            (sourceEntry.lastModifiedMs > 0L && sourceFile.lastModified() != sourceEntry.lastModifiedMs)
+    }
+    val meta = queryDocumentMetadata(sourceEntry.uri) ?: return false
+    val docSize = meta.size
+    val docModified = meta.lastModifiedMs
+    val sizeChanged = docSize != null && docSize != sourceEntry.size
+    val modChanged =
+        sourceEntry.lastModifiedMs > 0L && docModified != null && docModified > 0L && docModified != sourceEntry.lastModifiedMs
+    return sizeChanged || modChanged
+}
+
+/** The refused-operation record for a source that [sourceChangedSinceScan]. */
+internal fun FileOperationRepository.sourceChangedResult(
+    sourceEntry: FileEntry,
+    @StringRes messageRes: Int,
+): FileMoved =
+    FileMoved(
+        fileName = sourceEntry.name,
+        sourceUri = sourceEntry.uri.toString(),
+        destinationUri = "",
+        fileSizeBytes = sourceEntry.size,
+        relativeParentSegments = sourceEntry.relativeParentSegments,
+        success = false,
+        errorMessage = context.getString(messageRes),
+    )
 
 internal fun copyStreamWithProgress(
     inputStream: InputStream,

@@ -15,8 +15,8 @@ data class PendingHistoryUndoRequest(
 class PendingShortcutRepository
     @Inject
     constructor() {
-        private val _pendingRuleId = MutableStateFlow<Long?>(null)
-        val pendingRuleId: StateFlow<Long?> = _pendingRuleId.asStateFlow()
+        private val _pendingPreviewRuleId = MutableStateFlow<Long?>(null)
+        val pendingPreviewRuleId: StateFlow<Long?> = _pendingPreviewRuleId.asStateFlow()
 
         private val _pendingHistoryDetailId = MutableStateFlow<Long?>(null)
         val pendingHistoryDetailId: StateFlow<Long?> = _pendingHistoryDetailId.asStateFlow()
@@ -31,12 +31,12 @@ class PendingShortcutRepository
         private val _pendingOpenSettingsForUpdates = MutableStateFlow(false)
         val pendingOpenSettingsForUpdates: StateFlow<Boolean> = _pendingOpenSettingsForUpdates.asStateFlow()
 
-        fun requestRunRule(ruleId: Long) {
-            _pendingRuleId.value = ruleId
+        fun requestPreviewRule(ruleId: Long) {
+            _pendingPreviewRuleId.value = ruleId
         }
 
-        fun clearPendingRule() {
-            _pendingRuleId.value = null
+        fun clearPendingPreviewRule() {
+            _pendingPreviewRuleId.value = null
         }
 
         fun requestOpenHistoryDetail(

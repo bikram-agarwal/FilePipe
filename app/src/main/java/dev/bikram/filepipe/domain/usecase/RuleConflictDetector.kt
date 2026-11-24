@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.domain.usecase
 
+import dev.bikram.filepipe.data.repository.splitPatternLines
 import dev.bikram.filepipe.domain.model.ALL_FILES_EXTENSION
 import dev.bikram.filepipe.domain.model.NO_EXTENSION_TOKEN
 import dev.bikram.filepipe.domain.model.Rule
@@ -70,25 +71,23 @@ object RuleConflictDetector {
 
     /**
      * The set of extensions a filename pattern can match, or null when the pattern does not pin the
-     * extension (at least one alternative can match files of any type). A glob filename pattern is a
-     * comma-separated disjunction (mirrors [FileOperationRepository]'s buildFilenameRegexes), so the
+     * extension (at least one alternative can match files of any type). A filename pattern, glob or
+     * RegEx, is a disjunction of its lines (mirrors buildFilenameRegexes via splitPatternLines), so the
      * rule only matches nothing when EVERY alternative pins an extension and none of them are selected.
-     * Extracting only the last segment (as a naive single-pattern read would) wrongly flags
-     * "*.pdf, *.png" against [pdf] as a conflict even though "*.pdf" matches.
+     * Extracting only the last line (as a naive single-pattern read would) wrongly flags "*.pdf" and
+     * "*.png" on two lines against [pdf] as a conflict even though "*.pdf" matches.
      */
     private fun impliedPatternExtensions(
         pattern: String,
         isRegex: Boolean,
     ): Set<String>? {
-        if (isRegex) {
-            return extractExtensionFromPattern(pattern, isRegex = true)?.let { setOf(it) }
-        }
-        val segments = pattern.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        // Split exactly as a scan splits the box: one pattern per line, in both modes.
+        val segments = splitPatternLines(pattern)
         if (segments.isEmpty()) return null
         val extensions = LinkedHashSet<String>()
         for (segment in segments) {
             // An unconstrained alternative (no extension pinned) can match a selected type → no conflict.
-            val ext = extractExtensionFromPattern(segment, isRegex = false) ?: return null
+            val ext = extractExtensionFromPattern(segment, isRegex) ?: return null
             extensions += ext
         }
         return extensions

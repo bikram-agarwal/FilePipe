@@ -7,6 +7,7 @@ import android.provider.DocumentsContract
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.storage.folderPathForFilesystemAccess
 import dev.bikram.filepipe.data.storage.isCanonicalPathUnderAllowedSharedStorage
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
@@ -86,6 +87,7 @@ class FileOperationRepository
             isRegexPattern: Boolean = false,
             isExcludeRegexPattern: Boolean = false,
             useCache: Boolean = false,
+            excludedFolderUriString: String? = null,
         ): List<FileEntry> =
             withContext(ioDispatcher) {
                 val effectiveMaxDepth = maxDepth.coerceIn(0, MAX_SCAN_DEPTH)
@@ -105,6 +107,7 @@ class FileOperationRepository
                         filesystemAccessEnabled = filesystemAccessEnabled,
                         isRegexPattern = isRegexPattern,
                         isExcludeRegexPattern = isExcludeRegexPattern,
+                        excludedFolderUriString = excludedFolderUriString,
                     )
 
                 if (useCache) {
@@ -132,6 +135,7 @@ class FileOperationRepository
                         orientation = orientation,
                         isRegexPattern = isRegexPattern,
                         isExcludeRegexPattern = isExcludeRegexPattern,
+                        excludedFolderUriString = excludedFolderUriString,
                     )
 
                 val writeTime = System.currentTimeMillis()
@@ -237,6 +241,11 @@ class FileOperationRepository
                         success = false,
                         errorMessage = "All files access is required for this destination path",
                     )
+                }
+                // The preview sheet's run moves/copies exactly the files it listed: one that changed
+                // since is left as is rather than transferred against its stale size and timestamp.
+                if (requireUnchangedSource && sourceChangedSinceScan(sourceEntry)) {
+                    return@withContext sourceChangedResult(sourceEntry, R.string.file_operation_source_changed_after_preview)
                 }
 
                 when {

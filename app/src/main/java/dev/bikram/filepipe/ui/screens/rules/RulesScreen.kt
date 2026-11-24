@@ -3,13 +3,16 @@ package dev.bikram.filepipe.ui.screens.rules
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +22,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,17 +29,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Badge
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
@@ -48,31 +58,44 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.takeOrElse
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -88,12 +111,14 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.ui.common.AppBottomSheet
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.common.isLandscape
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeFilterChip
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.RuleCard
@@ -103,10 +128,13 @@ import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyRulesIllustration
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.previewSourceFolderDisplayPath
+import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
+import dev.bikram.filepipe.ui.feedback.performRejectHaptic
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalReducedMotion
 import dev.bikram.filepipe.ui.theme.LocalSnackbarHostState
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
@@ -117,6 +145,7 @@ import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -130,7 +159,7 @@ fun RulesScreen(
     onNavigateToRuleHistory: (Long) -> Unit,
     activeRuleId: Long? = null,
     onActivateRuleInDetailPane: ((Long) -> Unit)? = null,
-    onActivateRuleForRunInDetailPane: ((Long) -> Unit)? = null,
+    onActivateRuleForPreviewInDetailPane: ((Long) -> Unit)? = null,
     showPendingNewRuleInDetailPane: Boolean = false,
     showSelectionActionBar: Boolean = true,
     suppressBottomBlur: Boolean = false,
@@ -140,10 +169,21 @@ fun RulesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val rules = uiState.rules
+    val allRulesCount = uiState.allRulesCount
+    val availableGroups = uiState.availableGroups
+    val groupRuleCounts = uiState.groupRuleCounts
+    val ungroupedRuleCount = uiState.ungroupedRuleCount
+    val activeGroupFilter = uiState.activeGroupFilter
+    val showGroupFilterBar = availableGroups.isNotEmpty()
+    val headerItemCount = (if (showGroupFilterBar) 1 else 0) + (if (showPendingNewRuleInDetailPane) 1 else 0)
     val sortKey = uiState.sortKey
     val sortDirection = uiState.sortDirection
     val selectedRuleIds = uiState.selectedRuleIds
-    val progressMap = uiState.progressMap
+    // While the preview sheet shows a run, that run's progress lives in the sheet only. Its cards pick
+    // it up just if the sheet is dismissed mid-run (dismissing clears previewState, and with it this).
+    val sheetRun = uiState.previewState?.run
+    val sheetRunRuleIds = sheetRun?.ruleIds.orEmpty()
+    val progressMap = uiState.progressMap - sheetRunRuleIds
     val isRunning = uiState.isRunning
     val manualRunCancelAnchor = uiState.manualRunCancelAnchor
     val isCompactMode = uiState.isCompactMode
@@ -159,6 +199,7 @@ fun RulesScreen(
 
     var pendingDeleteSelected by remember { mutableStateOf(false) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var groupPickerTarget by remember { mutableStateOf<RuleGroupPickerTarget?>(null) }
     val snackbarHostState = LocalSnackbarHostState.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val hasSelection = selectedRuleIds.isNotEmpty()
@@ -223,14 +264,20 @@ fun RulesScreen(
             lazyListState.scrollToItem(0)
         }
     }
+    val currentHeaderItemCount = rememberUpdatedState(headerItemCount)
     val reorderableLazyListState =
         rememberReorderableLazyListState(lazyListState) { from, to ->
-            dragActuallyMoved = true
-            awaitingDraggedOrder = true
-            reorderableRules =
-                reorderableRules.toMutableList().apply {
-                    add(to.index, removeAt(from.index))
-                }
+            val offset = currentHeaderItemCount.value
+            val fromRuleIndex = from.index - offset
+            val toRuleIndex = to.index - offset
+            if (fromRuleIndex in reorderableRules.indices && toRuleIndex in reorderableRules.indices) {
+                dragActuallyMoved = true
+                awaitingDraggedOrder = true
+                reorderableRules =
+                    reorderableRules.toMutableList().apply {
+                        add(toRuleIndex, removeAt(fromRuleIndex))
+                    }
+            }
         }
     val sortKeyState = rememberUpdatedState(sortKey)
 
@@ -242,6 +289,10 @@ fun RulesScreen(
 
     BackHandler(enabled = hasSelection) {
         viewModel.clearSelection()
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.previewPendingShortcutRules()
     }
 
     LaunchedEffect(viewModel) {
@@ -270,6 +321,21 @@ fun RulesScreen(
                 )
             if (result == SnackbarResult.ActionPerformed) {
                 viewModel.undoDelete(event.rules)
+            }
+        }
+    }
+
+    // Same Undo snackbar as deleting a rule.
+    LaunchedEffect(viewModel) {
+        viewModel.duplicateUndoEvent.collect { event ->
+            val result =
+                snackbarHostState.showSnackbar(
+                    message = resources.getString(R.string.rule_duplicated, event.copyName),
+                    actionLabel = resources.getString(R.string.undo),
+                    duration = SnackbarDuration.Long,
+                )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoDuplicate(event)
             }
         }
     }
@@ -451,7 +517,6 @@ fun RulesScreen(
                                     fadeOut(animationSpec = selectionBarFadeOutSpec),
                             ),
                     ) {
-                        val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
                         Box(
                             modifier =
                                 Modifier
@@ -494,30 +559,33 @@ fun RulesScreen(
                                     ) {
                                         FilePipeMaterialRoundedSymbol(name = "delete", contentDescription = deleteLabel)
                                     }
-                                    val previewSelectedLabel = stringResource(R.string.preview_selected_rules)
+                                    val groupActionLabel = stringResource(R.string.rule_card_group)
                                     FilePipeFilledTonalIconButton(
-                                        onClick = { viewModel.startPreviewSelected() },
-                                        tooltipLabel = previewSelectedLabel,
+                                        onClick = { groupPickerTarget = uiState.selectionGroupPickerTarget() },
+                                        tooltipLabel = groupActionLabel,
+                                        colors =
+                                            IconButtonDefaults.filledTonalIconButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            ),
                                     ) {
-                                        FilePipeMaterialRoundedSymbol(
-                                            name = "visibility",
-                                            contentDescription = previewSelectedLabel,
-                                        )
+                                        FilePipeMaterialRoundedSymbol(name = "stacks", contentDescription = groupActionLabel)
                                     }
+                                    // Every manual run goes through the preview sheet, whose Run button
+                                    // starts it - there is no blind "Run selected".
                                     FilePipeFilledTonalButton(
-                                        onClick = { viewModel.runSelected() },
-                                        enabled = enabledSelectedCount > 0,
+                                        onClick = { viewModel.startPreviewSelected() },
                                         shape = pillShape,
                                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                                     ) {
                                         Text(
-                                            text = stringResource(R.string.run_button),
+                                            text = stringResource(R.string.preview_title),
                                             style = MaterialTheme.typography.labelLarge.copy(platformStyle = PlatformTextStyle(includeFontPadding = false)),
                                             modifier = Modifier.align(Alignment.CenterVertically),
                                         )
                                         Spacer(Modifier.width(6.dp))
                                         FilePipeMaterialRoundedSymbol(
-                                            name = "play_arrow",
+                                            name = "visibility",
                                             contentDescription = null,
                                             size = 18.dp,
                                             modifier = Modifier.offset(x = 1.dp).align(Alignment.CenterVertically),
@@ -531,7 +599,7 @@ fun RulesScreen(
             }
         },
     ) { innerPadding ->
-        if (rules.isEmpty() && !showPendingNewRuleInDetailPane) {
+        if (allRulesCount == 0 && !showPendingNewRuleInDetailPane) {
             RulesEmptyState(
                 onAddRule = {
                     onEditRule(Screen.RuleDetail.NEW_RULE_ID)
@@ -578,6 +646,18 @@ fun RulesScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 userScrollEnabled = listScrollEnabled,
             ) {
+                if (showGroupFilterBar) {
+                    item(key = "group_filter_bar") {
+                        RuleGroupFilterBar(
+                            availableGroups = availableGroups,
+                            groupRuleCounts = groupRuleCounts,
+                            ungroupedRuleCount = ungroupedRuleCount,
+                            activeFilter = activeGroupFilter,
+                            onSelectFilter = { filter -> viewModel.setGroupFilter(filter) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
                 if (showPendingNewRuleInDetailPane) {
                     item(key = "pending_new_rule") {
                         PendingNewRuleCard(
@@ -645,7 +725,6 @@ fun RulesScreen(
                             isSelectionMode = hasSelection,
                             isExpanded = isExpanded,
                             progress = progressMap[rule.id],
-                            isAnyRuleRunning = isRunning,
                             hasStaleFolder = rule.id in staleRuleIds,
                             folderIssueSeverity = folderIssueSeverity,
                             onStaleWarningClick = { onEditRule(rule.id) },
@@ -667,14 +746,14 @@ fun RulesScreen(
                             onToggleExpansion = { viewModel.toggleCardExpansion(rule.id) },
                             onDelete = { viewModel.deleteRule(rule) },
                             onDuplicate = { viewModel.duplicateRule(rule) },
-                            onRunRule = {
-                                onActivateRuleForRunInDetailPane?.invoke(rule.id)
-                                viewModel.runRule(rule)
-                            },
                             onCancelManualRun = { viewModel.cancelManualRun() },
                             showInlineProgressCancel = showInlineProgressCancel,
-                            onPreviewRule = { viewModel.startPreview(rule) },
+                            onPreviewRule = {
+                                onActivateRuleForPreviewInDetailPane?.invoke(rule.id)
+                                viewModel.startPreview(rule)
+                            },
                             onViewHistory = { onNavigateToRuleHistory(rule.id) },
+                            onAssignGroup = { groupPickerTarget = RuleGroupPickerTarget.SingleRule(rule) },
                             onLeadingLongClick =
                                 if (reorderLongPressActive) {
                                     { viewModel.toggleSelection(rule.id) }
@@ -706,6 +785,15 @@ fun RulesScreen(
         )
     }
 
+    groupPickerTarget?.let { target ->
+        RuleGroupPicker(
+            target = target,
+            availableGroups = availableGroups,
+            viewModel = viewModel,
+            onDismiss = { groupPickerTarget = null },
+        )
+    }
+
     val pendingDeleteConfirmation by viewModel.pendingDeleteConfirmation.collectAsStateWithLifecycle()
     pendingDeleteConfirmation?.let { confirmation ->
         val remaining = confirmation.fileCount - confirmation.sampleFileNames.size
@@ -733,23 +821,33 @@ fun RulesScreen(
     }
 
     previewState?.let { preview ->
-        val previewRunEnabled =
-            !isRunning &&
-                !preview.isLoading &&
-                preview.ruleGroups.any { ruleGroup ->
-                    ruleGroup.results.any { result -> !result.wouldSkip } &&
-                        rules.any { rule -> rule.id == ruleGroup.ruleId && rule.isEnabled }
-                }
-        val previewTitle =
-            preview.selectedRuleCount?.let { selectedRuleCount ->
-                pluralStringResource(
-                    R.plurals.preview_title_selected_rules,
-                    selectedRuleCount,
-                    selectedRuleCount,
-                )
-            } ?: stringResource(R.string.preview_title_for_rule, preview.ruleName)
+        // The groups the button would actually run - the same check RulesViewModel.runPreviewedRules
+        // makes, against every enabled rule rather than the group-filtered `rules` on screen.
+        val runnablePreviewGroups = preview.runnableRuleGroups(uiState.enabledRuleIds)
+        val previewRunEnabled = !isRunning && !preview.isLoading && runnablePreviewGroups.isNotEmpty()
+        // The button names the action it will take (Move / Copy / Delete); only a batch mixing actions
+        // says "Run". While nothing is runnable (button disabled) the label follows every previewed
+        // rule, so it doesn't fall back to "Run" for a single rule. The sheet is also the delete
+        // confirmation: any delete in the batch turns the button red.
+        val previewRunModes =
+            runnablePreviewGroups
+                .ifEmpty { preview.ruleGroups }
+                .map { ruleGroup -> ruleGroup.operationMode }
+                .toSet()
+        val previewRunDeletes = OperationMode.DELETE in previewRunModes
+        val previewRunLabelRes =
+            when (previewRunModes.singleOrNull()) {
+                OperationMode.MOVE -> R.string.operation_move
+                OperationMode.COPY -> R.string.operation_copy
+                OperationMode.DELETE -> R.string.operation_delete
+                null -> R.string.preview_run
+            }
         AppBottomSheet(
-            title = previewTitle,
+            // No visible title: the sheet only opens from buttons labelled "Preview", and every rule
+            // group below carries its own name. (The rule editor's preview sheet keeps its title -
+            // its trigger is an icon-only button.)
+            title = stringResource(R.string.preview_title),
+            showTitleBar = false,
             onDismiss = { viewModel.dismissPreview() },
             sheetState =
                 rememberBottomSheetState(
@@ -778,46 +876,124 @@ fun RulesScreen(
                         modifier = Modifier.padding(vertical = 16.dp),
                     )
                 } else {
+                    val sheetRun = preview.run
+                    val groupedPreview =
+                        remember(preview.ruleGroups, internalStorageDisplayName) {
+                            preview.ruleGroups.map { ruleGroup ->
+                                ruleGroup to
+                                    ruleGroup.results.groupBy { result ->
+                                        previewSourceFolderDisplayPath(
+                                            sourcePath = result.sourcePath,
+                                            fileName = result.fileName,
+                                            internalStorageRootDisplayName = internalStorageDisplayName,
+                                        )
+                                    }
+                            }
+                        }
+                    // Each file row's position in the LazyColumn below, built once per preview (it must list
+                    // the items in the same order the LazyColumn emits them), so following the run is a
+                    // lookup rather than a rebuild of every key per processed file.
+                    val fileItemIndexByKey =
+                        remember(groupedPreview) {
+                            buildMap {
+                                var index = 0
+                                groupedPreview.forEach { (ruleGroup, sections) ->
+                                    index++ // header_<ruleId>
+                                    sections.forEach { (_, sourceFiles) ->
+                                        index++ // source_<ruleId>_<folder>
+                                        sourceFiles.forEach { file -> put("${ruleGroup.ruleId}_${file.sourcePath}", index++) }
+                                    }
+                                }
+                            }
+                        }
+                    val previewListState = rememberLazyListState()
+                    // Follow the run: keep the file being processed in view. Dragging the list stops that,
+                    // so the next file doesn't pull the list back from wherever the user scrolled to; it
+                    // resumes once the file being processed is on screen again (they scrolled back to it).
+                    var followRun by remember { mutableStateOf(true) }
+                    LaunchedEffect(previewListState) {
+                        previewListState.interactionSource.interactions.collect { interaction ->
+                            if (interaction is DragInteraction.Start) followRun = false
+                        }
+                    }
+                    val currentFileKey = sheetRun?.currentFile?.let { file -> "${file.ruleId}_${file.sourcePath}" }
+                    LaunchedEffect(currentFileKey) {
+                        val key = currentFileKey ?: return@LaunchedEffect
+                        if (previewListState.isScrollInProgress) return@LaunchedEffect
+                        val layoutInfo = previewListState.layoutInfo
+                        val index = layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
+                        val fullyVisible =
+                            index != null &&
+                                index.offset >= layoutInfo.viewportStartOffset &&
+                                index.offset + index.size <= layoutInfo.viewportEndOffset
+                        if (fullyVisible) {
+                            followRun = true
+                            return@LaunchedEffect
+                        }
+                        if (!followRun) return@LaunchedEffect
+                        val targetIndex = fileItemIndexByKey[key] ?: return@LaunchedEffect
+                        // Land it a couple of rows down so the files just finished stay visible above it.
+                        previewListState.animateScrollToItem((targetIndex - 2).coerceAtLeast(0))
+                    }
                     LazyColumn(
+                        // Grow with the list up to the sheet's own max height (no fixed cap) and only
+                        // scroll beyond that; fill = false keeps a short list short, and weighting
+                        // measures the Cancel/Run row first so it is never pushed off the sheet.
+                        state = previewListState,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 400.dp),
+                                .weight(1f, fill = false),
                     ) {
-                        preview.ruleGroups.forEach { ruleGroup ->
+                        groupedPreview.forEach { (ruleGroup, groupedResults) ->
+                            val groupInRun = sheetRun != null && ruleGroup.ruleId in sheetRun.ruleIds
                             item(key = "header_${ruleGroup.ruleId}") {
                                 Column(
                                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
                                     verticalArrangement = Arrangement.spacedBy(2.dp),
                                 ) {
+                                    // Rule name is the sheet's top heading (the sheet hides its title bar);
+                                    // one step smaller in landscape, matching AppBottomSheet's title.
                                     Text(
                                         text = ruleGroup.ruleName,
-                                        style = MaterialTheme.typography.titleSmall,
+                                        style =
+                                            if (isLandscape()) {
+                                                MaterialTheme.typography.titleSmall
+                                            } else {
+                                                MaterialTheme.typography.titleMedium
+                                            },
                                     )
-                                    Text(
-                                        text =
-                                            pluralStringResource(
-                                                when (ruleGroup.operationMode) {
-                                                    OperationMode.MOVE -> R.plurals.preview_files_would_move
-                                                    OperationMode.COPY -> R.plurals.preview_files_would_copy
-                                                    OperationMode.DELETE -> R.plurals.preview_files_would_delete
+                                    if (sheetRun != null && groupInRun) {
+                                        val (runLine, runLineColor) = previewGroupRunLine(ruleGroup, sheetRun)
+                                        Text(
+                                            text = runLine,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = runLineColor,
+                                        )
+                                    } else {
+                                        Text(
+                                            text =
+                                                pluralStringResource(
+                                                    when (ruleGroup.operationMode) {
+                                                        OperationMode.MOVE -> R.plurals.preview_files_would_move
+                                                        OperationMode.COPY -> R.plurals.preview_files_would_copy
+                                                        OperationMode.DELETE -> R.plurals.preview_files_would_delete
+                                                    },
+                                                    ruleGroup.results.size,
+                                                    ruleGroup.results.size,
+                                                ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            // "Permanently deleted" is a warning, so it takes the error color.
+                                            color =
+                                                if (ruleGroup.operationMode == OperationMode.DELETE) {
+                                                    MaterialTheme.colorScheme.error
+                                                } else {
+                                                    MaterialTheme.colorScheme.primary
                                                 },
-                                                ruleGroup.results.size,
-                                                ruleGroup.results.size,
-                                            ),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
+                                        )
+                                    }
                                 }
                             }
-                            val groupedResults =
-                                ruleGroup.results.groupBy { result ->
-                                    previewSourceFolderDisplayPath(
-                                        sourcePath = result.sourcePath,
-                                        fileName = result.fileName,
-                                        internalStorageRootDisplayName = internalStorageDisplayName,
-                                    )
-                                }
                             groupedResults.forEach { (sourceFolder, sourceFiles) ->
                                 item(key = "source_${ruleGroup.ruleId}_$sourceFolder") {
                                     Text(
@@ -837,23 +1013,37 @@ fun RulesScreen(
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
-                                                .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+                                                .padding(top = 4.dp, bottom = 4.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = result.fileName,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                // The row's indent doubles as the run-status slot (see
+                                                // PreviewRowStatusSlot: fixed size, never grows the row).
+                                                PreviewRowStatusSlot(
+                                                    status =
+                                                        if (sheetRun != null && groupInRun) {
+                                                            sheetRun.fileStatuses[ruleGroup.ruleId, result.sourcePath]
+                                                        } else {
+                                                            null
+                                                        },
+                                                )
+                                                Text(
+                                                    text = result.fileName,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                            val detailModifier = Modifier.padding(start = PreviewRowIndent)
                                             when {
                                                 result.wouldSkip -> {
                                                     Text(
                                                         text = stringResource(R.string.preview_would_skip),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = detailModifier,
                                                     )
                                                 }
 
@@ -862,6 +1052,7 @@ fun RulesScreen(
                                                         text = stringResource(R.string.preview_would_overwrite),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = detailModifier,
                                                     )
                                                 }
 
@@ -876,6 +1067,7 @@ fun RulesScreen(
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
+                                                        modifier = detailModifier,
                                                     )
                                                 }
                                             }
@@ -892,23 +1084,59 @@ fun RulesScreen(
                         }
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
+                // This row lives in the sheet content (not AppBottomSheet's `actions` slot, which a
+                // non-scrollable body would let the list push off-screen), so it mirrors that slot's
+                // landscape compaction itself: 36dp touch targets and a 4dp bottom gap.
+                val landscape = isLandscape()
+                CompositionLocalProvider(
+                    LocalMinimumInteractiveComponentSize provides if (landscape) 36.dp else 48.dp,
                 ) {
-                    FilePipeTextButton(onClick = { viewModel.dismissPreview() }) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    FilePipeButton(
-                        onClick = { viewModel.runPreviewedRules() },
-                        enabled = previewRunEnabled,
-                    ) {
-                        Text(stringResource(R.string.preview_run))
+                    val sheetRun = preview.run
+                    if (sheetRun != null) {
+                        PreviewSheetRunFooter(
+                            run = sheetRun,
+                            ruleGroups = preview.ruleGroups,
+                            onCancelRun = { viewModel.cancelManualRun() },
+                            onDone = { viewModel.dismissPreview() },
+                            onViewHistory = { historyIds ->
+                                viewModel.dismissPreview()
+                                val singleHistoryId = historyIds.singleOrNull()
+                                if (singleHistoryId != null) {
+                                    onNavigateToHistoryDetail(singleHistoryId)
+                                } else {
+                                    onNavigateToHistoryList()
+                                }
+                            },
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            FilePipeTextButton(onClick = { viewModel.dismissPreview() }) {
+                                Text(stringResource(R.string.cancel))
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            FilePipeButton(
+                                onClick = { viewModel.runPreviewedRules() },
+                                enabled = previewRunEnabled,
+                                colors =
+                                    if (previewRunDeletes) {
+                                        ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                            contentColor = MaterialTheme.colorScheme.onError,
+                                        )
+                                    } else {
+                                        ButtonDefaults.buttonColors()
+                                    },
+                            ) {
+                                Text(stringResource(previewRunLabelRes))
+                            }
+                        }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(if (landscape) 4.dp else 16.dp))
             }
         }
     }
@@ -964,7 +1192,6 @@ private fun SwipeToDismissRuleCard(
     isSelectionMode: Boolean,
     isExpanded: Boolean,
     progress: dev.bikram.filepipe.domain.model.RunProgress?,
-    isAnyRuleRunning: Boolean,
     hasStaleFolder: Boolean,
     folderIssueSeverity: RuleCardFolderIssueSeverity?,
     onStaleWarningClick: () -> Unit,
@@ -976,11 +1203,11 @@ private fun SwipeToDismissRuleCard(
     onToggleExpansion: () -> Unit,
     onDelete: () -> Unit,
     onDuplicate: () -> Unit,
-    onRunRule: () -> Unit,
     onCancelManualRun: () -> Unit,
     showInlineProgressCancel: Boolean,
     onPreviewRule: () -> Unit,
     onViewHistory: () -> Unit,
+    onAssignGroup: () -> Unit,
     modifier: Modifier = Modifier,
     onLeadingLongClick: (() -> Unit)? = null,
     reorderLongPressDrag: () -> Modifier = { Modifier },
@@ -989,24 +1216,45 @@ private fun SwipeToDismissRuleCard(
     val cardShape = MaterialTheme.shapes.medium
     val isMockRule = DevMockFileMove.isMockRule(rule)
     val swipeAssigned = setOf(swipeStartToEnd, swipeEndToStart)
+    // Preview is the card's main button, so it never repeats in this row. The Group action always
+    // leads the row (whatever the swipe setup) and turns into a chip showing the group's name once
+    // the rule has one.
+    val groupLabel = stringResource(R.string.rule_card_group)
     val cardIconPairs: List<RuleCardAction> =
-        SwipeAction.entries
-            .filter { it !in swipeAssigned }
-            .filterNot { action -> isMockRule && action.isBlockedForMockRule() }
-            .map { action ->
-                RuleCardAction(
-                    iconName = action.materialSymbolName(isExpanded),
-                    label = action.label(isExpanded),
-                    onClick = {
-                        action.dispatch(
-                            onDelete = onDelete,
-                            onToggleExpansion = onToggleExpansion,
-                            onDuplicate = onDuplicate,
-                            onViewHistory = onViewHistory,
-                            onPreview = onPreviewRule,
+        listOf(
+            RuleCardAction(
+                iconName = "stacks",
+                label = groupLabel,
+                onClick = onAssignGroup,
+                chipLabel = rule.groupName,
+            ),
+        ) +
+            SwipeAction.entries.mapNotNull { action ->
+                when {
+                    action == SwipeAction.PREVIEW -> {
+                        null
+                    }
+
+                    action in swipeAssigned || (isMockRule && action.isBlockedForMockRule()) -> {
+                        null
+                    }
+
+                    else -> {
+                        RuleCardAction(
+                            iconName = action.materialSymbolName(isExpanded),
+                            label = action.label(isExpanded),
+                            onClick = {
+                                action.dispatch(
+                                    onDelete = onDelete,
+                                    onToggleExpansion = onToggleExpansion,
+                                    onDuplicate = onDuplicate,
+                                    onViewHistory = onViewHistory,
+                                    onPreview = onPreviewRule,
+                                )
+                            },
                         )
-                    },
-                )
+                    }
+                }
             }
 
     DeliberateSwipeRevealCard(
@@ -1107,10 +1355,9 @@ private fun SwipeToDismissRuleCard(
             onLongClick = onLongClick,
             cardActions = cardIconPairs,
             onToggleEnabled = onToggleEnabled,
-            onRunClick = onRunRule,
+            onPreviewClick = onPreviewRule,
             onCancelRunClick = onCancelManualRun,
             showInlineProgressCancel = showInlineProgressCancel,
-            isAnyRuleRunning = isAnyRuleRunning,
             hasStaleFolder = hasStaleFolder,
             folderIssueSeverity = folderIssueSeverity,
             onStaleWarningClick = onStaleWarningClick,
@@ -1148,9 +1395,8 @@ private fun PendingNewRuleCard(
         onLongClick = {},
         cardActions = emptyList(),
         onToggleEnabled = {},
-        onRunClick = {},
+        onPreviewClick = {},
         onCancelRunClick = {},
-        isAnyRuleRunning = false,
         showOperationalControls = false,
         modifier = modifier,
     )
@@ -1312,6 +1558,344 @@ fun RulesEmptyState(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.rules_add_rule))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun RuleGroupFilterBar(
+    availableGroups: List<String>,
+    groupRuleCounts: Map<String, Int>,
+    ungroupedRuleCount: Int,
+    activeFilter: RuleGroupFilter,
+    onSelectFilter: (RuleGroupFilter) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        item(key = "group_filter_all") {
+            FilePipeFilterChip(
+                selected = activeFilter == RuleGroupFilter.All,
+                onClick = { onSelectFilter(RuleGroupFilter.All) },
+                label = { Text(stringResource(R.string.rule_group_filter_all)) },
+            )
+        }
+        items(availableGroups, key = { groupName -> "group_filter_$groupName" }) { groupName ->
+            val count = groupRuleCounts[groupName] ?: 0
+            FilePipeFilterChip(
+                selected = activeFilter == RuleGroupFilter.Group(groupName),
+                onClick = { onSelectFilter(RuleGroupFilter.Group(groupName)) },
+                label = {
+                    Text(stringResource(R.string.rule_group_filter_chip_count, groupName, count))
+                },
+            )
+        }
+        if (ungroupedRuleCount > 0) {
+            item(key = "group_filter_ungrouped") {
+                val ungroupedLabel = stringResource(R.string.rule_group_filter_ungrouped)
+                FilePipeFilterChip(
+                    selected = activeFilter == RuleGroupFilter.Ungrouped,
+                    onClick = { onSelectFilter(RuleGroupFilter.Ungrouped) },
+                    label = {
+                        Text(
+                            stringResource(
+                                R.string.rule_group_filter_chip_count,
+                                ungroupedLabel,
+                                ungroupedRuleCount,
+                            ),
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * What the rule-group sheet is open for, captured when it opens. Each place that offers the Group
+ * action keeps one of these and shows [RuleGroupPicker] for it: RulesScreen for a card and for the
+ * phone selection bar, the two-pane route for its selection pane (like their delete confirmations).
+ */
+internal sealed interface RuleGroupPickerTarget {
+    data class SingleRule(
+        val rule: Rule,
+    ) : RuleGroupPickerTarget
+
+    data class Selection(
+        val ruleIds: Set<Long>,
+        /** The group every selected rule is in, if they share one (shown checked). */
+        val commonGroup: String?,
+        /** Whether any selected rule is in a group (Remove from group is offered only then). */
+        val anyGrouped: Boolean,
+    ) : RuleGroupPickerTarget
+}
+
+/** The Group action's target for the current rule selection. */
+internal fun RulesUiState.selectionGroupPickerTarget(): RuleGroupPickerTarget.Selection =
+    RuleGroupPickerTarget.Selection(
+        ruleIds = selectedRuleIds,
+        commonGroup = selectedRulesCommonGroup,
+        anyGrouped = selectedRulesHaveGroup,
+    )
+
+/** The rule-group sheet for [target]; assigning a group (or removing it) goes through [viewModel]. */
+@Composable
+internal fun RuleGroupPicker(
+    target: RuleGroupPickerTarget,
+    availableGroups: List<String>,
+    viewModel: RulesViewModel,
+    onDismiss: () -> Unit,
+) {
+    when (target) {
+        is RuleGroupPickerTarget.SingleRule -> {
+            RuleGroupPickerSheet(
+                subtitleTemplate = stringResource(R.string.rule_group_sheet_subtitle_single, RULE_GROUP_SUBTITLE_MARKER),
+                subtitleHighlight = target.rule.name,
+                currentGroup = target.rule.groupName,
+                hasAnyGroupAssigned = target.rule.groupName != null,
+                availableGroups = availableGroups,
+                onSelectGroup = { chosenGroup -> viewModel.setRuleGroup(target.rule.id, chosenGroup) },
+                onDismiss = onDismiss,
+            )
+        }
+
+        is RuleGroupPickerTarget.Selection -> {
+            RuleGroupPickerSheet(
+                subtitleTemplate = stringResource(R.string.rule_group_sheet_subtitle_multiple, RULE_GROUP_SUBTITLE_MARKER),
+                subtitleHighlight = target.ruleIds.size.toString(),
+                currentGroup = target.commonGroup,
+                // Remove from group only when there is a group to remove.
+                hasAnyGroupAssigned = target.anyGrouped,
+                availableGroups = availableGroups,
+                onSelectGroup = { chosenGroup -> viewModel.setRulesGroup(target.ruleIds, chosenGroup) },
+                onDismiss = onDismiss,
+            )
+        }
+    }
+}
+
+private const val RULE_GROUP_NAME_MAX_LENGTH = 12
+
+// Private-use character passed into the subtitle format string so the highlighted part (rule name
+// or count) can be located and bolded wherever the translation places it.
+private const val RULE_GROUP_SUBTITLE_MARKER = "\uE000"
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun RuleGroupPickerSheet(
+    subtitleTemplate: String,
+    subtitleHighlight: String,
+    currentGroup: String?,
+    hasAnyGroupAssigned: Boolean,
+    availableGroups: List<String>,
+    onSelectGroup: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val newGroupFieldState = rememberTextFieldState()
+    val trimmedNewGroup = newGroupFieldState.text.toString().trim()
+    val newGroupLength = newGroupFieldState.text.length
+    val pillShape = MaterialTheme.shapes.extraLarge
+    val newGroupFocusRequester = remember { FocusRequester() }
+
+    val view = LocalView.current
+    val hapticEnabled by rememberUpdatedState(LocalHapticEnabled.current)
+    val reducedMotion by rememberUpdatedState(LocalReducedMotion.current)
+    val sheetScope = rememberCoroutineScope()
+    val limitBuzzOffset = remember { Animatable(0f) }
+    val sheetState =
+        rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        )
+    // Picking a group must slide the sheet down like a swipe-dismiss; removing it from the
+    // composition straight away would make it vanish in a single frame.
+    val chooseGroup: (String?) -> Unit = { chosenGroup ->
+        onSelectGroup(chosenGroup)
+        sheetScope.launch {
+            sheetState.hide()
+            onDismiss()
+        }
+    }
+    // Cuts anything past the limit (typed or pasted), and buzzes whenever an edit grows the text
+    // to the limit or tries to grow it beyond the limit: a haptic reject plus the same tiny, fast
+    // horizontal jitter Remember's editor title field plays at its width limit (keep in parity).
+    val groupNameInputTransformation =
+        remember(view) {
+            InputTransformation {
+                val proposedLength = length
+                val growsText = proposedLength > originalText.length
+                if (proposedLength > RULE_GROUP_NAME_MAX_LENGTH) {
+                    replace(RULE_GROUP_NAME_MAX_LENGTH, proposedLength, "")
+                }
+                if (growsText && length >= RULE_GROUP_NAME_MAX_LENGTH) {
+                    if (hapticEnabled) {
+                        view.performRejectHaptic()
+                    }
+                    if (!reducedMotion) {
+                        sheetScope.launch {
+                            limitBuzzOffset.snapTo(0f)
+                            limitBuzzOffset.animateTo(targetValue = -3f, animationSpec = tween(durationMillis = 25))
+                            limitBuzzOffset.animateTo(targetValue = 3f, animationSpec = tween(durationMillis = 50))
+                            limitBuzzOffset.animateTo(targetValue = 0f, animationSpec = tween(durationMillis = 25))
+                        }
+                    }
+                }
+            }
+        }
+    val subtitleParts = subtitleTemplate.split(RULE_GROUP_SUBTITLE_MARKER)
+    val subtitleText =
+        buildAnnotatedString {
+            append(subtitleParts.first())
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(subtitleHighlight) }
+            append(subtitleParts.getOrElse(1) { "" })
+        }
+
+    AppBottomSheet(
+        title = stringResource(R.string.rule_group_sheet_title),
+        onDismiss = onDismiss,
+        sheetState = sheetState,
+        subtitleContent = {
+            Text(
+                text = subtitleText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        titleActions =
+            if (hasAnyGroupAssigned) {
+                {
+                    FilePipeTextButton(onClick = { chooseGroup(null) }) {
+                        Text(stringResource(R.string.rule_group_remove))
+                    }
+                }
+            } else {
+                null
+            },
+    ) {
+        // With no groups yet, creating one is the only thing to do here, so open on the name field.
+        // This lives inside the sheet's content, not around the sheet: the sheet composes into its own
+        // window, usually a frame or more after the code around it, so an effect out there could run
+        // before the field's focusRequester was attached (no focus, no keyboard). In here the field is
+        // attached by the time the effect runs; waiting for the sheet's window to gain focus also lets
+        // the keyboard request land, since an IME request from an unfocused window is dropped.
+        val windowInfo = LocalWindowInfo.current
+        val keyboardController = LocalSoftwareKeyboardController.current
+        LaunchedEffect(Unit) {
+            if (availableGroups.isNotEmpty()) return@LaunchedEffect
+            snapshotFlow { windowInfo.isWindowFocused }.first { focused -> focused }
+            newGroupFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+        // OutlinedTextField reserves extra space above its border for the floating label, so a
+        // centered Row would line the button up with that taller box instead of the visible
+        // border. Bottom-align instead (the border box ends at the field's bottom edge) and lift
+        // the button by half the height difference. The button is laid out at its touch-target
+        // height (its 40dp visual shape centered inside), so that height is what must be centered.
+        val createButtonLayoutHeight =
+            maxOf(
+                ButtonDefaults.MinHeight,
+                LocalMinimumInteractiveComponentSize.current.takeOrElse { ButtonDefaults.MinHeight },
+            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                state = newGroupFieldState,
+                label = { Text(stringResource(R.string.rule_group_new_label)) },
+                placeholder = { Text(stringResource(R.string.rule_group_new_placeholder)) },
+                lineLimits = TextFieldLineLimits.SingleLine,
+                inputTransformation = groupNameInputTransformation,
+                trailingIcon = {
+                    Text(
+                        text =
+                            stringResource(
+                                R.string.rule_group_name_counter,
+                                newGroupLength,
+                                RULE_GROUP_NAME_MAX_LENGTH,
+                            ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color =
+                            if (newGroupLength >= RULE_GROUP_NAME_MAX_LENGTH) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                    )
+                },
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .focusRequester(newGroupFocusRequester)
+                        .graphicsLayer { translationX = limitBuzzOffset.value },
+            )
+            FilePipeFilledTonalButton(
+                onClick = {
+                    if (trimmedNewGroup.isNotEmpty()) {
+                        chooseGroup(trimmedNewGroup)
+                    }
+                },
+                enabled = trimmedNewGroup.isNotEmpty(),
+                shape = pillShape,
+                modifier = Modifier.padding(bottom = (OutlinedTextFieldDefaults.MinHeight - createButtonLayoutHeight) / 2),
+            ) {
+                Text(stringResource(R.string.rule_group_create_and_assign))
+            }
+        }
+
+        if (availableGroups.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                availableGroups.forEach { groupName ->
+                    val isSelected = currentGroup == groupName
+                    Surface(
+                        onClick = { chooseGroup(groupName) },
+                        shape = MaterialTheme.shapes.medium,
+                        color =
+                            if (isSelected) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                            },
+                        contentColor =
+                            if (isSelected) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = groupName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (isSelected) {
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "check",
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                )
+                            }
+                        }
                     }
                 }
             }

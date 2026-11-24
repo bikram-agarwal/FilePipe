@@ -47,9 +47,12 @@ import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
+import com.materialkolor.ktx.toColor
+import com.materialkolor.ktx.toHct
 import com.materialkolor.rememberDynamicColorScheme
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
+import dev.bikram.filepipe.data.preferences.CuratedColorTriplet
 import dev.bikram.filepipe.data.preferences.DEFAULT_SHADING_INTENSITY
 import dev.bikram.filepipe.data.preferences.DEFAULT_UI_SCALE
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
@@ -77,6 +80,30 @@ internal fun appDisplayDensity(
     }
 
 private val FilePipeColorSpecVersion = ColorSpec.SpecVersion.SPEC_2025
+
+// Since material-kolor 5.0.1 the 2025 spec is fully applied to the curated/custom triplet
+// overrides, and those triplets are full-strength seeds (e.g. Ember #F97316): containers - rule-card
+// chips, tonal buttons, the FAB - came out near the seed itself, far more saturated than the app
+// looked through 5.0.0. Scaling the triplet's chroma (hue and tone unchanged) before it seeds the
+// scheme calms every role together while keeping the 2025 spec. Wallpaper (Material You) schemes are
+// untouched. The Settings swatches use the same [forAppliedScheme] so they match what gets applied.
+// Tuning: the effect is not linear (2025 containers sit at the palette's most chromatic tone), so
+// 0.7 lands back on the pre-5.0.1 look (pale light-theme chips); 0.8 is visibly milder; 1.0 = off.
+// Remember shares this theme scaffolding (RememberColorSpecVersion) - keep the two apps in parity.
+private const val SEED_TRIPLET_CHROMA_SCALE = 0.7
+
+private fun Color.withScaledChroma(scale: Double): Color {
+    val hct = toHct()
+    return hct.withChroma(hct.chroma * scale).toColor()
+}
+
+/** The triplet as it actually seeds the theme; the Settings swatches draw this too. */
+internal fun CuratedColorTriplet.forAppliedScheme(): CuratedColorTriplet =
+    CuratedColorTriplet(
+        primary = primary.withScaledChroma(SEED_TRIPLET_CHROMA_SCALE),
+        secondary = secondary.withScaledChroma(SEED_TRIPLET_CHROMA_SCALE),
+        tertiary = tertiary.withScaledChroma(SEED_TRIPLET_CHROMA_SCALE),
+    )
 
 // Modest cap so text on extreme OS font settings stays large enough to honor the user's
 // choice, but not so large that sheets/lists balloon far past the (necessarily shrunk)
@@ -309,12 +336,14 @@ fun FilePipeTheme(
 
     /** Non-wallpaper themes use either curated triplets or a custom seed ramp. */
     val staticTriplet =
-        if (useDynamic) {
-            null
-        } else if (colorSource == AppColorSource.CUSTOM) {
-            parseCustomTriplet(activeCustomSeedHex)
-        } else {
-            colorSource.curatedTriplet()
+        remember(useDynamic, colorSource, activeCustomSeedHex) {
+            val sourceTriplet =
+                when {
+                    useDynamic -> null
+                    colorSource == AppColorSource.CUSTOM -> parseCustomTriplet(activeCustomSeedHex)
+                    else -> colorSource.curatedTriplet()
+                }
+            sourceTriplet?.forAppliedScheme()
         }
     val staticSeedColor =
         if (useDynamic || staticTriplet != null) {

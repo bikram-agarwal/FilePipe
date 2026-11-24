@@ -16,6 +16,7 @@ import dev.bikram.filepipe.LEGACY_APP_DATABASE_NAME
 import dev.bikram.filepipe.data.local.dao.FileMovedDao
 import dev.bikram.filepipe.data.local.dao.RuleDao
 import dev.bikram.filepipe.data.local.dao.RunHistoryDao
+import dev.bikram.filepipe.data.repository.legacyFilenamePatternAsLines
 import java.io.File
 import javax.inject.Singleton
 
@@ -125,6 +126,35 @@ object DatabaseModule {
             }
         }
 
+    /**
+     * Adds the rule group column, and rewrites filename patterns as one pattern per line.
+     *
+     * The second part is data only. Every pattern box now holds one pattern per line
+     * (splitPatternLines). A wildcard filename pattern used to be comma separated, so its commas become
+     * line breaks, which reads exactly as before; a RegEx one was a single expression, already one line
+     * (legacyFilenamePatternAsLines). Exclude patterns were always stored as a list, so they need
+     * nothing. Backups written before this change get the same conversion on import
+     * (RuleBackupDto.patternsOnePerLine).
+     */
+    internal val migration12To13 =
+        object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE rules ADD COLUMN groupName TEXT")
+
+                val linesById = mutableMapOf<Long, String>()
+                db.query("SELECT id, filenamePattern FROM rules WHERE isRegexPattern = 0 AND filenamePattern LIKE '%,%'").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val pattern = cursor.getString(1) ?: continue
+                        val lines = legacyFilenamePatternAsLines(pattern, isRegexPattern = false)
+                        if (lines != pattern) linesById[cursor.getLong(0)] = lines
+                    }
+                }
+                linesById.forEach { (id, lines) ->
+                    db.execSQL("UPDATE rules SET filenamePattern = ? WHERE id = ?", arrayOf<Any>(lines, id))
+                }
+            }
+        }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -142,6 +172,7 @@ object DatabaseModule {
                 migration9To10,
                 migration10To11,
                 migration11To12,
+                migration12To13,
             )
             // Fail closed if a migration path is missing. Recreating this database would silently
             // erase rules and run history, while a failed open leaves the original file recoverable.

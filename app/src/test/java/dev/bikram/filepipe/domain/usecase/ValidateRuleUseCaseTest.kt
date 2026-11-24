@@ -193,6 +193,29 @@ class ValidateRuleUseCaseTest {
         assertEquals(ValidateRuleUseCase.Result.Valid, result)
     }
 
+    @Test
+    fun excludeRegexSplitIntoAnInvalidPieceIsRefused() {
+        // A stored pattern that doesn't compile on its own - e.g. split naively at a comma by an older
+        // build - is refused, whatever the rest of the list holds.
+        val result =
+            validate(
+                baseRule().copy(isExcludeRegexPattern = true, excludePatterns = listOf("^tmp_\\d{2", "4}$")),
+            )
+
+        assertTrue(result is ValidateRuleUseCase.Result.Invalid)
+    }
+
+    @Test
+    fun excludeRegexFolderPatternIsChecked() {
+        assertEquals(
+            ValidateRuleUseCase.Result.Valid,
+            validate(baseRule().copy(isExcludeRegexPattern = true, excludePatterns = listOf("""\.thumbnails/""", "^cache$/"))),
+        )
+        assertTrue(
+            validate(baseRule().copy(isExcludeRegexPattern = true, excludePatterns = listOf("[/"))) is ValidateRuleUseCase.Result.Invalid,
+        )
+    }
+
     private fun baseRule(): Rule =
         Rule(
             name = "Screenshots",

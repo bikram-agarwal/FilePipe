@@ -5,6 +5,7 @@ package dev.bikram.filepipe.domain.export
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.SwipeAction
+import dev.bikram.filepipe.data.repository.legacyFilenamePatternAsLines
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FileOrientation
@@ -26,7 +27,7 @@ import java.io.InputStream
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
  * (`@Database`); Room KSP does not allow that annotation to reference this constant.
  */
-const val APP_DATABASE_SCHEMA_VERSION = 12
+const val APP_DATABASE_SCHEMA_VERSION = 13
 
 /**
  * Root object for `filepipe_backup_*.json`.
@@ -58,6 +59,7 @@ data class RuleBackupDto(
     /** Null in backups written before the rule carried its own last-run time. */
     val lastRunStartedAt: Long? = null,
     val cardModeOverride: Boolean = false,
+    val groupName: String? = null,
     val schedule: ScheduleBackupDto? = null,
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
@@ -75,6 +77,14 @@ data class RuleBackupDto(
     val orientation: String? = null,
     val isRegexPattern: Boolean = false,
     val isExcludeRegexPattern: Boolean = false,
+    /**
+     * True in backups written since pattern boxes hold one pattern per line. Absent - so false - in
+     * older backups, whose wildcard [filenamePattern] was comma separated: import rewrites it as lines
+     * (legacyFilenamePatternAsLines) so the rule matches what it did, as the 12 -> 13 database
+     * migration does. [excludePatterns] needs nothing; it was always a list. Not inferred from
+     * [AppBackup.version], which older backups don't reliably carry.
+     */
+    val patternsOnePerLine: Boolean = false,
 )
 
 @Serializable
@@ -183,6 +193,7 @@ fun Rule.toBackupDto(): RuleBackupDto =
         sortOrder = sortOrder,
         lastRunStartedAt = lastRunStartedAt,
         cardModeOverride = cardModeOverride,
+        groupName = groupName?.trim()?.takeIf { it.isNotEmpty() },
         schedule = schedule?.toBackupDto(),
         conflictPolicy = conflictPolicy.name,
         operationMode = operationMode.name,
@@ -200,6 +211,7 @@ fun Rule.toBackupDto(): RuleBackupDto =
         orientation = orientation?.name,
         isRegexPattern = isRegexPattern,
         isExcludeRegexPattern = isExcludeRegexPattern,
+        patternsOnePerLine = true,
     )
 
 fun RuleSchedule.toBackupDto(): ScheduleBackupDto =
@@ -298,6 +310,7 @@ fun RuleBackupDto.toDomain(): Rule =
         sortOrder = sortOrder,
         lastRunStartedAt = lastRunStartedAt,
         cardModeOverride = cardModeOverride,
+        groupName = groupName?.trim()?.takeIf { it.isNotEmpty() },
         schedule = schedule?.toDomain(),
         conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
         operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),
@@ -306,7 +319,12 @@ fun RuleBackupDto.toDomain(): Rule =
         suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
         icon = RuleIcon.fromStored(iconKey),
         iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
-        filenamePattern = filenamePattern,
+        filenamePattern =
+            if (patternsOnePerLine) {
+                filenamePattern
+            } else {
+                filenamePattern?.let { pattern -> legacyFilenamePatternAsLines(pattern, isRegexPattern) }
+            },
         minFileSizeBytes = minFileSizeBytes,
         maxFileSizeBytes = maxFileSizeBytes,
         minAgeDays = minAgeDays,

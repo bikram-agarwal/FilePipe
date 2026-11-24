@@ -94,6 +94,18 @@ interface RuleDao {
     @Query("UPDATE rules SET cardModeOverride = 0")
     suspend fun clearCardModeOverrides()
 
+    @Query("UPDATE rules SET groupName = :groupName WHERE id = :id")
+    suspend fun updateGroupName(
+        id: Long,
+        groupName: String?,
+    )
+
+    @Query("UPDATE rules SET groupName = :groupName WHERE id IN (:ids)")
+    suspend fun updateGroupNames(
+        ids: List<Long>,
+        groupName: String?,
+    )
+
     @Query("DELETE FROM rules WHERE trashedAt IS NOT NULL AND trashedAt < :cutoff")
     suspend fun deleteTrashedRulesOlderThan(cutoff: Long)
 

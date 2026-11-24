@@ -50,6 +50,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -64,6 +65,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -71,6 +73,7 @@ import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
@@ -116,7 +119,9 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -161,6 +166,7 @@ import dev.bikram.filepipe.ui.common.AppBottomSheet
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.FilePipePredictiveBackHandler
 import dev.bikram.filepipe.ui.common.isSmallLandscape
+import dev.bikram.filepipe.ui.common.rememberHoistedStringTextFieldState
 import dev.bikram.filepipe.ui.components.CenteredTooltipText
 import dev.bikram.filepipe.ui.components.FileExtensionChips
 import dev.bikram.filepipe.ui.components.FilePipeButton
@@ -771,6 +777,22 @@ fun RuleDetailScreen(
         }
     }
 
+    // A RegEx toggle rewrote a box's patterns: say so, with Undo. A newer toggle replaces the notice,
+    // which restarts this effect and dismisses the older snackbar.
+    LaunchedEffect(state.patternConversionNotice) {
+        val notice = state.patternConversionNotice ?: return@LaunchedEffect
+        val result =
+            snackbarHostState.showSnackbar(
+                message =
+                    resources.getString(
+                        if (notice.toRegex) R.string.pattern_converted_to_regex else R.string.pattern_converted_to_wildcards,
+                    ),
+                actionLabel = resources.getString(R.string.undo),
+            )
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoPatternConversion(notice)
+        viewModel.dismissPatternConversionNotice(notice)
+    }
+
     fun tryNavigateBack() {
         when {
             showDiscardDialog -> showDiscardDialog = false
@@ -1025,12 +1047,16 @@ fun RuleDetailScreen(
                                 )
                             }
                         }
+                        val nameFieldState =
+                            rememberHoistedStringTextFieldState(
+                                text = state.name,
+                                onTextChange = viewModel::setName,
+                            )
                         OutlinedTextField(
-                            value = state.name,
-                            onValueChange = viewModel::setName,
+                            state = nameFieldState,
                             label = { Text(stringResource(R.string.rule_name_label)) },
                             placeholder = { Text(stringResource(R.string.rule_name_placeholder)) },
-                            singleLine = true,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             enabled = !isReadOnly,
                             isError = nameHasError,
                             modifier =
@@ -1839,78 +1865,54 @@ fun RuleDetailScreen(
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                     modifier = Modifier.padding(top = 16.dp),
                                 ) {
-                                    OutlinedTextField(
-                                        value = state.filenamePattern,
-                                        onValueChange = viewModel::setFilenamePattern,
-                                        label = {
-                                            Text(
-                                                text =
-                                                    stringResource(
-                                                        if (state.isRegexPattern) {
-                                                            R.string.advanced_filename_pattern_regex_label
-                                                        } else {
-                                                            R.string.advanced_filename_pattern_label
-                                                        },
-                                                    ),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                softWrap = false,
-                                            )
-                                        },
-                                        placeholder = {
-                                            Text(
-                                                text =
-                                                    stringResource(
-                                                        if (state.isRegexPattern) {
-                                                            R.string.advanced_filename_pattern_regex_placeholder
-                                                        } else {
-                                                            R.string.advanced_filename_pattern_placeholder
-                                                        },
-                                                    ),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                softWrap = false,
-                                            )
-                                        },
-                                        trailingIcon = {
-                                            FilePipeFilterChip(
-                                                selected = state.isRegexPattern,
-                                                onClick = { viewModel.setIsRegexPattern(!state.isRegexPattern) },
-                                                enabled = !isReadOnly,
-                                                label = { Text(stringResource(R.string.advanced_filename_pattern_regex_chip)) },
-                                                modifier = Modifier.padding(end = 4.dp),
-                                            )
-                                        },
-                                        singleLine = true,
+                                    val filenamePatternFieldState =
+                                        rememberHoistedStringTextFieldState(
+                                            text = state.filenamePattern,
+                                            onTextChange = viewModel::setFilenamePattern,
+                                        )
+                                    PatternListField(
+                                        fieldState = filenamePatternFieldState,
+                                        label = stringResource(R.string.advanced_filename_pattern_label),
+                                        placeholder =
+                                            stringResource(
+                                                if (state.isRegexPattern) {
+                                                    R.string.advanced_filename_pattern_regex_placeholder
+                                                } else {
+                                                    R.string.advanced_filename_pattern_placeholder
+                                                },
+                                            ),
+                                        isRegex = state.isRegexPattern,
+                                        onToggleRegex = { viewModel.togglePatternRegex(PatternBox.INCLUDE) },
+                                        invalidLine = state.filenamePatternInvalidLine,
                                         enabled = !isReadOnly,
-                                        isError = state.isFilenamePatternInvalidRegex,
-                                        supportingText =
-                                            if (state.isFilenamePatternInvalidRegex) {
-                                                { Text(stringResource(R.string.advanced_filename_pattern_regex_error)) }
-                                            } else {
-                                                null
-                                            },
-                                        modifier = Modifier.fillMaxWidth(),
                                     )
 
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
+                                        val minFileSizeFieldState =
+                                            rememberHoistedStringTextFieldState(
+                                                text = state.minFileSizeMb,
+                                                onTextChange = viewModel::setMinFileSizeMb,
+                                            )
                                         OutlinedTextField(
-                                            value = state.minFileSizeMb,
-                                            onValueChange = viewModel::setMinFileSizeMb,
+                                            state = minFileSizeFieldState,
                                             label = { Text(stringResource(R.string.advanced_min_size_label)) },
-                                            singleLine = true,
+                                            lineLimits = TextFieldLineLimits.SingleLine,
                                             enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                             modifier = Modifier.weight(1f),
                                         )
+                                        val maxFileSizeFieldState =
+                                            rememberHoistedStringTextFieldState(
+                                                text = state.maxFileSizeMb,
+                                                onTextChange = viewModel::setMaxFileSizeMb,
+                                            )
                                         OutlinedTextField(
-                                            value = state.maxFileSizeMb,
-                                            onValueChange = viewModel::setMaxFileSizeMb,
+                                            state = maxFileSizeFieldState,
                                             label = { Text(stringResource(R.string.advanced_max_size_label)) },
-                                            singleLine = true,
+                                            lineLimits = TextFieldLineLimits.SingleLine,
                                             enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                             modifier = Modifier.weight(1f),
@@ -1921,78 +1923,73 @@ fun RuleDetailScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
+                                        val minAgeFieldState =
+                                            rememberHoistedStringTextFieldState(
+                                                text = state.minAgeDays,
+                                                onTextChange = viewModel::setMinAgeDays,
+                                            )
                                         OutlinedTextField(
-                                            value = state.minAgeDays,
-                                            onValueChange = viewModel::setMinAgeDays,
+                                            state = minAgeFieldState,
                                             label = { Text(stringResource(R.string.advanced_min_age_label)) },
-                                            singleLine = true,
+                                            lineLimits = TextFieldLineLimits.SingleLine,
                                             enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
+                                        val maxAgeFieldState =
+                                            rememberHoistedStringTextFieldState(
+                                                text = state.maxAgeDays,
+                                                onTextChange = viewModel::setMaxAgeDays,
+                                            )
                                         OutlinedTextField(
-                                            value = state.maxAgeDays,
-                                            onValueChange = viewModel::setMaxAgeDays,
+                                            state = maxAgeFieldState,
                                             label = { Text(stringResource(R.string.advanced_max_age_label)) },
-                                            singleLine = true,
+                                            lineLimits = TextFieldLineLimits.SingleLine,
                                             enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
                                     }
 
-                                    OutlinedTextField(
-                                        value = state.excludePatternsText,
-                                        onValueChange = viewModel::setExcludePatternsText,
-                                        label = {
-                                            Text(
-                                                text =
-                                                    stringResource(
-                                                        if (state.isExcludeRegexPattern) {
-                                                            R.string.advanced_exclude_patterns_regex_label
-                                                        } else {
-                                                            R.string.advanced_exclude_patterns_label
-                                                        },
-                                                    ),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                softWrap = false,
-                                            )
-                                        },
-                                        placeholder = {
-                                            Text(
-                                                text =
-                                                    stringResource(
-                                                        if (state.isExcludeRegexPattern) {
-                                                            R.string.advanced_exclude_patterns_regex_placeholder
-                                                        } else {
-                                                            R.string.advanced_exclude_placeholder
-                                                        },
-                                                    ),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                softWrap = false,
-                                            )
-                                        },
-                                        trailingIcon = {
-                                            FilePipeFilterChip(
-                                                selected = state.isExcludeRegexPattern,
-                                                onClick = { viewModel.setIsExcludeRegexPattern(!state.isExcludeRegexPattern) },
-                                                enabled = !isReadOnly,
-                                                label = { Text(stringResource(R.string.advanced_filename_pattern_regex_chip)) },
-                                                modifier = Modifier.padding(end = 4.dp),
-                                            )
-                                        },
-                                        isError = state.isExcludePatternInvalidRegex,
-                                        supportingText =
-                                            if (state.isExcludePatternInvalidRegex) {
-                                                { Text(stringResource(R.string.advanced_exclude_patterns_regex_error)) }
-                                            } else {
-                                                null
-                                            },
-                                        singleLine = true,
+                                    val excludePatternsFieldState =
+                                        rememberHoistedStringTextFieldState(
+                                            text = state.excludePatternsText,
+                                            onTextChange = viewModel::setExcludePatternsText,
+                                        )
+                                    PatternListField(
+                                        fieldState = excludePatternsFieldState,
+                                        label = stringResource(R.string.advanced_exclude_patterns_label),
+                                        placeholder =
+                                            stringResource(
+                                                if (state.isExcludeRegexPattern) {
+                                                    R.string.advanced_exclude_patterns_regex_placeholder
+                                                } else {
+                                                    R.string.advanced_exclude_placeholder
+                                                },
+                                            ),
+                                        isRegex = state.isExcludeRegexPattern,
+                                        onToggleRegex = { viewModel.togglePatternRegex(PatternBox.EXCLUDE) },
+                                        invalidLine = state.excludePatternInvalidLine,
                                         enabled = !isReadOnly,
-                                        modifier = Modifier.fillMaxWidth(),
+                                        helpAction = {
+                                            // Folder exclusion (a trailing "/") is the part of this box nobody
+                                            // would guess, so its help opens right at that FAQ entry. Styled like
+                                            // the editor's other help icons (ToggleLabelHelpDropdown), and
+                                            // available on a read-only (trashed) rule too.
+                                            val excludeHelpLabel = stringResource(R.string.advanced_exclude_patterns_help)
+                                            FilePipeIconButton(
+                                                onClick = { onOpenFaq(Screen.Faq.FOCUS_PATTERNS) },
+                                                tooltipLabel = excludeHelpLabel,
+                                            ) {
+                                                FilePipeMaterialRoundedSymbol(
+                                                    name = "help",
+                                                    contentDescription = excludeHelpLabel,
+                                                    filled = false,
+                                                    size = 20.dp,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        },
                                     )
 
                                     if (appliesToImageAndVideoOnly(state.fileExtensions)) {
@@ -2008,9 +2005,13 @@ fun RuleDetailScreen(
                                                     FileOrientation.LANDSCAPE -> stringResource(R.string.advanced_orientation_landscape)
                                                     null -> stringResource(R.string.advanced_orientation_any)
                                                 }
+                                            val orientationFieldState =
+                                                rememberHoistedStringTextFieldState(
+                                                    text = displayValue,
+                                                    onTextChange = {},
+                                                )
                                             OutlinedTextField(
-                                                value = displayValue,
-                                                onValueChange = {},
+                                                state = orientationFieldState,
                                                 readOnly = true,
                                                 label = { Text(stringResource(R.string.advanced_orientation_label)) },
                                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(orientationExpanded) },
@@ -2318,6 +2319,17 @@ fun RuleDetailScreen(
                                 navBottom + bottomOverlayPadding
                             },
                     ),
+        )
+    }
+
+    state.pendingWildcardSwitch?.let { pending ->
+        val lines = pending.unconvertibleLines
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.pattern_wildcard_switch_title),
+            text = pluralStringResource(R.plurals.pattern_wildcard_switch_message, lines.size, lines.joinToString(", ")),
+            confirmLabel = stringResource(R.string.pattern_wildcard_switch_confirm),
+            onConfirm = viewModel::confirmWildcardSwitch,
+            onDismiss = viewModel::cancelWildcardSwitch,
         )
     }
 
@@ -2761,7 +2773,13 @@ fun RuleDetailScreen(
                                     files.size,
                                 ),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            // Same as the Rules preview sheet: "permanently deleted" takes the error color.
+                            color =
+                                if (state.operationMode == OperationMode.DELETE) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                         val groupedFiles =
@@ -2865,3 +2883,84 @@ private val FirstGraphemeInputTransformation =
             replace(0, length, firstGrapheme)
         }
     }
+
+/**
+ * One of the Advanced filters pattern boxes (file include, file/folder exclude): one pattern per line,
+ * in wildcard and RegEx mode alike (see splitPatternLines). Its [label] sits permanently above the
+ * field, in one row with [helpAction] (if any) and the RegEx toggle - styled like the editor's other
+ * labels above a control ("If file already exists"). The label never changes with the mode; the
+ * toggle itself reads "RegEx On" / "RegEx Off". RegEx text is monospace, and the keyboard neither
+ * autocorrects nor capitalizes: a pattern isn't prose, and "fixing" `thumb*` or `.nomedia` breaks it.
+ * [invalidLine] (1-based) names the line whose RegEx doesn't compile.
+ */
+@Composable
+private fun PatternListField(
+    fieldState: TextFieldState,
+    label: String,
+    placeholder: String,
+    isRegex: Boolean,
+    onToggleRegex: () -> Unit,
+    invalidLine: Int?,
+    enabled: Boolean,
+    helpAction: (@Composable () -> Unit)? = null,
+) {
+    val patternFontFamily = if (isRegex) FontFamily.Monospace else null
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color =
+                    if (enabled) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    },
+                modifier = Modifier.weight(1f),
+            )
+            helpAction?.invoke()
+            FilePipeFilterChip(
+                selected = isRegex,
+                onClick = onToggleRegex,
+                enabled = enabled,
+                label = {
+                    Text(stringResource(if (isRegex) R.string.advanced_regex_toggle_on else R.string.advanced_regex_toggle_off))
+                },
+            )
+        }
+        OutlinedTextField(
+            state = fieldState,
+            placeholder = {
+                Text(
+                    text = placeholder,
+                    fontFamily = patternFontFamily,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = false,
+                )
+            },
+            textStyle = LocalTextStyle.current.copy(fontFamily = patternFontFamily),
+            // Grows with its patterns, then scrolls past five lines.
+            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 5),
+            keyboardOptions =
+                KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
+                    autoCorrectEnabled = false,
+                ),
+            enabled = enabled,
+            isError = invalidLine != null,
+            supportingText =
+                invalidLine?.let { line ->
+                    { Text(stringResource(R.string.advanced_pattern_regex_line_error, line)) }
+                },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}

@@ -1,3 +1,24 @@
+## v3.12 Groups, Exclude folders, Selective undo
+
+### ✨ New Features
+- **Rule groups**: sort your rules into groups and filter the list with one tap on a group chip. 
+- **Exclude whole folders**: in addition to files, whole folders can now be excluded in your rules.
+- **Undo just some files**: pick individual files from a run in History and undo only those.
+
+### 🛠 Improved Features
+- Running a rule by hand now always starts from the Preview sheet, so you always know which files will be affected. 
+- Include and exclude patterns are now one per line, and a comma is just a comma in a pattern, not pattern separator. 
+- You can now convert include/exclued patterns from wildcard to regex or vice-versa. 
+- Delete previews now say clearly that files will be permanently deleted.
+- Help and FAQ have a new guide to include and exclude patterns and folder skipping.
+
+### 🐛 Bug Fixes
+- Rules no longer scan their own destination folder when it sits inside a scanned source folder. This stops repeated nesting, duplicates and accidental deletion.
+- A run from the Preview sheet now acts on exactly the files you were shown. Files that changed since the preview are left alone instead of being touched.
+- Theme accent colors are less oversaturated and look the way they did before the recent color-engine update.
+
+---
+
 ## v3.11.3 Offline flavor, Tablet layout fix
 
 ### ✨ New Features

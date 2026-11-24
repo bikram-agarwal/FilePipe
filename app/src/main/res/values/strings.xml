@@ -26,22 +26,22 @@
     <string name="rule_card_progress_copying_file">Copying %1$s (%2$d / %3$d)</string>
     <string name="rule_card_progress_deleting_file">Deleting %1$s (%2$d / %3$d)</string>
     <plurals name="rule_card_progress_files_moved_summary">
-        <item quantity="one">%1$d / %2$d file moved</item>
-        <item quantity="other">%1$d / %2$d files moved</item>
+        <item quantity="one">%1$d/%2$d file moved</item>
+        <item quantity="other">%1$d/%2$d files moved</item>
     </plurals>
     <plurals name="rule_card_progress_files_copied_summary">
-        <item quantity="one">%1$d / %2$d file copied</item>
-        <item quantity="other">%1$d / %2$d files copied</item>
+        <item quantity="one">%1$d/%2$d file copied</item>
+        <item quantity="other">%1$d/%2$d files copied</item>
     </plurals>
     <plurals name="rule_card_progress_files_deleted_summary">
-        <item quantity="one">%1$d / %2$d file deleted</item>
-        <item quantity="other">%1$d / %2$d files deleted</item>
+        <item quantity="one">%1$d/%2$d file deleted</item>
+        <item quantity="other">%1$d/%2$d files deleted</item>
     </plurals>
     <string name="rule_card_progress_error">Error: %1$s</string>
     <string name="rule_card_progress_no_matching_files">No matching files found</string>
     <string name="rule_card_progress_scanning">Scanning…</string>
     <string name="rule_card_progress_unknown_file">Unknown file</string>
-    <string name="shortcut_run_rule_label">Run: %1$s</string>
+    <string name="shortcut_preview_rule_label">Preview: %1$s</string>
 
     <!-- Rule detail screen -->
     <string name="rule_detail_redundant_subfolder_removed">Removed redundant subfolder(s): %1$s</string>
@@ -156,8 +156,6 @@
     <string name="run_select_all">Select all</string>
     <string name="run_deselect_all">Deselect all</string>
     <string name="run_cancel_selection">Cancel selection</string>
-    <string name="run_button">Run selected</string>
-    <string name="run_now">Run now</string>
 
     <!-- History screen -->
     <string name="history_no_files_affected">No files affected</string>
@@ -178,10 +176,9 @@
     <string name="history_detail_files_moved_label">Files moved</string>
     <string name="history_detail_files_copied_label">Files copied</string>
     <string name="history_detail_files_deleted_label">Files deleted</string>
-    <plurals name="history_detail_undo_files">
-        <item quantity="one">Undo (%d file)</item>
-        <item quantity="other">Undo (%d files)</item>
-    </plurals>
+    <string name="history_detail_undo_prompt">Undo?</string>
+    <string name="history_detail_run_undo">Run Undo (%1$d)</string>
+    <string name="history_detail_file_undone">Undone</string>
     <string name="history_detail_not_processed_cancelled_label">Not processed (cancelled)</string>
     <string name="history_empty_title">No history yet</string>
     <string name="history_empty_subtitle">Run some rules to see your file move history here</string>
@@ -205,6 +202,7 @@
     <string name="history_trash_empty_confirm_title">Delete all rules forever?</string>
     <string name="history_trash_empty_confirm_message">All rules in Trash will be permanently deleted and cannot be recovered.</string>
     <string name="rule_moved_to_trash">\"%1$s\" moved to Trash</string>
+    <string name="rule_duplicated">\"%1$s\" created</string>
     <plurals name="rules_moved_to_trash">
         <item quantity="one">%1$d rule moved to Trash</item>
         <item quantity="other">%1$d rules moved to Trash</item>
@@ -862,6 +860,19 @@
 
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>
+    <string name="rule_card_group">Group</string>
+    <string name="rule_group_filter_all">All</string>
+    <string name="rule_group_filter_ungrouped">Ungrouped</string>
+    <string name="rule_group_filter_chip_count">%1$s (%2$d)</string>
+    <string name="rule_group_sheet_title">Rule group</string>
+    <string name="rule_group_sheet_subtitle_single">Choose a group for %1$s</string>
+    <string name="rule_group_sheet_subtitle_multiple">Choose a group for %1$s selected rules</string>
+    <string name="rule_group_name_counter">%1$d/%2$d</string>
+    <string name="rule_group_new_label">New group name</string>
+    <string name="rule_group_new_placeholder">e.g. Documents, Music</string>
+    <string name="rule_group_create_and_assign">Create</string>
+    <string name="rule_group_remove">Remove from group</string>
+    <string name="rule_group_badge_cd">Group: %1$s</string>
     <string name="rule_scan_subdirs_label">Scan subfolders</string>
     <string name="rule_scan_subdirs_support">Subfolders will be scanned up to 32 levels deep for matching files</string>
     <string name="rule_recreate_subfolders_label">Mirror subfolders to destination</string>
@@ -876,6 +887,7 @@
     <string name="operation_delete">Delete</string>
     <string name="file_operation_incomplete_copy">The destination file did not receive all source data</string>
     <string name="file_operation_source_changed_after_confirmation">The file changed after deletion was confirmed, so it was not deleted</string>
+    <string name="file_operation_source_changed_after_preview">The file changed after it was previewed, so it was left in place</string>
     <string name="file_operation_source_delete_failed">The source file could not be deleted after it was copied</string>
     <string name="rule_operation_delete_warning">CAUTION: FILES WILL BE PERMANENTLY DELETED, WITH NO UNDO OPTION ANYWHERE.</string>
     <string name="rule_delete_confirmation_scan_failed">Couldn\'t verify which files would be deleted. Nothing was changed.</string>
@@ -893,13 +905,20 @@
 
     <!-- Preview sheet -->
     <string name="preview_title">Preview</string>
-    <string name="preview_title_for_rule">Preview — %1$s</string>
-    <plurals name="preview_title_selected_rules">
-        <item quantity="one">Preview — %1$d selected rule</item>
-        <item quantity="other">Preview — %1$d selected rules</item>
-    </plurals>
-    <string name="preview_selected_rules">Preview selected</string>
     <string name="preview_run">Run</string>
+    <!-- Preview sheet: the run shown in place once Run is tapped -->
+    <plurals name="preview_run_status_failed">
+        <item quantity="one">%1$d failed</item>
+        <item quantity="other">%1$d failed</item>
+    </plurals>
+    <plurals name="preview_run_status_cancelled">
+        <item quantity="one">%1$d cancelled</item>
+        <item quantity="other">%1$d cancelled</item>
+    </plurals>
+    <!-- A rule line in the preview sheet plus how its run ended, e.g. "6/10 files moved • 4 cancelled" -->
+    <string name="preview_run_line_with_status">%1$s • %2$s</string>
+    <string name="preview_run_done">Done</string>
+    <string name="preview_run_view_in_history">View in History</string>
     <string name="preview_empty">No matching files found in the selected source folders</string>
     <string name="preview_would_skip">Would skip</string>
     <string name="preview_would_overwrite">Would overwrite</string>
@@ -913,8 +932,8 @@
         <item quantity="other">%1$d files would be copied</item>
     </plurals>
     <plurals name="preview_files_would_delete">
-        <item quantity="one">%1$d file would be deleted</item>
-        <item quantity="other">%1$d files would be deleted</item>
+        <item quantity="one">%1$d file would be permanently deleted</item>
+        <item quantity="other">%1$d files would be permanently deleted</item>
     </plurals>
 
     <!-- Template picker -->
@@ -948,23 +967,30 @@
     <string name="advanced_section_title">Advanced filters</string>
     <string name="advanced_section_subtitle">Optional filters to narrow matching files</string>
     <string name="advanced_section_filters_active">Filters active</string>
-    <string name="advanced_filename_pattern_label">Filename patterns, comma separated</string>
+    <string name="advanced_filename_pattern_label">File include patterns, one per line</string>
     <string name="advanced_filename_pattern_placeholder">e.g. Screenshot_*</string>
-    <string name="advanced_filename_pattern_regex_chip">RegEx</string>
-    <string name="advanced_filename_pattern_regex_label">Filename RegEx pattern</string>
+    <string name="advanced_regex_toggle_on">RegEx On</string>
+    <string name="advanced_regex_toggle_off">RegEx Off</string>
     <string name="advanced_filename_pattern_regex_placeholder">e.g. ^IMG_\\d{4}\\.(jpg|png)$</string>
-    <string name="advanced_filename_pattern_regex_error">Invalid regular expression syntax</string>
     <string name="advanced_min_size_label">Min size (MB)</string>
     <string name="advanced_max_size_label">Max size (MB)</string>
     <string name="advanced_min_age_label">Min age (days)</string>
     <string name="advanced_max_age_label">Max age (days)</string>
     <string name="rule_error_age_out_of_range" tools:ignore="PluralsCandidate">Age must be between 1 and %1$d days</string>
     <string name="rule_error_minimum_age_exceeds_maximum">Minimum age cannot be greater than maximum age</string>
-    <string name="advanced_exclude_patterns_label">Exclude patterns, comma separated</string>
-    <string name="advanced_exclude_placeholder">e.g. .nomedia</string>
-    <string name="advanced_exclude_patterns_regex_label">Exclude RegEx pattern</string>
+    <string name="advanced_exclude_patterns_label">Exclude patterns, one per line</string>
+    <string name="advanced_exclude_placeholder">e.g. cache/</string>
+    <string name="advanced_exclude_patterns_help">How to exclude a folder</string>
     <string name="advanced_exclude_patterns_regex_placeholder">e.g. \\.nomedia|.*\\.tmp</string>
-    <string name="advanced_exclude_patterns_regex_error">Invalid regular expression syntax in exclude pattern</string>
+    <string name="advanced_pattern_regex_line_error">Invalid regular expression on line %1$d</string>
+    <string name="pattern_converted_to_regex">Patterns converted to RegEx</string>
+    <string name="pattern_converted_to_wildcards">Patterns converted to wildcards</string>
+    <string name="pattern_wildcard_switch_title">Switch to wildcards?</string>
+    <string name="pattern_wildcard_switch_confirm">Switch anyway</string>
+    <plurals name="pattern_wildcard_switch_message">
+        <item quantity="one">Line %1$s is a regular expression with no wildcard equivalent. It will stay as typed, and as a wildcard it only matches a name spelled exactly like it.</item>
+        <item quantity="other">Lines %1$s are regular expressions with no wildcard equivalent. They will stay as typed, and as wildcards they only match names spelled exactly like them.</item>
+    </plurals>
     <string name="advanced_orientation_label">Orientation</string>
     <string name="advanced_orientation_any">Any orientation</string>
     <string name="advanced_orientation_portrait">Portrait</string>

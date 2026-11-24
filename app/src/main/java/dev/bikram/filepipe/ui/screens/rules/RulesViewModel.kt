@@ -29,6 +29,7 @@ import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.Rule
+import dev.bikram.filepipe.domain.model.RunFileEvent
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.RunResult
 import dev.bikram.filepipe.domain.model.TriggerType
@@ -36,6 +37,7 @@ import dev.bikram.filepipe.domain.usecase.ExecuteRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
 import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
+import dev.bikram.filepipe.domain.usecase.executeSequentially
 import dev.bikram.filepipe.manualrun.ManualRunForegroundCoordinator
 import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
@@ -62,21 +64,115 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 data class DeleteUndoEvent(
     val rules: List<Rule>,
 )
 
+/** A duplicate just created from the rules list; Undo removes it again (see undoDuplicate). */
+data class DuplicateUndoEvent(
+    val copyRuleId: Long,
+    val copyName: String,
+)
+
 data class PreviewState(
-    val ruleName: String,
     val isLoading: Boolean = true,
     val results: List<PreviewFileResult> = emptyList(),
-    val selectedRuleCount: Int? = null,
     val ruleGroups: List<PreviewRuleGroup> = emptyList(),
+    /** Set once Run is tapped: the sheet stays open and shows the run in place of its Cancel/Run row. */
+    val run: PreviewSheetRun? = null,
+)
+
+/** Where one previewed file stands once the sheet's run reaches it. */
+enum class PreviewFileRunStatus {
+    IN_PROGRESS,
+    DONE,
+    SKIPPED,
+    FAILED,
+}
+
+/** One previewed file of a sheet run, keyed the way the sheet lists it. */
+data class PreviewRunFile(
+    val ruleId: Long,
+    val sourcePath: String,
+)
+
+/** How many of a rule's files the sheet's run has finished with, by outcome. */
+data class PreviewRuleRunTally(
+    val done: Int = 0,
+    val skipped: Int = 0,
+    val failed: Int = 0,
+) {
+    /** Files the run is through with, whatever the outcome. */
+    val settled: Int get() = done + skipped + failed
+
+    internal fun adjusted(
+        status: PreviewFileRunStatus?,
+        delta: Int,
+    ): PreviewRuleRunTally =
+        when (status) {
+            PreviewFileRunStatus.DONE -> copy(done = done + delta)
+            PreviewFileRunStatus.SKIPPED -> copy(skipped = skipped + delta)
+            PreviewFileRunStatus.FAILED -> copy(failed = failed + delta)
+            PreviewFileRunStatus.IN_PROGRESS, null -> this
+        }
+}
+
+/**
+ * Per-file statuses of one sheet run, written in place as the run's file events arrive and read by
+ * the sheet's rows. Not copied per event: copying a run-sized map twice per file made a large run
+ * quadratic. Every write comes with a new [PreviewSheetRun.revision], so the state still changes and
+ * the sheet recomposes and re-reads it. Concurrent maps because run events and composition need not
+ * share a thread.
+ */
+class PreviewRunFileStatuses {
+    private val byRule = ConcurrentHashMap<Long, ConcurrentHashMap<String, PreviewFileRunStatus>>()
+
+    operator fun get(
+        ruleId: Long,
+        sourcePath: String,
+    ): PreviewFileRunStatus? = byRule[ruleId]?.get(sourcePath)
+
+    /** Records [status] for [file] and returns the status it replaced. */
+    internal fun put(
+        file: PreviewRunFile,
+        status: PreviewFileRunStatus,
+    ): PreviewFileRunStatus? = byRule.computeIfAbsent(file.ruleId) { ConcurrentHashMap() }.put(file.sourcePath, status)
+
+    internal fun remove(file: PreviewRunFile) {
+        byRule[file.ruleId]?.remove(file.sourcePath)
+    }
+}
+
+/**
+ * A manual run started from the preview sheet, shown in the sheet itself: per-file status against the
+ * listed rows while it runs, then [outcome] once it ends. If the sheet is dismissed mid-run the run
+ * carries on and finishes the pre-sheet way (rule-card progress, then History).
+ */
+data class PreviewSheetRun(
+    /** The previewed rules this run executes (enabled rules with something to do). */
+    val ruleIds: Set<Long>,
+    /** Status per listed file; files the run hasn't reached yet have none. */
+    val fileStatuses: PreviewRunFileStatuses = PreviewRunFileStatuses(),
+    /** Per-rule counts of finished files, kept alongside [fileStatuses] so nothing has to recount them. */
+    val tallies: Map<Long, PreviewRuleRunTally> = emptyMap(),
+    /** The file being processed right now, if any; the sheet keeps it in view. */
+    val currentFile: PreviewRunFile? = null,
+    /** Bumped by every [fileStatuses] write, which mutates in place (see [PreviewRunFileStatuses]). */
+    val revision: Long = 0L,
+    val outcome: PreviewSheetRunOutcome? = null,
+)
+
+data class PreviewSheetRunOutcome(
+    val cancelled: Boolean,
+    /** Rules that failed outright (e.g. lost folder access), keyed by rule id. */
+    val ruleErrors: Map<Long, String> = emptyMap(),
+    /** History rows the run produced: one opens that row's detail, otherwise the History list. */
+    val historyIds: List<Long> = emptyList(),
 )
 
 data class PreviewRuleGroup(
@@ -85,6 +181,47 @@ data class PreviewRuleGroup(
     val operationMode: OperationMode,
     val results: List<PreviewFileResult>,
 )
+
+/**
+ * The previewed rule groups the sheet's Run button executes: each has something to do, and its rule
+ * still exists and is enabled. Used by both the button's enabled state and [RulesViewModel.runPreviewedRules]
+ * so they can't disagree. [enabledRuleIds] must cover every rule, not the group-filtered list on
+ * screen: a launcher shortcut can preview a rule the active group filter hides.
+ */
+internal fun PreviewState.runnableRuleGroups(enabledRuleIds: Set<Long>): List<PreviewRuleGroup> =
+    ruleGroups.filter { ruleGroup ->
+        ruleGroup.ruleId in enabledRuleIds && ruleGroup.results.any { result -> !result.wouldSkip }
+    }
+
+internal fun enabledRuleIds(rules: List<Rule>): Set<Long> =
+    rules
+        .asSequence()
+        .filter { rule -> rule.isEnabled }
+        .map { rule -> rule.id }
+        .toSet()
+
+/**
+ * The full "My order" after a drag in a possibly group-filtered list: the visible rules, in their new
+ * [visibleReordered] order, take the slots they held in [allInMyOrder]; rules the filter hides keep
+ * their places. With no filter (every rule visible) the dragged order is the whole order.
+ */
+internal fun mergeVisibleRuleOrder(
+    allInMyOrder: List<Rule>,
+    visibleReordered: List<Rule>,
+): List<Rule> {
+    if (visibleReordered.size >= allInMyOrder.size) return visibleReordered
+    val visibleIds = visibleReordered.map { rule -> rule.id }.toSet()
+    val queue = ArrayDeque(visibleReordered)
+    return allInMyOrder.map { existing ->
+        if (existing.id in visibleIds && queue.isNotEmpty()) queue.removeFirst() else existing
+    }
+}
+
+/**
+ * A rule's group while its preview is still scanning: no results yet, but the operation is known,
+ * so the sheet's action button reads Move / Copy / Delete from the first frame.
+ */
+private fun Rule.toPendingPreviewGroup() = PreviewRuleGroup(ruleId = id, ruleName = name, operationMode = operationMode, results = emptyList())
 
 enum class RuleFolderIssueSeverity {
     WARNING,
@@ -142,6 +279,17 @@ sealed interface ManualRunCancelAnchor {
     data object RunSelectedBar : ManualRunCancelAnchor
 }
 
+/** Active group filter for the Rules screen list. */
+sealed interface RuleGroupFilter {
+    data object All : RuleGroupFilter
+
+    data class Group(
+        val name: String,
+    ) : RuleGroupFilter
+
+    data object Ungrouped : RuleGroupFilter
+}
+
 /** A sorted rules list together with the sort selection that produced it. */
 private data class SortedRules(
     val rules: List<Rule>,
@@ -151,12 +299,22 @@ private data class SortedRules(
 
 data class RulesUiState(
     val rules: List<Rule> = emptyList(),
+    val allRulesCount: Int = 0,
+    /** Every enabled rule, whatever the group filter: the preview sheet's Run check (see runnableRuleGroups). */
+    val enabledRuleIds: Set<Long> = emptySet(),
+    val availableGroups: List<String> = emptyList(),
+    val groupRuleCounts: Map<String, Int> = emptyMap(),
+    val ungroupedRuleCount: Int = 0,
+    val activeGroupFilter: RuleGroupFilter = RuleGroupFilter.All,
     val staleRuleIds: Set<Long> = emptySet(),
     val staleRuleWarningIds: Set<Long> = emptySet(),
     val staleRuleErrorIds: Set<Long> = emptySet(),
     val swipeStartToEnd: SwipeAction = SwipeAction.EDIT,
     val swipeEndToStart: SwipeAction = SwipeAction.DELETE,
     val selectedRuleIds: Set<Long> = emptySet(),
+    val selectedRulesCommonGroup: String? = null,
+    /** Whether any selected rule is in a group (the group sheet offers Remove from group only then). */
+    val selectedRulesHaveGroup: Boolean = false,
     val progressMap: Map<Long, RunProgress> = emptyMap(),
     val isRunning: Boolean = false,
     val manualRunCancelAnchor: ManualRunCancelAnchor = ManualRunCancelAnchor.None,
@@ -182,6 +340,7 @@ class RulesViewModel
         private val pendingShortcutRepository: PendingShortcutRepository,
         private val fileOperationRepository: FileOperationRepository,
         private val manualRunForegroundCoordinator: ManualRunForegroundCoordinator,
+        private val ruleGroupFilterStore: RuleGroupFilterStore,
         @param:ApplicationContext private val appContext: Context,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
@@ -197,6 +356,12 @@ class RulesViewModel
         private val _previewState = MutableStateFlow<PreviewState?>(null)
         private var previewJob: Job? = null
         private var previewRequestId = 0L
+
+        // Every previewed rule's scanned file list from the open preview, so the sheet's Move / Copy /
+        // Delete button acts on exactly the files it listed (see runPreviewedRules). Reset with every
+        // preview request.
+        private var previewPreparedEntries: Map<Long, List<FileEntry>> = emptyMap()
+        private var previewPreparedAtMillis = 0L
         private val _manualRunCancelAnchor = MutableStateFlow<ManualRunCancelAnchor>(ManualRunCancelAnchor.None)
 
         // A manual run deferred pending the user's delete confirmation, plus the confirmation shown
@@ -282,6 +447,42 @@ class RulesViewModel
                     )
                 }.combine(_manualRunCancelAnchor) { state, anchor ->
                     state.copy(manualRunCancelAnchor = anchor)
+                }.combine(ruleGroupFilterStore.filter) { state, requestedFilter ->
+                    val allRules = state.rules
+                    val availableGroups =
+                        allRules
+                            .mapNotNull { it.groupName }
+                            .distinct()
+                            .sortedWith(String.CASE_INSENSITIVE_ORDER)
+                    val groupRuleCounts =
+                        allRules
+                            .mapNotNull { it.groupName }
+                            .groupingBy { it }
+                            .eachCount()
+                    val ungroupedCount = allRules.count { it.groupName == null }
+                    val effectiveFilter = requestedFilter.resolvedFor(allRules)
+                    val filteredRules =
+                        when (effectiveFilter) {
+                            RuleGroupFilter.All -> allRules
+                            is RuleGroupFilter.Group -> allRules.filter { it.groupName == effectiveFilter.name }
+                            RuleGroupFilter.Ungrouped -> allRules.filter { it.groupName == null }
+                        }
+                    val selectedRules = allRules.filter { rule -> rule.id in state.selectedRuleIds }
+                    state.copy(
+                        rules = filteredRules,
+                        selectedRulesCommonGroup =
+                            selectedRules
+                                .map { rule -> rule.groupName }
+                                .distinct()
+                                .singleOrNull(),
+                        selectedRulesHaveGroup = selectedRules.any { rule -> rule.groupName != null },
+                        allRulesCount = allRules.size,
+                        enabledRuleIds = enabledRuleIds(allRules),
+                        availableGroups = availableGroups,
+                        groupRuleCounts = groupRuleCounts,
+                        ungroupedRuleCount = ungroupedCount,
+                        activeGroupFilter = effectiveFilter,
+                    )
                 }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RulesUiState())
 
         private val _navigateAfterRun = MutableSharedFlow<RulesRunNavigation>(extraBufferCapacity = 1)
@@ -289,6 +490,9 @@ class RulesViewModel
 
         private val _deleteUndoEvent = MutableSharedFlow<DeleteUndoEvent>(extraBufferCapacity = 1)
         val deleteUndoEvent = _deleteUndoEvent.asSharedFlow()
+
+        private val _duplicateUndoEvent = MutableSharedFlow<DuplicateUndoEvent>(extraBufferCapacity = 1)
+        val duplicateUndoEvent = _duplicateUndoEvent.asSharedFlow()
 
         // One-shot snackbar messages: a Channel (not a StateFlow) so each message is delivered
         // exactly once — no replay on rotation, and identical/rapid messages aren't conflated.
@@ -354,33 +558,62 @@ class RulesViewModel
                 }
             }
             _rules.onEach { appShortcutsManager.updateShortcuts(it) }.launchIn(viewModelScope)
-            pendingShortcutRepository.pendingRuleId
+        }
+
+        override fun onCleared() {
+            // The group filter lives in a singleton only so the rule editor can read it; it still
+            // lasts as long as this list does (leaving the app and coming back starts on All).
+            ruleGroupFilterStore.setFilter(RuleGroupFilter.All)
+        }
+
+        /**
+         * Opens the preview sheet for a rule launched from a launcher shortcut. Collected by
+         * RulesScreen (not from init) so a request is only consumed while the sheet can actually
+         * show; AppNavigation brings the Rules tab forward first.
+         */
+        suspend fun previewPendingShortcutRules() {
+            pendingShortcutRepository.pendingPreviewRuleId
                 .combine(_rules) { pendingRuleId, rules -> pendingRuleId to rules }
-                .onEach { (pendingRuleId, rules) ->
-                    val ruleId = pendingRuleId ?: return@onEach
+                .collect { (pendingRuleId, rules) ->
+                    val ruleId = pendingRuleId ?: return@collect
                     val rule = rules.find { it.id == ruleId }
                     if (rule == null) {
                         if (rules.isNotEmpty()) {
-                            pendingShortcutRepository.clearPendingRule()
+                            pendingShortcutRepository.clearPendingPreviewRule()
                         }
-                        return@onEach
+                        return@collect
                     }
-                    pendingShortcutRepository.clearPendingRule()
-                    runRule(rule)
-                }.launchIn(viewModelScope)
+                    pendingShortcutRepository.clearPendingPreviewRule()
+                    startPreview(rule)
+                }
+        }
+
+        /** Scans [rule] for the preview sheet, keeping its file list for [runPreviewedRules]. */
+        private suspend fun simulateForPreview(
+            rule: Rule,
+            preparedEntries: MutableMap<Long, List<FileEntry>>,
+        ): List<PreviewFileResult> {
+            val prepared = simulateRuleUseCase.prepare(rule)
+            preparedEntries[rule.id] = prepared.fileEntries
+            return prepared.previewResults
+        }
+
+        private fun beginPreviewRequest(): Long {
+            previewJob?.cancel()
+            previewRequestId += 1
+            previewPreparedEntries = emptyMap()
+            previewPreparedAtMillis = 0L
+            return previewRequestId
         }
 
         fun startPreview(rule: Rule) {
-            previewJob?.cancel()
-            previewRequestId += 1
-            val requestId = previewRequestId
+            val requestId = beginPreviewRequest()
             previewJob =
                 viewModelScope.launch {
                     if (DevMockFileMove.isMockRule(rule)) {
                         if (previewRequestId != requestId) return@launch
                         _previewState.value =
                             PreviewState(
-                                ruleName = rule.name,
                                 isLoading = false,
                                 results = mockFileMovePreviewResults(),
                                 ruleGroups =
@@ -396,12 +629,19 @@ class RulesViewModel
                         return@launch
                     }
                     if (previewRequestId != requestId) return@launch
-                    _previewState.value = PreviewState(ruleName = rule.name, isLoading = true)
-                    val results = simulateRuleUseCase(rule)
-                    if (previewRequestId != requestId) return@launch
                     _previewState.value =
                         PreviewState(
-                            ruleName = rule.name,
+                            isLoading = true,
+                            ruleGroups = listOf(rule.toPendingPreviewGroup()),
+                        )
+                    val scanStartedAtMillis = System.currentTimeMillis()
+                    val preparedEntries = mutableMapOf<Long, List<FileEntry>>()
+                    val results = simulateForPreview(rule, preparedEntries)
+                    if (previewRequestId != requestId) return@launch
+                    previewPreparedEntries = preparedEntries
+                    previewPreparedAtMillis = scanStartedAtMillis
+                    _previewState.value =
+                        PreviewState(
                             isLoading = false,
                             results = results,
                             ruleGroups =
@@ -420,25 +660,24 @@ class RulesViewModel
         fun startPreviewSelected() {
             val selectedRules = _rules.value.filter { rule -> rule.id in _selectedRuleIds.value }
             if (selectedRules.isEmpty()) return
-            previewJob?.cancel()
-            previewRequestId += 1
-            val requestId = previewRequestId
+            val requestId = beginPreviewRequest()
             previewJob =
                 viewModelScope.launch {
                     if (previewRequestId != requestId) return@launch
                     _previewState.value =
                         PreviewState(
-                            ruleName = "",
                             isLoading = true,
-                            selectedRuleCount = selectedRules.size,
+                            ruleGroups = selectedRules.map { rule -> rule.toPendingPreviewGroup() },
                         )
+                    val scanStartedAtMillis = System.currentTimeMillis()
+                    val preparedEntries = mutableMapOf<Long, List<FileEntry>>()
                     val ruleGroups =
                         selectedRules.map { rule ->
                             val results =
                                 if (DevMockFileMove.isMockRule(rule)) {
                                     mockFileMovePreviewResults()
                                 } else {
-                                    simulateRuleUseCase(rule)
+                                    simulateForPreview(rule, preparedEntries)
                                 }
                             PreviewRuleGroup(
                                 ruleId = rule.id,
@@ -448,48 +687,173 @@ class RulesViewModel
                             )
                         }
                     if (previewRequestId != requestId) return@launch
+                    previewPreparedEntries = preparedEntries
+                    previewPreparedAtMillis = scanStartedAtMillis
                     _previewState.value =
                         PreviewState(
-                            ruleName = "",
                             isLoading = false,
                             results = ruleGroups.flatMap { it.results },
-                            selectedRuleCount = selectedRules.size,
                             ruleGroups = ruleGroups,
                         )
                 }
         }
 
         fun dismissPreview() {
-            previewRequestId += 1
-            previewJob?.cancel()
+            beginPreviewRequest()
             previewJob = null
             _previewState.value = null
         }
 
+        /**
+         * The only manual-run entry point from the Rules screen: every manual run goes through the
+         * preview sheet first, and the sheet is the confirmation. So the run acts on exactly the files
+         * the preview listed, never a rescan: one that changed since is refused rather than processed
+         * unseen, and one that appeared since is left for the next run. For delete rules that also
+         * stands in for the separate delete dialog (the sheet says "permanently deleted" and its button
+         * reads Delete in the error color); a preview older than [DELETE_CONFIRMATION_MAX_AGE_MS]
+         * falls back to that dialog's fresh scan.
+         */
         fun runPreviewedRules() {
             val preview = _previewState.value ?: return
+            if (preview.run != null) return
             val rulesById = _rules.value.associateBy { rule -> rule.id }
             val rulesToRun =
-                preview.ruleGroups
-                    .filter { ruleGroup -> ruleGroup.results.any { result -> !result.wouldSkip } }
+                preview
+                    .runnableRuleGroups(enabledRuleIds(_rules.value))
                     .mapNotNull { ruleGroup -> rulesById[ruleGroup.ruleId] }
-                    .filter { rule -> rule.isEnabled }
             if (rulesToRun.isEmpty()) return
 
-            dismissPreview()
-            if (rulesToRun.size == 1 && DevMockFileMove.isMockRule(rulesToRun.first())) {
-                enqueueMockFileMoveRun(rulesToRun.first())
-                return
-            }
-            val realRulesToRun = rulesToRun.filterNot(DevMockFileMove::isMockRule)
-            if (realRulesToRun.isEmpty()) return
+            val preparedEntries = previewPreparedEntries
+            val previewAgeMillis = System.currentTimeMillis() - previewPreparedAtMillis
+            // The sheet that started the run; any later preview request or dismissal changes it, so the
+            // run's events stop reaching a sheet that is gone (see updateSheetRun).
+            val sheetRunToken = previewRequestId
             val anchor =
-                if (realRulesToRun.size == 1) {
-                    ManualRunCancelAnchor.SingleRule(realRulesToRun.first().id)
+                if (rulesToRun.size == 1) {
+                    ManualRunCancelAnchor.SingleRule(rulesToRun.first().id)
                 } else {
                     ManualRunCancelAnchor.RunSelectedBar
                 }
-            enqueueManualRun(realRulesToRun, anchor, useCache = true)
+            val deleteRuleIds =
+                rulesToRun
+                    .filter { rule -> rule.operationMode == OperationMode.DELETE }
+                    .map { rule -> rule.id }
+            val previewConfirmsDeletes =
+                deleteRuleIds.isNotEmpty() &&
+                    previewAgeMillis <= DELETE_CONFIRMATION_MAX_AGE_MS &&
+                    deleteRuleIds.all { ruleId -> ruleId in preparedEntries }
+            if (deleteRuleIds.isNotEmpty() && !previewConfirmsDeletes) {
+                // Preview too old to stand as the delete confirmation: close the sheet and fall back to
+                // the delete dialog's fresh scan; that run shows on the rule card as before.
+                dismissPreview()
+                enqueueManualRun(rulesToRun, anchor, useCache = true)
+                return
+            }
+            beginSheetRun(rulesToRun)
+            invalidateDeleteConfirmation()
+            startManualRun(
+                rules = rulesToRun,
+                anchor = anchor,
+                useCache = true,
+                // Every rule but the dev-options mock (which simulates its own files) has its list here.
+                preparedFileEntriesByRuleId = preparedEntries,
+                sheetRunToken = sheetRunToken,
+            )
+        }
+
+        private fun beginSheetRun(rules: List<Rule>) {
+            _previewState.update { state ->
+                state?.copy(run = PreviewSheetRun(ruleIds = rules.map { rule -> rule.id }.toSet()))
+            }
+        }
+
+        /**
+         * Applies [transform] to the sheet's run if the sheet that started it ([sheetRunToken]) is still
+         * open. Returns false when it isn't - the caller then falls back to the pre-sheet behavior.
+         */
+        private fun updateSheetRun(
+            sheetRunToken: Long?,
+            transform: (PreviewSheetRun) -> PreviewSheetRun,
+        ): Boolean {
+            if (sheetRunToken == null || sheetRunToken != previewRequestId) return false
+            var applied = false
+            _previewState.update { state ->
+                val run = state?.run ?: return@update state
+                applied = true
+                state.copy(run = transform(run))
+            }
+            return applied
+        }
+
+        /** The open sheet's run if [sheetRunToken] started it, else null (see [updateSheetRun]). */
+        private fun activeSheetRun(sheetRunToken: Long?): PreviewSheetRun? {
+            if (sheetRunToken == null || sheetRunToken != previewRequestId) return null
+            return _previewState.value?.run
+        }
+
+        /**
+         * Drops [file]'s spinner if it is still showing one: a file whose Finished event never came
+         * (interrupted by Cancel, or its rule failed mid-file) would otherwise spin forever.
+         */
+        private fun PreviewRunFileStatuses.clearInProgress(file: PreviewRunFile?) {
+            if (file != null && this[file.ruleId, file.sourcePath] == PreviewFileRunStatus.IN_PROGRESS) {
+                remove(file)
+            }
+        }
+
+        /**
+         * O(1) per event: the status store is written in place and only the per-rule tally and the
+         * current file are copied. The write happens outside [updateSheetRun]'s transform, which a
+         * contended StateFlow update may run more than once.
+         */
+        private fun recordSheetFileEvent(
+            sheetRunToken: Long?,
+            event: RunFileEvent,
+        ) {
+            val run = activeSheetRun(sheetRunToken) ?: return
+            val file = PreviewRunFile(event.ruleId, event.sourceUri)
+            when (event) {
+                is RunFileEvent.Started -> {
+                    // Files run one at a time, so a previous file still marked in progress never finished.
+                    run.fileStatuses.clearInProgress(run.currentFile)
+                    run.fileStatuses.put(file, PreviewFileRunStatus.IN_PROGRESS)
+                    updateSheetRun(sheetRunToken) { current ->
+                        current.copy(currentFile = file, revision = current.revision + 1)
+                    }
+                }
+
+                is RunFileEvent.Finished -> {
+                    val status =
+                        when {
+                            event.file.skipped -> PreviewFileRunStatus.SKIPPED
+                            event.file.success -> PreviewFileRunStatus.DONE
+                            else -> PreviewFileRunStatus.FAILED
+                        }
+                    val replaced = run.fileStatuses.put(file, status)
+                    updateSheetRun(sheetRunToken) { current ->
+                        val tally =
+                            (current.tallies[event.ruleId] ?: PreviewRuleRunTally())
+                                .adjusted(replaced, -1)
+                                .adjusted(status, +1)
+                        current.copy(
+                            tallies = current.tallies + (event.ruleId to tally),
+                            currentFile = current.currentFile.takeUnless { it == file },
+                            revision = current.revision + 1,
+                        )
+                    }
+                }
+            }
+        }
+
+        /** Ends the sheet's run with [outcome]; false if the sheet is gone (caller navigates instead). */
+        private fun finishSheetRun(
+            sheetRunToken: Long?,
+            outcome: PreviewSheetRunOutcome,
+        ): Boolean {
+            activeSheetRun(sheetRunToken)?.let { run -> run.fileStatuses.clearInProgress(run.currentFile) }
+            return updateSheetRun(sheetRunToken) { run ->
+                run.copy(currentFile = null, revision = run.revision + 1, outcome = outcome)
+            }
         }
 
         fun isCardExpanded(
@@ -523,7 +887,43 @@ class RulesViewModel
         }
 
         fun selectAll() {
-            _selectedRuleIds.value = _rules.value.map { it.id }.toSet()
+            _selectedRuleIds.value =
+                uiState.value.rules
+                    .map { it.id }
+                    .toSet()
+        }
+
+        fun setGroupFilter(filter: RuleGroupFilter) {
+            if (ruleGroupFilterStore.filter.value != filter) {
+                ruleGroupFilterStore.setFilter(filter)
+                _selectedRuleIds.value = emptySet()
+            }
+        }
+
+        fun setRuleGroup(
+            ruleId: Long,
+            groupName: String?,
+        ) = viewModelScope.launch(ioDispatcher) {
+            ruleRepository.updateRuleGroup(ruleId, existingGroupSpelling(groupName))
+            rulesAutoExportTrigger.maybeExportAfterRuleChange()
+        }
+
+        fun setRulesGroup(
+            ruleIds: Set<Long>,
+            groupName: String?,
+        ) = viewModelScope.launch(ioDispatcher) {
+            ruleRepository.updateRulesGroup(ruleIds, existingGroupSpelling(groupName))
+            rulesAutoExportTrigger.maybeExportAfterRuleChange()
+            _selectedRuleIds.value = emptySet()
+        }
+
+        /**
+         * [groupName] as an existing group spells it, if one matches ignoring case: typing "work" when
+         * "Work" exists joins "Work" rather than starting a second group that looks the same.
+         */
+        private fun existingGroupSpelling(groupName: String?): String? {
+            val trimmed = groupName?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            return existingRuleGroupSpelling(trimmed, _rules.value)
         }
 
         fun setSort(
@@ -582,38 +982,10 @@ class RulesViewModel
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
             }
 
-        fun runSelected() {
-            val selected = _rules.value.filter { it.id in _selectedRuleIds.value && it.isEnabled }
-            if (selected.size == 1 && DevMockFileMove.isMockRule(selected.first())) {
-                enqueueMockFileMoveRun(selected.first())
-                return
-            }
-            enqueueManualRunAfterPreview(selected, ManualRunCancelAnchor.RunSelectedBar)
-        }
-
-        fun runRule(rule: Rule) {
-            if (!rule.isEnabled) return
-            if (DevMockFileMove.isMockRule(rule)) {
-                enqueueMockFileMoveRun(rule)
-                return
-            }
-            enqueueManualRunAfterPreview(listOf(rule), ManualRunCancelAnchor.SingleRule(rule.id))
-        }
-
-        private fun enqueueManualRunAfterPreview(
-            rules: List<Rule>,
-            anchor: ManualRunCancelAnchor,
-        ) {
-            val realRules = rules.filterNot(DevMockFileMove::isMockRule)
-            if (realRules.isEmpty()) return
-            enqueueManualRun(realRules, anchor, runSimulationCheck = true)
-        }
-
         private data class PendingManualRun(
             val rules: List<Rule>,
             val anchor: ManualRunCancelAnchor,
             val useCache: Boolean,
-            val runSimulationCheck: Boolean,
             val preparedFileEntriesByRuleId: Map<Long, List<FileEntry>>,
             val preparedAtMillis: Long,
         )
@@ -627,27 +999,25 @@ class RulesViewModel
             rules: List<Rule>,
             anchor: ManualRunCancelAnchor,
             useCache: Boolean = false,
-            runSimulationCheck: Boolean = false,
         ) {
             if (rules.isEmpty()) return
             if (rules.any { it.operationMode == OperationMode.DELETE }) {
-                requestDeleteConfirmation(rules, anchor, useCache, runSimulationCheck)
+                requestDeleteConfirmation(rules, anchor, useCache)
                 return
             }
             invalidateDeleteConfirmation()
-            startManualRun(rules, anchor, useCache, runSimulationCheck)
+            startManualRun(rules, anchor, useCache)
         }
 
         /**
          * Simulates the delete rules in [rules] to count/sample the files that would be permanently
          * removed, then raises a [PendingDeleteConfirmation] for the UI. If nothing would be deleted,
-         * the run proceeds normally (the existing simulation check surfaces any "no files" message).
+         * the run proceeds normally (its history row records "No changes").
          */
         private fun requestDeleteConfirmation(
             rules: List<Rule>,
             anchor: ManualRunCancelAnchor,
             useCache: Boolean,
-            runSimulationCheck: Boolean,
         ) {
             invalidateDeleteConfirmation()
             val requestId = deleteConfirmationRequestId
@@ -677,8 +1047,8 @@ class RulesViewModel
 
                     val confirmation = deleteConfirmationFor(deleteRuleResults)
                     if (confirmation == null) {
-                        // Nothing to delete; run normally - the sim check emits the "no files" message.
-                        startManualRun(rules, anchor, useCache, runSimulationCheck)
+                        // Nothing to delete; run normally.
+                        startManualRun(rules, anchor, useCache)
                         return@launch
                     }
                     pendingManualRun =
@@ -686,7 +1056,6 @@ class RulesViewModel
                             rules = rules,
                             anchor = anchor,
                             useCache = useCache,
-                            runSimulationCheck = runSimulationCheck,
                             preparedFileEntriesByRuleId = preparedFileEntriesByRuleId,
                             preparedAtMillis = scanStartedAtMillis,
                         )
@@ -703,7 +1072,6 @@ class RulesViewModel
                     rules = pending.rules,
                     anchor = pending.anchor,
                     useCache = pending.useCache,
-                    runSimulationCheck = pending.runSimulationCheck,
                 )
                 return
             }
@@ -712,7 +1080,6 @@ class RulesViewModel
                 rules = pending.rules,
                 anchor = pending.anchor,
                 useCache = pending.useCache,
-                runSimulationCheck = false,
                 preparedFileEntriesByRuleId = pending.preparedFileEntriesByRuleId,
             )
         }
@@ -741,8 +1108,8 @@ class RulesViewModel
             rules: List<Rule>,
             anchor: ManualRunCancelAnchor,
             useCache: Boolean = false,
-            runSimulationCheck: Boolean = false,
             preparedFileEntriesByRuleId: Map<Long, List<FileEntry>> = emptyMap(),
+            sheetRunToken: Long? = null,
         ) {
             if (rules.isEmpty()) return
             viewModelScope.launch {
@@ -761,47 +1128,51 @@ class RulesViewModel
                                     )
                             }
                         var runCompleted = false
+                        val ruleErrors = mutableMapOf<Long, String>()
                         try {
-                            // Every rule the user ran is executed, even one that matches nothing: that
-                            // run is real, so it earns a history row ("No changes", where it can be
-                            // filtered by chip or deleted) and a last-run time for sorting. The
-                            // simulation now only picks the feedback - a run that affects no files
-                            // reports that instead of pulling the user into History.
-                            val affectsFiles =
-                                try {
-                                    !runSimulationCheck ||
-                                        rules.any { rule ->
-                                            simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
-                                        }
-                                } catch (e: CancellationException) {
-                                    withContext(NonCancellable) {
-                                        rules.forEach { rule ->
-                                            val hId =
-                                                runHistoryRepository.startRun(
-                                                    ruleId = rule.id,
-                                                    ruleName = rule.name,
-                                                    triggerType = TriggerType.MANUAL,
-                                                    operationMode = rule.operationMode,
-                                                )
-                                            runHistoryRepository.finishRunUserCancelled(hId, 0)
-                                        }
-                                    }
-                                    throw e
+                            // Every rule passed in runs; nothing here re-checks whether it has work. The
+                            // preview sheet only offers rules it found work for, but by run time there
+                            // can still be none (the listed files are gone, or the delete dialog's fresh
+                            // scan came back empty). That run is still real, so like a scheduled run that
+                            // matched nothing it earns a "No changes" history row and a last-run time.
+                            val onFileEvent = { event: RunFileEvent -> recordSheetFileEvent(sheetRunToken, event) }
+                            val onProgress = { progress: RunProgress ->
+                                _progressMap.update { current -> current + (progress.ruleId to progress) }
+                                val error = progress.error
+                                if (progress.isComplete && error != null && error != RunProgress.ERROR_CANCELLED) {
+                                    ruleErrors[progress.ruleId] = error
                                 }
-
+                            }
+                            // In the given (sheet) order; the dev-options mock rule takes its simulated
+                            // path but is otherwise one more rule in the batch.
                             val results =
-                                executeRulesUseCase(
-                                    rules,
-                                    TriggerType.MANUAL,
-                                    useCache = useCache || runSimulationCheck,
-                                    preparedFileEntriesByRuleId = preparedFileEntriesByRuleId,
-                                ) { progress ->
-                                    _progressMap.update { current -> current + (progress.ruleId to progress) }
+                                executeSequentially(rules) { rule ->
+                                    if (DevMockFileMove.isMockRule(rule)) {
+                                        executeMockFileMoveRule(rule, onFileEvent, onProgress)
+                                    } else {
+                                        executeRulesUseCase(
+                                            listOf(rule),
+                                            TriggerType.MANUAL,
+                                            useCache = useCache,
+                                            preparedFileEntriesByRuleId = preparedFileEntriesByRuleId,
+                                            onFileEvent = onFileEvent,
+                                            onProgress = onProgress,
+                                        ).single()
+                                    }
                                 }
+                            val shownInSheet =
+                                finishSheetRun(
+                                    sheetRunToken,
+                                    PreviewSheetRunOutcome(
+                                        cancelled = false,
+                                        ruleErrors = ruleErrors.toMap(),
+                                        historyIds = results.map { result -> result.historyId },
+                                    ),
+                                )
+                            // The sheet shows the outcome itself; only a run whose sheet was dismissed
+                            // still navigates to History the pre-sheet way.
                             when {
-                                !affectsFiles -> {
-                                    postUserMessage(appContext.getString(R.string.history_no_files_affected))
-                                }
+                                shownInSheet -> {}
 
                                 results.size == 1 -> {
                                     _navigateAfterRun.emit(
@@ -816,6 +1187,10 @@ class RulesViewModel
                             runCompleted = true
                         } catch (_: CancellationException) {
                             // History finalized inside ExecuteRulesUseCase
+                            finishSheetRun(
+                                sheetRunToken,
+                                PreviewSheetRunOutcome(cancelled = true, ruleErrors = ruleErrors.toMap()),
+                            )
                         } finally {
                             manualRunForegroundCoordinator.setManualRunActive(false)
                             synchronized(manualRunJobLock) {
@@ -842,120 +1217,98 @@ class RulesViewModel
             }
         }
 
-        private fun enqueueMockFileMoveRun(rule: Rule) {
-            viewModelScope.launch {
-                val newJob =
-                    viewModelScope.launch(start = CoroutineStart.LAZY) {
-                        val selfJob = coroutineContext[Job]!!
-                        val fileNames = mockLargeFileNames()
-                        manualRunForegroundCoordinator.setManualRunActive(true)
-                        _manualRunCancelAnchor.value = ManualRunCancelAnchor.SingleRule(rule.id)
-                        _progressMap.value =
-                            mapOf(
-                                rule.id to
-                                    RunProgress(
-                                        ruleId = rule.id,
-                                        ruleName = rule.name,
-                                        progress = 0f,
-                                        totalFiles = fileNames.size,
-                                    ),
-                            )
-                        var runCompleted = false
-                        var mockHistoryId: Long? = null
-                        try {
-                            val startedAt = System.currentTimeMillis()
-                            val historyId =
-                                runHistoryRepository.startRun(
-                                    ruleId = rule.id,
-                                    ruleName = rule.name,
-                                    triggerType = TriggerType.MANUAL,
-                                    operationMode = OperationMode.MOVE,
-                                )
-                            mockHistoryId = historyId
-                            fileNames.forEachIndexed { index, fileName ->
-                                if (!isActive) throw CancellationException("User cancelled")
-                                _progressMap.update { current ->
-                                    current + (
-                                        rule.id to
-                                            RunProgress(
-                                                ruleId = rule.id,
-                                                ruleName = rule.name,
-                                                progress = index.toFloat() / fileNames.size.toFloat(),
-                                                currentFileName = fileName,
-                                                filesMoved = index,
-                                                totalFiles = fileNames.size,
-                                            )
-                                    )
-                                }
-                                delay(DevMockFileMove.FILE_OPERATION_DELAY_MILLIS)
-                            }
-                            _progressMap.update { current ->
-                                current + (
-                                    rule.id to
-                                        RunProgress(
-                                            ruleId = rule.id,
-                                            ruleName = rule.name,
-                                            progress = 1f,
-                                            currentFileName = fileNames.lastOrNull().orEmpty(),
-                                            filesMoved = fileNames.size,
-                                            totalFiles = fileNames.size,
-                                            isComplete = true,
-                                        )
-                                )
-                            }
-                            val completedAt = System.currentTimeMillis()
-                            val movedFiles =
-                                fileNames.mapIndexed { index, fileName ->
-                                    FileMoved(
-                                        fileName = fileName,
-                                        sourceUri = DevMockFileMove.sourceUri(fileName),
-                                        destinationUri = DevMockFileMove.destinationUri(fileName),
-                                        fileSizeBytes = DevMockFileMove.FILE_SIZE_BYTES,
-                                        movedAt = startedAt + ((completedAt - startedAt) * (index + 1) / fileNames.size),
-                                        success = true,
-                                    )
-                                }
-                            runHistoryRepository.completeRun(
-                                RunResult(
-                                    ruleId = rule.id,
-                                    ruleName = rule.name,
-                                    historyId = historyId,
-                                    filesMoved = movedFiles,
-                                    startedAt = startedAt,
-                                    completedAt = completedAt,
+        /**
+         * The dev-options mock rule's stand-in for a real rule run: walks [mockLargeFileNames] with a
+         * delay per file instead of touching storage, reporting progress, file events and history the
+         * way [ExecuteRulesUseCase] does for a real rule, so it can run alone or inside a batch.
+         */
+        private suspend fun executeMockFileMoveRule(
+            rule: Rule,
+            onFileEvent: (RunFileEvent) -> Unit,
+            onProgress: (RunProgress) -> Unit,
+        ): RunResult {
+            val fileNames = mockLargeFileNames()
+            val startedAt = System.currentTimeMillis()
+            val historyId =
+                runHistoryRepository.startRun(
+                    ruleId = rule.id,
+                    ruleName = rule.name,
+                    triggerType = TriggerType.MANUAL,
+                    operationMode = OperationMode.MOVE,
+                )
+            try {
+                fileNames.forEachIndexed { index, fileName ->
+                    val sourceUri = DevMockFileMove.sourceUri(fileName)
+                    onProgress(
+                        RunProgress(
+                            ruleId = rule.id,
+                            ruleName = rule.name,
+                            progress = index.toFloat() / fileNames.size.toFloat(),
+                            currentFileName = fileName,
+                            filesMoved = index,
+                            totalFiles = fileNames.size,
+                        ),
+                    )
+                    onFileEvent(RunFileEvent.Started(rule.id, sourceUri))
+                    delay(DevMockFileMove.FILE_OPERATION_DELAY_MILLIS)
+                    onFileEvent(
+                        RunFileEvent.Finished(
+                            ruleId = rule.id,
+                            sourceUri = sourceUri,
+                            file =
+                                FileMoved(
+                                    fileName = fileName,
+                                    sourceUri = sourceUri,
+                                    destinationUri = DevMockFileMove.destinationUri(fileName),
+                                    fileSizeBytes = DevMockFileMove.FILE_SIZE_BYTES,
+                                    success = true,
                                 ),
-                            )
-                            mockHistoryId = null
-                            runCompleted = true
-                            _navigateAfterRun.emit(RulesRunNavigation.HistoryDetail(historyId))
-                        } catch (_: CancellationException) {
-                            mockHistoryId?.let { id ->
-                                runHistoryRepository.finishRunUserCancelled(id, fileNames.size)
-                            }
-                        } finally {
-                            manualRunForegroundCoordinator.setManualRunActive(false)
-                            synchronized(manualRunJobLock) {
-                                if (manualRunJob === selfJob) {
-                                    manualRunJob = null
-                                }
-                            }
-                            _manualRunCancelAnchor.value = ManualRunCancelAnchor.None
-                            clearRunProgressOnly()
-                            if (runCompleted) {
-                                clearSelection()
-                            }
-                        }
-                    }
-                val previousJob =
-                    synchronized(manualRunJobLock) {
-                        val old = manualRunJob
-                        manualRunJob = newJob
-                        old
-                    }
-                previousJob?.cancel()
-                previousJob?.cancelAndJoin()
-                newJob.start()
+                        ),
+                    )
+                }
+            } catch (e: CancellationException) {
+                // Same as a real rule: the history row is closed out even though the job is cancelled.
+                withContext(NonCancellable) {
+                    runHistoryRepository.finishRunUserCancelled(historyId, fileNames.size)
+                }
+                onProgress(
+                    RunProgress(rule.id, rule.name, 1f, isComplete = true, error = RunProgress.ERROR_CANCELLED),
+                )
+                throw e
             }
+            val completedAt = System.currentTimeMillis()
+            val result =
+                RunResult(
+                    ruleId = rule.id,
+                    ruleName = rule.name,
+                    historyId = historyId,
+                    filesMoved =
+                        fileNames.mapIndexed { index, fileName ->
+                            FileMoved(
+                                fileName = fileName,
+                                sourceUri = DevMockFileMove.sourceUri(fileName),
+                                destinationUri = DevMockFileMove.destinationUri(fileName),
+                                fileSizeBytes = DevMockFileMove.FILE_SIZE_BYTES,
+                                movedAt = startedAt + ((completedAt - startedAt) * (index + 1) / fileNames.size),
+                                success = true,
+                            )
+                        },
+                    startedAt = startedAt,
+                    completedAt = completedAt,
+                )
+            runHistoryRepository.completeRun(result)
+            onProgress(
+                RunProgress(
+                    ruleId = rule.id,
+                    ruleName = rule.name,
+                    progress = 1f,
+                    currentFileName = fileNames.lastOrNull().orEmpty(),
+                    filesMoved = fileNames.size,
+                    totalFiles = fileNames.size,
+                    isComplete = true,
+                ),
+            )
+            return result
         }
 
         fun duplicateRule(rule: Rule) =
@@ -970,9 +1323,19 @@ class RulesViewModel
                         // and sort under "last run" as though it had.
                         lastRunStartedAt = null,
                     )
-                ruleRepository.saveRule(copy)
+                val copyRuleId = ruleRepository.saveRule(copy)
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
-                postUserMessage("\"${copy.name}\" created")
+                _duplicateUndoEvent.emit(DuplicateUndoEvent(copyRuleId, copy.name))
+            }
+
+        /**
+         * Removes a duplicate outright rather than trashing it: the copy is seconds old and was
+         * never run or scheduled (duplicates start disabled), so Trash would only hold clutter.
+         */
+        fun undoDuplicate(event: DuplicateUndoEvent) =
+            viewModelScope.launch {
+                ruleRepository.deleteRuleForever(event.copyRuleId)
+                rulesAutoExportTrigger.maybeExportAfterRuleChange()
             }
 
         private fun mockLargeFileNames(): List<String> =
@@ -1128,7 +1491,8 @@ class RulesViewModel
             ordered: List<Rule>,
             alsoSwitchSortToMyOrder: Boolean,
         ) = viewModelScope.launch(ioDispatcher) {
-            persistSortOrderIndices(ordered)
+            val allInMyOrder = sortRulesList(_rules.value, HistorySortKey.MY_ORDER, HistorySortDirection.ASCENDING)
+            persistSortOrderIndices(mergeVisibleRuleOrder(allInMyOrder, ordered))
             rulesAutoExportTrigger.maybeExportAfterRuleChange()
             if (alsoSwitchSortToMyOrder) {
                 userPreferencesRepository.setRulesSort(

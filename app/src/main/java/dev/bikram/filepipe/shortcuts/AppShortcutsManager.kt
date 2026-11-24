@@ -36,7 +36,7 @@ class AppShortcutsManager
                     ShortcutInfoCompat
                         .Builder(context, "rule_${rule.id}")
                         .setShortLabel(rule.name.take(25))
-                        .setLongLabel(context.getString(R.string.shortcut_run_rule_label, rule.name))
+                        .setLongLabel(context.getString(R.string.shortcut_preview_rule_label, rule.name))
                         .setIcon(ruleShortcutIconFactory.createIcon(rule))
                         .setIntent(intent)
                         .build()

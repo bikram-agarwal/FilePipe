@@ -11,7 +11,15 @@ Ever wanted all your videos in one folder, regardless of which app downloaded th
 That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let the pipes do the work. Move or copy any media to its rightful place.
 
 <b>━━ 📋 RULES ━━</b>
-Use templates to start fast or build your own. Create a rule by choosing source folders, file types, and a destination. Types can be specific extensions, All files, or No extension for names with no file type. Each rule can move, copy or delete files, and you control what happens when a filename collision occurs — skip, overwrite, or rename automatically. Rules can scan subfolders recursively and each one gets its own schedule.
+Use templates to start fast or build your own. Every rule has:
+• Source folders, with optional subfolder scanning
+• File types: specific extensions, All files, or No extension (names with no file type)
+• An action: move, copy, or delete
+• A destination, for move and copy
+• What to do when a file with the same name is already there: skip, overwrite, or rename
+• Its own schedule
+
+Sort rules into groups and filter the list with one tap on a group chip.
 
 Moved files keep their original date and time (copies too, with All files access), so they stay in the right order in your gallery and file manager instead of showing up as brand new.
 
@@ -20,7 +28,7 @@ Not every file in a folder should match. Narrow things down with:
 • Filename patterns (wildcards or RegEx)
 • Minimum and maximum file size
 • Minimum and maximum file age
-• Exclude patterns (wildcards or RegEx)
+• Exclude patterns (wildcards or RegEx), including whole folders
 • Media orientation (portrait or landscape)
 
 All optional, all collapsed by default so simple rules stay simple.
@@ -40,10 +48,10 @@ Every run is logged with a full per-file breakdown — moved, skipped, or failed
 • Sort by date or rule name
 • Switch between date view, rule view, or status view
 • Tap a moved file to open it directly
-• Undo a run to restore files when possible
+• Undo a whole run, or just the files you pick, to restore them when possible
 
 <b>━━ ⚡ APP SHORTCUTS ━━</b>
-Long-press the app icon to run any of your top four enabled rules immediately, without opening the app.
+Long-press the app icon to run any of your top four enabled rules directly from your phone homescreen.
 
 <b>━━ 🔔 NOTIFICATIONS ━━</b>
 Scheduled runs post a summary notification showing the files that were moved. Tap <b>Undo</b> directly from the notification to reverse the last batch.

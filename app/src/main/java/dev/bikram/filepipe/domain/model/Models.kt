@@ -28,6 +28,8 @@ data class Rule(
     val lastRunStartedAt: Long? = null,
     /** Overrides the global expanded/collapsed display mode for this rule card. */
     val cardModeOverride: Boolean = false,
+    /** Optional user-defined group label for organizing and filtering rules. */
+    val groupName: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val trashedAt: Long? = null,
@@ -281,6 +283,27 @@ data class RunProgress(
         /** Matches [ExecuteRulesUseCase] cancellation path; distinguishes success terminal from stopped mid-run. */
         const val ERROR_CANCELLED: String = "Cancelled"
     }
+}
+
+/**
+ * Per-file run notification, for UIs that list the files a manual run works through (the Rules
+ * preview sheet ticks its rows off with these). [sourceUri] is the scanned file's URI string - the
+ * same key as [PreviewFileResult.sourcePath].
+ */
+sealed interface RunFileEvent {
+    val ruleId: Long
+    val sourceUri: String
+
+    data class Started(
+        override val ruleId: Long,
+        override val sourceUri: String,
+    ) : RunFileEvent
+
+    data class Finished(
+        override val ruleId: Long,
+        override val sourceUri: String,
+        val file: FileMoved,
+    ) : RunFileEvent
 }
 
 enum class FileOrientation {

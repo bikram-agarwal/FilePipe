@@ -62,6 +62,7 @@ class RuleRepository
                     } else {
                         edited.copy(
                             cardModeOverride = stored.cardModeOverride,
+                            groupName = stored.groupName,
                             lastRunStartedAt = stored.lastRunStartedAt,
                             createdAt = stored.createdAt,
                             trashedAt = stored.trashedAt,
@@ -109,6 +110,19 @@ class RuleRepository
         ) = ruleDao.updateCardModeOverride(ruleId, override)
 
         suspend fun clearCardModeOverrides() = ruleDao.clearCardModeOverrides()
+
+        suspend fun updateRuleGroup(
+            ruleId: Long,
+            groupName: String?,
+        ) = ruleDao.updateGroupName(ruleId, groupName?.trim()?.takeIf { it.isNotEmpty() })
+
+        suspend fun updateRulesGroup(
+            ruleIds: Set<Long>,
+            groupName: String?,
+        ) {
+            if (ruleIds.isEmpty()) return
+            ruleDao.updateGroupNames(ruleIds.toList(), groupName?.trim()?.takeIf { it.isNotEmpty() })
+        }
 
         suspend fun deleteRuleForever(ruleId: Long) {
             val deletedRule = ruleDao.getRuleByIdIncludingTrashed(ruleId)?.toDomain()

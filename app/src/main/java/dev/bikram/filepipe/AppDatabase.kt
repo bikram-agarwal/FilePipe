@@ -18,9 +18,9 @@ const val LEGACY_APP_DATABASE_NAME = "media_organizer.db"
 @Database(
     entities = [RuleEntity::class, RunHistoryEntity::class, FileMovedEntity::class],
     // Literal required by Room KSP. Keep in sync with [dev.bikram.filepipe.domain.export.APP_DATABASE_SCHEMA_VERSION].
-    version = 12,
+    version = 13,
     exportSchema = true,
-    // 2 -> 3, 5 -> 6, 6 -> 7, 7 -> 8, 8 -> 9, 9 -> 10, 10 -> 11, and 11 -> 12 are manual migrations
+    // 2 -> 3, 5 -> 6, 6 -> 7, 7 -> 8, 8 -> 9, 9 -> 10, 10 -> 11, 11 -> 12, and 12 -> 13 are manual migrations
     // in [dev.bikram.filepipe.di.DatabaseModule].
     autoMigrations = [
         AutoMigration(from = 1, to = 2),

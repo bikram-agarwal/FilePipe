@@ -14,6 +14,11 @@ import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.data.repository.convertPatternsToRegex
+import dev.bikram.filepipe.data.repository.convertPatternsToWildcards
+import dev.bikram.filepipe.data.repository.firstInvalidExcludeRegexLine
+import dev.bikram.filepipe.data.repository.firstInvalidFilenameRegexLine
+import dev.bikram.filepipe.data.repository.splitPatternLines
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathAllowedForRules
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
@@ -40,6 +45,9 @@ import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
 import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
 import dev.bikram.filepipe.domain.usecase.ValidateRuleUseCase
 import dev.bikram.filepipe.ui.navigation.Screen
+import dev.bikram.filepipe.ui.screens.rules.RuleGroupFilter
+import dev.bikram.filepipe.ui.screens.rules.RuleGroupFilterStore
+import dev.bikram.filepipe.ui.screens.rules.resolvedFor
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -62,6 +70,46 @@ import java.io.File
 import java.math.BigDecimal
 import java.math.RoundingMode
 import javax.inject.Inject
+
+/** The two Advanced filters pattern boxes. */
+enum class PatternBox {
+    INCLUDE,
+    EXCLUDE,
+}
+
+/**
+ * A RegEx Off switch waiting on the user's say-so: [unconvertibleLines] (1-based) are real regular
+ * expressions with no wildcard form, which would otherwise stop matching silently.
+ */
+data class PendingWildcardSwitch(
+    val box: PatternBox,
+    val previousText: String,
+    val convertedText: String,
+    val unconvertibleLines: List<Int>,
+)
+
+/**
+ * Patterns just rewritten by a RegEx toggle, for the Undo snackbar: Undo restores [previousText] in
+ * the previous mode, as long as the box still holds [convertedText] (edits made since aren't undone).
+ */
+data class PatternConversionNotice(
+    val box: PatternBox,
+    val toRegex: Boolean,
+    val previousText: String,
+    val convertedText: String,
+)
+
+private fun RuleDetailUiState.patternText(box: PatternBox): String =
+    when (box) {
+        PatternBox.INCLUDE -> filenamePattern
+        PatternBox.EXCLUDE -> excludePatternsText
+    }
+
+private fun RuleDetailUiState.isPatternRegex(box: PatternBox): Boolean =
+    when (box) {
+        PatternBox.INCLUDE -> isRegexPattern
+        PatternBox.EXCLUDE -> isExcludeRegexPattern
+    }
 
 data class RuleDetailUiState(
     val id: Long = 0,
@@ -109,12 +157,23 @@ data class RuleDetailUiState(
     val folderAccessMode: FolderAccessMode = FolderAccessMode.SAF_ONLY,
     val allFilesAccessGranted: Boolean = false,
     val isTrashed: Boolean = false,
+    val pendingWildcardSwitch: PendingWildcardSwitch? = null,
+    val patternConversionNotice: PatternConversionNotice? = null,
 ) {
+    // Both pattern boxes are checked exactly as the rule is saved and scanned: one pattern per line,
+    // each compiled. The same per-line checks back ValidateRuleUseCase and backup import, so the
+    // field and Save can't disagree. The line number goes into the field's error message.
+    val filenamePatternInvalidLine: Int?
+        get() = if (isRegexPattern) firstInvalidFilenameRegexLine(filenamePattern) else null
+
+    val excludePatternInvalidLine: Int?
+        get() = if (isExcludeRegexPattern) firstInvalidExcludeRegexLine(excludePatternsText) else null
+
     val isFilenamePatternInvalidRegex: Boolean
-        get() = isRegexPattern && filenamePattern.isNotBlank() && runCatching { Regex(filenamePattern) }.isFailure
+        get() = filenamePatternInvalidLine != null
 
     val isExcludePatternInvalidRegex: Boolean
-        get() = isExcludeRegexPattern && excludePatternsText.isNotBlank() && runCatching { Regex(excludePatternsText.trim()) }.isFailure
+        get() = excludePatternInvalidLine != null
 }
 
 private data class RuleSnapshot(
@@ -257,12 +316,18 @@ class RuleDetailViewModel
         private val rulesAutoExportTrigger: RulesAutoExportTrigger,
         private val userPreferencesRepository: UserPreferencesRepository,
         private val fileOperationRepository: FileOperationRepository,
+        ruleGroupFilterStore: RuleGroupFilterStore,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
         @param:ApplicationContext private val appContext: Context,
     ) : ViewModel() {
         private val ruleId: Long = savedStateHandle[Screen.RuleDetail.ARG_RULE_ID] ?: Screen.RuleDetail.NEW_RULE_ID
         private val templateIndex: Int = savedStateHandle[Screen.RuleDetail.ARG_TEMPLATE_INDEX] ?: -1
         val isNewRule = ruleId == Screen.RuleDetail.NEW_RULE_ID
+
+        // The Rules list's group filter when this new rule was started; the rule joins that group on
+        // its first save (see newRuleGroupName). Captured now, not at save: in two-pane layouts the
+        // list stays usable while the editor is open, and the group the user created it from wins.
+        private val newRuleGroupFilter: RuleGroupFilter? = ruleGroupFilterStore.filter.value.takeIf { isNewRule }
         val showInitialTemplatePicker: Boolean = false
 
         private val _uiState = MutableStateFlow(RuleDetailUiState())
@@ -333,7 +398,7 @@ class RuleDetailViewModel
                             maxFileSizeMb = rule.maxFileSizeBytes?.let(::formatFileSizeMegabytes) ?: "",
                             minAgeDays = rule.minAgeDays?.toString() ?: "",
                             maxAgeDays = rule.maxAgeDays?.toString() ?: "",
-                            excludePatternsText = rule.excludePatterns.joinToString(", "),
+                            excludePatternsText = rule.excludePatterns.joinToString("\n"),
                             isExcludeRegexPattern = rule.isExcludeRegexPattern,
                             orientation = rule.orientation,
                             isLoading = false,
@@ -566,7 +631,79 @@ class RuleDetailViewModel
         // Advanced filter setters
         fun setFilenamePattern(pattern: String) = _uiState.update { it.copy(filenamePattern = pattern) }
 
-        fun setIsRegexPattern(isRegex: Boolean) = _uiState.update { it.copy(isRegexPattern = isRegex) }
+        /**
+         * Flips [box] between wildcards and RegEx, rewriting its patterns so the rule keeps matching
+         * exactly the same files: to RegEx always converts exactly ([convertPatternsToRegex]). To
+         * wildcards converts lines written in that shape back; when a line is a real RegEx with no
+         * wildcard form, the switch waits for the user instead ([PendingWildcardSwitch]).
+         */
+        fun togglePatternRegex(box: PatternBox) {
+            val state = _uiState.value
+            val text = state.patternText(box)
+            val folderPatterns = box == PatternBox.EXCLUDE
+            when {
+                text.isBlank() -> {
+                    applyPatternMode(box, text, isRegex = !state.isPatternRegex(box), notice = null)
+                }
+
+                !state.isPatternRegex(box) -> {
+                    val converted = convertPatternsToRegex(text, folderPatterns)
+                    applyPatternMode(box, converted, isRegex = true, notice = PatternConversionNotice(box, true, text, converted))
+                }
+
+                else -> {
+                    val conversion = convertPatternsToWildcards(text, folderPatterns)
+                    if (conversion.unconvertibleLines.isEmpty()) {
+                        applyPatternMode(
+                            box,
+                            conversion.text,
+                            isRegex = false,
+                            notice = PatternConversionNotice(box, false, text, conversion.text),
+                        )
+                    } else {
+                        _uiState.update {
+                            it.copy(pendingWildcardSwitch = PendingWildcardSwitch(box, text, conversion.text, conversion.unconvertibleLines))
+                        }
+                    }
+                }
+            }
+        }
+
+        /** Switches to wildcards anyway: convertible lines converted, the rest left as typed. */
+        fun confirmWildcardSwitch() {
+            val pending = _uiState.value.pendingWildcardSwitch ?: return
+            _uiState.update { it.copy(pendingWildcardSwitch = null) }
+            applyPatternMode(
+                pending.box,
+                pending.convertedText,
+                isRegex = false,
+                notice = PatternConversionNotice(pending.box, false, pending.previousText, pending.convertedText),
+            )
+        }
+
+        fun cancelWildcardSwitch() = _uiState.update { it.copy(pendingWildcardSwitch = null) }
+
+        fun undoPatternConversion(notice: PatternConversionNotice) {
+            val state = _uiState.value
+            if (state.patternText(notice.box) != notice.convertedText || state.isPatternRegex(notice.box) != notice.toRegex) return
+            applyPatternMode(notice.box, notice.previousText, isRegex = !notice.toRegex, notice = null)
+        }
+
+        fun dismissPatternConversionNotice(notice: PatternConversionNotice) {
+            _uiState.update { state -> if (state.patternConversionNotice == notice) state.copy(patternConversionNotice = null) else state }
+        }
+
+        private fun applyPatternMode(
+            box: PatternBox,
+            text: String,
+            isRegex: Boolean,
+            notice: PatternConversionNotice?,
+        ) = _uiState.update { state ->
+            when (box) {
+                PatternBox.INCLUDE -> state.copy(filenamePattern = text, isRegexPattern = isRegex)
+                PatternBox.EXCLUDE -> state.copy(excludePatternsText = text, isExcludeRegexPattern = isRegex)
+            }.copy(patternConversionNotice = notice)
+        }
 
         fun setMinFileSizeMb(value: String) = _uiState.update { it.copy(minFileSizeMb = value) }
 
@@ -577,8 +714,6 @@ class RuleDetailViewModel
         fun setMaxAgeDays(value: String) = _uiState.update { it.copy(maxAgeDays = value) }
 
         fun setExcludePatternsText(text: String) = _uiState.update { it.copy(excludePatternsText = text) }
-
-        fun setIsExcludeRegexPattern(isRegex: Boolean) = _uiState.update { it.copy(isExcludeRegexPattern = isRegex) }
 
         fun setOrientation(orientation: FileOrientation?) = _uiState.update { it.copy(orientation = orientation) }
 
@@ -714,8 +849,11 @@ class RuleDetailViewModel
                         return@launch
                     }
 
-                    val savedId = ruleRepository.saveRule(rule)
-                    val savedRule = rule.copy(id = savedId)
+                    // The editor has no group field: a new rule's group comes from the list it was created
+                    // from, and saveRule keeps the stored group on every later save.
+                    val ruleToSave = if (rule.id == 0L) rule.copy(groupName = newRuleGroupName()) else rule
+                    val savedId = ruleRepository.saveRule(ruleToSave)
+                    val savedRule = ruleToSave.copy(id = savedId)
 
                     if (savedRule.isEnabled && savedRule.schedule != null) {
                         scheduleRulesUseCase.scheduleRule(savedRule)
@@ -734,6 +872,17 @@ class RuleDetailViewModel
                     saveMutex.unlock()
                 }
             }
+
+        /**
+         * The group a new rule joins: the one the Rules list was filtered to when the rule was started,
+         * if that group still has rules - resolved exactly as the list resolves it, so a filter that
+         * has since fallen back to All (its last rule left the group) doesn't revive the old name.
+         */
+        private suspend fun newRuleGroupName(): String? {
+            val filter = newRuleGroupFilter as? RuleGroupFilter.Group ?: return null
+            val currentRules = ruleRepository.getAllRules().first()
+            return (filter.resolvedFor(currentRules) as? RuleGroupFilter.Group)?.name
+        }
 
         fun restoreRule() =
             viewModelScope.launch {
@@ -774,18 +923,15 @@ class RuleDetailViewModel
                 suppressMissingSourceFolderCardWarning = state.suppressMissingSourceFolderCardWarning,
                 icon = state.icon,
                 iconEmoji = state.iconEmoji?.takeIf { it.isNotBlank() },
-                filenamePattern = state.filenamePattern.takeIf { it.isNotBlank() },
+                // Stored tidied: one trimmed pattern per line, no blank lines.
+                filenamePattern = splitPatternLines(state.filenamePattern).joinToString("\n").takeIf { it.isNotEmpty() },
                 minFileSizeBytes =
                     parseFileSizeMegabytes(state.minFileSizeMb),
                 maxFileSizeBytes =
                     parseFileSizeMegabytes(state.maxFileSizeMb),
                 minAgeDays = state.minAgeDays.toIntOrNull()?.takeIf { it > 0 },
                 maxAgeDays = state.maxAgeDays.toIntOrNull()?.takeIf { it > 0 },
-                excludePatterns =
-                    state.excludePatternsText
-                        .split(",")
-                        .map { it.trim() }
-                        .filter { it.isNotBlank() },
+                excludePatterns = splitPatternLines(state.excludePatternsText),
                 orientation = if (appliesToImageAndVideoOnly(state.fileExtensions)) state.orientation else null,
                 isRegexPattern = state.isRegexPattern,
                 isExcludeRegexPattern = state.isExcludeRegexPattern,
