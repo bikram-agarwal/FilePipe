@@ -59,6 +59,7 @@ fun AppBottomSheet(
     containerColor: Color = BottomSheetDefaults.ContainerColor,
     contentColor: Color = contentColorFor(containerColor),
     subtitleContent: (@Composable () -> Unit)? = null,
+    titleLeading: (@Composable RowScope.() -> Unit)? = null,
     titleAccessory: (@Composable RowScope.() -> Unit)? = null,
     titleActions: (@Composable RowScope.() -> Unit)? = null,
     actions: (@Composable () -> Unit)? = null,
@@ -103,6 +104,7 @@ fun AppBottomSheet(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
+                            titleLeading?.invoke(this)
                             titleAccessory?.invoke(this)
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(

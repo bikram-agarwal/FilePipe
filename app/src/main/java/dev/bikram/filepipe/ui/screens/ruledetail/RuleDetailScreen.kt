@@ -648,6 +648,7 @@ fun RuleDetailScreen(
     val context = LocalContext.current
     val resources = LocalResources.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
+    val sdCardDisplayName = stringResource(R.string.filesystem_folder_picker_sd_card)
 
     var pendingFolderPick by remember { mutableStateOf<FolderPickIntent?>(null) }
     var pendingFilesystemFolderPick by remember { mutableStateOf<PendingFilesystemFolderPick?>(null) }
@@ -708,7 +709,7 @@ fun RuleDetailScreen(
     fun resolveFilesystemPickerStartDirectory(initialPath: String?): String {
         if (initialPath.isNullOrBlank()) return externalStorageRootPath()
         if (initialPath.startsWith("content://")) {
-            val pathFromSaf = runCatching { safTreeUriToPath(initialPath.toUri()) }.getOrNull()
+            val pathFromSaf = safTreeUriToPath(initialPath)
             val normalized = pathFromSaf?.let { normalizeFilesystemFolderPath(it) }
             return normalized?.takeIf { candidate ->
                 val folder = File(candidate)
@@ -1142,7 +1143,7 @@ fun RuleDetailScreen(
                                                 if (sourceNeedsAccess) {
                                                     append(folderAccessIssueEmojiPrefix(path, state.folderAccessMode))
                                                 }
-                                                append(displayPath(path, internalStorageDisplayName))
+                                                append(displayPath(path, internalStorageDisplayName, sdCardDisplayName))
                                             },
                                         style = MaterialTheme.typography.bodyMedium,
                                         color =
@@ -1255,7 +1256,7 @@ fun RuleDetailScreen(
                                             FilePipeDropdownMenuItem(
                                                 text = {
                                                     Text(
-                                                        text = displayPath(bookmarkPath, internalStorageDisplayName),
+                                                        text = displayPath(bookmarkPath, internalStorageDisplayName, sdCardDisplayName),
                                                         style = MaterialTheme.typography.bodyMedium,
                                                     )
                                                 },
@@ -1403,7 +1404,7 @@ fun RuleDetailScreen(
                                                     ),
                                                 )
                                             }
-                                            append(displayPath(state.destinationFolderPath, internalStorageDisplayName))
+                                            append(displayPath(state.destinationFolderPath, internalStorageDisplayName, sdCardDisplayName))
                                         },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color =
@@ -1511,7 +1512,7 @@ fun RuleDetailScreen(
                                             FilePipeDropdownMenuItem(
                                                 text = {
                                                     Text(
-                                                        text = displayPath(bookmarkPath, internalStorageDisplayName),
+                                                        text = displayPath(bookmarkPath, internalStorageDisplayName, sdCardDisplayName),
                                                         style = MaterialTheme.typography.bodyMedium,
                                                     )
                                                 },
@@ -2788,6 +2789,7 @@ fun RuleDetailScreen(
                                     sourcePath = file.sourcePath,
                                     fileName = file.fileName,
                                     internalStorageRootDisplayName = internalStorageDisplayName,
+                                    sdCardRootDisplayName = sdCardDisplayName,
                                 )
                             }
                         LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -2842,7 +2844,11 @@ fun RuleDetailScreen(
                                                         text =
                                                             stringResource(
                                                                 R.string.preview_destination_path,
-                                                                displayPath(file.simulatedDestPath, internalStorageDisplayName),
+                                                                displayPath(
+                                                                    file.simulatedDestPath,
+                                                                    internalStorageDisplayName,
+                                                                    sdCardDisplayName,
+                                                                ),
                                                             ),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,

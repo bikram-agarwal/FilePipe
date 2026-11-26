@@ -202,6 +202,7 @@ fun RulesScreen(
     var groupPickerTarget by remember { mutableStateOf<RuleGroupPickerTarget?>(null) }
     val snackbarHostState = LocalSnackbarHostState.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
+    val sdCardDisplayName = stringResource(R.string.filesystem_folder_picker_sd_card)
     val hasSelection = selectedRuleIds.isNotEmpty()
     val lazyListState = rememberLazyListState()
     val density = LocalDensity.current
@@ -878,7 +879,7 @@ fun RulesScreen(
                 } else {
                     val sheetRun = preview.run
                     val groupedPreview =
-                        remember(preview.ruleGroups, internalStorageDisplayName) {
+                        remember(preview.ruleGroups, internalStorageDisplayName, sdCardDisplayName) {
                             preview.ruleGroups.map { ruleGroup ->
                                 ruleGroup to
                                     ruleGroup.results.groupBy { result ->
@@ -886,6 +887,7 @@ fun RulesScreen(
                                             sourcePath = result.sourcePath,
                                             fileName = result.fileName,
                                             internalStorageRootDisplayName = internalStorageDisplayName,
+                                            sdCardRootDisplayName = sdCardDisplayName,
                                         )
                                     }
                             }
@@ -1061,7 +1063,11 @@ fun RulesScreen(
                                                         text =
                                                             stringResource(
                                                                 R.string.preview_destination_path,
-                                                                displayPath(result.simulatedDestPath, internalStorageDisplayName),
+                                                                displayPath(
+                                                                    result.simulatedDestPath,
+                                                                    internalStorageDisplayName,
+                                                                    sdCardDisplayName,
+                                                                ),
                                                             ),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,

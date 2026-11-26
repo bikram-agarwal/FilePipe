@@ -2,8 +2,6 @@ package dev.bikram.filepipe.ui.screens.ruledetail
 
 import android.content.Context
 import android.os.Environment
-import android.provider.DocumentsContract
-import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,6 +19,7 @@ import dev.bikram.filepipe.data.repository.firstInvalidFilenameRegexLine
 import dev.bikram.filepipe.data.repository.splitPatternLines
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathAllowedForRules
+import dev.bikram.filepipe.data.storage.isSafOrFilesystemChildFolder
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.data.storage.primaryDownloadsDirectoryPath
 import dev.bikram.filepipe.data.storage.primaryScreenshotsDirectoryPath
@@ -460,30 +459,9 @@ class RuleDetailViewModel
         private fun removeRedundantPaths(paths: List<String>): Pair<List<String>, List<String>> {
             val toRemove =
                 paths.filter { child ->
-                    paths.any { parent -> parent != child && isChildFolder(child, parent) }
+                    paths.any { parent -> parent != child && isSafOrFilesystemChildFolder(child, parent) }
                 }
             return (paths - toRemove.toSet()) to toRemove
-        }
-
-        private fun isChildFolder(
-            child: String,
-            parent: String,
-        ): Boolean {
-            if (child.startsWith("content://") && parent.startsWith("content://")) {
-                return try {
-                    val childId = DocumentsContract.getTreeDocumentId(child.toUri())
-                    val parentId = DocumentsContract.getTreeDocumentId(parent.toUri())
-                    val childVolume = childId.substringBefore(":")
-                    val parentVolume = parentId.substringBefore(":")
-                    if (childVolume != parentVolume) return false
-                    val childPath = childId.substringAfter(":", "")
-                    val parentPath = parentId.substringAfter(":", "")
-                    parentPath.isNotEmpty() && childPath.startsWith("$parentPath/")
-                } catch (_: Exception) {
-                    false
-                }
-            }
-            return child.startsWith("$parent/")
         }
 
         fun addSourceFolder(path: String) {

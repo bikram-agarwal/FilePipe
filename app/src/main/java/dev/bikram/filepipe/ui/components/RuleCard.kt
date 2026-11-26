@@ -327,6 +327,7 @@ private fun CompactContent(
     showOperationalControls: Boolean = true,
 ) {
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
+    val sdCardDisplayName = stringResource(R.string.filesystem_folder_picker_sd_card)
     val activeProgress = progress?.takeUnless { progressValue -> progressValue.isComplete }
 
     val allFilesLabel = stringResource(R.string.file_type_all_files)
@@ -337,7 +338,9 @@ private fun CompactContent(
             .map { formatExtensionLabel(it, allFilesLabel, noExtensionLabel) }
             .joinToString(" · ") +
             if (rule.fileExtensions.size > 4) " +${rule.fileExtensions.size - 4}" else ""
-    val destText = displayPath(rule.destinationFolderPath, internalStorageDisplayName).takeIf { it.isNotBlank() } ?: ""
+    val destText =
+        displayPath(rule.destinationFolderPath, internalStorageDisplayName, sdCardDisplayName)
+            .takeIf { it.isNotBlank() } ?: ""
     val infoText =
         listOfNotNull(
             typesText.takeIf { it.isNotBlank() },
@@ -547,6 +550,7 @@ private fun ExpandedContent(
     showOperationalControls: Boolean = true,
 ) {
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
+    val sdCardDisplayName = stringResource(R.string.filesystem_folder_picker_sd_card)
     val allFilesLabel = stringResource(R.string.file_type_all_files)
     val noExtensionLabel = stringResource(R.string.file_type_no_extension)
     val hasConflicts = remember(rule) { RuleConflictDetector.detectConflicts(rule).isNotEmpty() }
@@ -703,7 +707,9 @@ private fun ExpandedContent(
                     if (rule.sourceFolderPaths.isEmpty()) {
                         listOf(stringResource(R.string.rule_card_from_none))
                     } else {
-                        rule.sourceFolderPaths.map { path -> displayPath(path, internalStorageDisplayName) }
+                        rule.sourceFolderPaths.map { path ->
+                            displayPath(path, internalStorageDisplayName, sdCardDisplayName)
+                        }
                     }
                 val operationIconName =
                     when (rule.operationMode) {
@@ -734,7 +740,7 @@ private fun ExpandedContent(
                                 if (rule.destinationFolderPath.isEmpty()) {
                                     notSet
                                 } else {
-                                    displayPath(rule.destinationFolderPath, internalStorageDisplayName)
+                                    displayPath(rule.destinationFolderPath, internalStorageDisplayName, sdCardDisplayName)
                                 },
                             ),
                         leadingIconName = operationIconName,

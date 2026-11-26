@@ -596,6 +596,7 @@ private fun FileMovedCard(
 ) {
     val context = LocalContext.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
+    val sdCardDisplayName = stringResource(R.string.filesystem_folder_picker_sd_card)
     val isSuccess = file.success && !file.skipped
     val isFileUndoable = file.isUndoCandidate
     val showSelectionCheckbox = isUndoSelectionMode && isFileUndoable
@@ -690,7 +691,7 @@ private fun FileMovedCard(
                 Text(
                     stringResource(
                         R.string.history_detail_source_path,
-                        folderDisplayPath(file.sourceUri, internalStorageDisplayName),
+                        folderDisplayPath(file.sourceUri, internalStorageDisplayName, sdCardDisplayName),
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -701,7 +702,7 @@ private fun FileMovedCard(
                     Text(
                         stringResource(
                             R.string.preview_destination_path,
-                            folderDisplayPath(file.destinationUri, internalStorageDisplayName),
+                            folderDisplayPath(file.destinationUri, internalStorageDisplayName, sdCardDisplayName),
                         ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1176,8 +1177,9 @@ private fun calculateSampleSize(
 private fun folderDisplayPath(
     uriString: String,
     internalStorageRootDisplayName: String,
+    sdCardRootDisplayName: String,
 ): String {
-    val full = displayPath(uriString, internalStorageRootDisplayName)
+    val full = displayPath(uriString, internalStorageRootDisplayName, sdCardRootDisplayName)
     return full.substringBeforeLast('/', missingDelimiterValue = full)
 }
 

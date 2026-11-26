@@ -60,10 +60,11 @@ internal fun BackupSection(
     val context = LocalContext.current
     val resources = LocalResources.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
+    val sdCardDisplayName = stringResource(R.string.filesystem_folder_picker_sd_card)
     val localFolderLabel =
         preferences.exportFolderUri
             .takeIf { it.isNotBlank() }
-            ?.let { displayPath(it, internalStorageDisplayName) }
+            ?.let { displayPath(it, internalStorageDisplayName, sdCardDisplayName) }
             ?: stringResource(R.string.settings_choose_local_backup_folder)
     val cloudFolderLabel =
         preferences.cloudExportFolderUri

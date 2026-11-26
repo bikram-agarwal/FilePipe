@@ -1,8 +1,6 @@
 package dev.bikram.filepipe.data.storage
 
 import android.os.Environment
-import android.provider.DocumentsContract
-import androidx.core.net.toUri
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.usesAllFilesPaths
 import java.io.File
@@ -78,15 +76,15 @@ fun isFilesystemPathPrimarySharedStorageRoot(rawPath: String): Boolean {
 }
 
 /**
- * True when [treeUriString] is a SAF tree for the primary volume root (`primary:` with no path segment).
+ * True when [treeUriString] is an external-storage SAF tree for the primary volume root (`primary:` with no path segment).
  */
 fun isSafTreeUriPrimarySharedStorageRoot(treeUriString: String): Boolean {
-    if (!treeUriString.startsWith("content://")) return false
-    val treeDocumentId =
-        runCatching {
-            DocumentsContract.getTreeDocumentId(treeUriString.toUri())
-        }.getOrNull() ?: return false
-    if (!treeDocumentId.startsWith("primary", ignoreCase = true)) return false
+    val parsed = parseSafUri(treeUriString) ?: return false
+    if (!parsed.isExternalStorageProvider) return false
+    val treeDocumentId = parsed.treeDocumentId ?: return false
+    if (!treeDocumentId.startsWith("primary:", ignoreCase = true) && !treeDocumentId.equals("primary", ignoreCase = true)) {
+        return false
+    }
     val relative = treeDocumentId.substringAfter(":", "").trim().trimEnd('/')
     return relative.isEmpty()
 }
@@ -122,16 +120,18 @@ fun isPublicDownloadsDirectoryOnUserAccessibleVolume(rawPath: String): Boolean {
 }
 
 /**
- * True when [treeUriString] is a SAF tree whose document id is the volume's `Download` root (e.g. `primary:Download`).
+ * True when [treeUriString] is an external-storage SAF tree whose document id is the volume's `Download` root (e.g. `primary:Download`).
  */
 fun isSafTreeUriPublicDownloadRoot(treeUriString: String): Boolean {
-    if (!treeUriString.startsWith("content://")) return false
-    val treeDocumentId =
-        runCatching {
-            DocumentsContract.getTreeDocumentId(treeUriString.toUri())
-        }.getOrNull() ?: return false
+    val parsed = parseSafUri(treeUriString) ?: return false
+    if (!parsed.isExternalStorageProvider) return false
+    val treeDocumentId = parsed.treeDocumentId ?: return false
     val colonIndex = treeDocumentId.indexOf(':')
     if (colonIndex < 0) return false
+    val volume = treeDocumentId.substring(0, colonIndex)
+    if (!volume.equals("primary", ignoreCase = true) && !removableStorageVolumeIdRegex.matches(volume)) {
+        return false
+    }
     val relative = treeDocumentId.substring(colonIndex + 1).trim().trimEnd('/')
     return relative.equals("Download", ignoreCase = true)
 }

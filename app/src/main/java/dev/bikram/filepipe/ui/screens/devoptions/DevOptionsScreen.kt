@@ -303,6 +303,7 @@ fun DevOptionsScreen(
                         DevSafAccessGrantSection(
                             folderAccess = state.folderAccess,
                             internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage),
+                            sdCardDisplayName = stringResource(R.string.filesystem_folder_picker_sd_card),
                             collapsed = safAccessGrantsCollapsed,
                             onToggleCollapsed = {
                                 safAccessGrantsCollapsed = !safAccessGrantsCollapsed
@@ -744,6 +745,7 @@ private fun DevInfoCard(
 private fun DevSafAccessGrantSection(
     folderAccess: DevFolderAccessUiState,
     internalStorageDisplayName: String,
+    sdCardDisplayName: String,
     collapsed: Boolean,
     onToggleCollapsed: () -> Unit,
 ) {
@@ -761,12 +763,14 @@ private fun DevSafAccessGrantSection(
                     DevRuleAccessCard(
                         ruleAccess = ruleAccess,
                         internalStorageDisplayName = internalStorageDisplayName,
+                        sdCardDisplayName = sdCardDisplayName,
                     )
                 }
                 if (folderAccess.unassociatedGrants.isNotEmpty()) {
                     DevUnassociatedSafGrantsCard(
                         grants = folderAccess.unassociatedGrants,
                         internalStorageDisplayName = internalStorageDisplayName,
+                        sdCardDisplayName = sdCardDisplayName,
                     )
                 }
             }
@@ -795,6 +799,7 @@ private fun DevFolderAccessEmptyCard() {
 private fun DevRuleAccessCard(
     ruleAccess: DevRuleAccessUiItem,
     internalStorageDisplayName: String,
+    sdCardDisplayName: String,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -838,6 +843,7 @@ private fun DevRuleAccessCard(
                     DevFolderAccessRow(
                         folderAccess = folderAccess,
                         internalStorageDisplayName = internalStorageDisplayName,
+                        sdCardDisplayName = sdCardDisplayName,
                     )
                 }
             }
@@ -849,6 +855,7 @@ private fun DevRuleAccessCard(
 private fun DevUnassociatedSafGrantsCard(
     grants: List<DevRuleFolderAccessUiItem>,
     internalStorageDisplayName: String,
+    sdCardDisplayName: String,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -883,6 +890,7 @@ private fun DevUnassociatedSafGrantsCard(
                 DevFolderAccessRow(
                     folderAccess = grant,
                     internalStorageDisplayName = internalStorageDisplayName,
+                    sdCardDisplayName = sdCardDisplayName,
                 )
             }
         }
@@ -893,6 +901,7 @@ private fun DevUnassociatedSafGrantsCard(
 private fun DevFolderAccessRow(
     folderAccess: DevRuleFolderAccessUiItem,
     internalStorageDisplayName: String,
+    sdCardDisplayName: String,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -921,7 +930,7 @@ private fun DevFolderAccessRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = displayPath(folderAccess.uri, internalStorageDisplayName),
+                        text = displayPath(folderAccess.uri, internalStorageDisplayName, sdCardDisplayName),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium,

@@ -114,7 +114,11 @@ internal fun backupDestinationDisplayLabel(
         } else {
             relativeTreePath?.takeIf { it.isNotBlank() }
                 ?: documentName?.takeIf { it.isNotBlank() }
-        } ?: displayPath(uriString, internalStorageRootDisplayName)
+        } ?: displayPath(
+            uriString,
+            internalStorageRootDisplayName,
+            context.getString(R.string.filesystem_folder_picker_sd_card),
+        )
     return if (providerName != null && !folderLabel.equals(providerName, ignoreCase = true)) {
         context.getString(R.string.cloud_provider_folder_path, providerName, folderLabel)
     } else {
